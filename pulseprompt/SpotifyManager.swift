@@ -260,7 +260,11 @@ class SpotifyManager: NSObject, ObservableObject {
             appRemote.connect()
         }
         
-        // Wait for connection and then check if successful
+        // Wait for connection and then check if successful. Even if AppRemote
+        // is not connected, when a playlistID was provided we already asked the
+        // Spotify app to start playback via authorizeAndPlayURI. In that case,
+        // treat activation as successful to avoid re-starting the playlist via
+        // fallback a few seconds later.
         DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
             self.isDeviceActivating = false
             if appRemote.isConnected {
@@ -273,10 +277,18 @@ class SpotifyManager: NSObject, ObservableObject {
                 print("✅ Device activation successful - ready for training playlist control")
                 completion(true)
             } else {
-                print("ℹ️ AppRemote connection not established - using Web API for playlist control")
-                // Mark as completed to avoid retries, Web API should work
                 self.deviceActivationCompleted = true
-                completion(false)
+                if playlistID != nil {
+                    // Playback was likely started by Spotify app already; proceed
+                    print("ℹ️ AppRemote not connected yet, but training playlist should be playing. Proceeding without remote control.")
+                    self.isPlaying = true
+                    self.currentTrack = "Training Playlist"
+                    completion(true)
+                } else {
+                    print("ℹ️ AppRemote connection not established - using Web API for playlist control")
+                    // No playlist was requested during activation; allow caller to fallback
+                    completion(false)
+                }
             }
         }
     }
