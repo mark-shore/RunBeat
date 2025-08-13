@@ -20,9 +20,16 @@ class VO2MaxTrainingManager: ObservableObject {
     
     private var timer: Timer?
     private var spotifyManager = SpotifyManager.shared
-    private var phaseStartTime: Date?
-    private var currentPhaseDuration: TimeInterval = 0
+    private struct IntervalState {
+        var phase: TrainingPhase
+        var start: Date
+        var duration: TimeInterval
+    }
+
+    private var intervalState: IntervalState?
     private var pausedAt: Date?
+    private var lastIssuedCommandInterval: Int?
+    private var timeProvider: TimeProvider = SystemTimeProvider()
     
     enum TrainingPhase {
         case notStarted
@@ -43,11 +50,11 @@ class VO2MaxTrainingManager: ObservableObject {
         isTraining = true
         currentInterval = 1
         currentPhase = .highIntensity
-        currentPhaseDuration = highIntensityDuration
-        phaseStartTime = Date()
-        timeRemaining = currentPhaseDuration
+        intervalState = IntervalState(phase: .highIntensity, start: timeProvider.now(), duration: highIntensityDuration)
+        timeRemaining = highIntensityDuration
 
-        // Start timer immediately for responsive UI (foreground only)
+        // Reset switch guard and start timer immediately for responsive UI (foreground only)
+        lastIssuedCommandInterval = nil
         startTimer()
         
         // Activate device and start music in parallel (non-blocking)
@@ -69,15 +76,16 @@ class VO2MaxTrainingManager: ObservableObject {
         timer?.invalidate()
         timer = nil
         isPaused = true
-        pausedAt = Date()
+        pausedAt = timeProvider.now()
         spotifyManager.pause()
     }
     
     func resumeTraining() {
         isPaused = false
-        if let pausedAt = pausedAt, let start = phaseStartTime {
-            let delta = Date().timeIntervalSince(pausedAt)
-            phaseStartTime = start.addingTimeInterval(delta)
+        if let pausedAt = pausedAt, var state = intervalState {
+            let delta = timeProvider.now().timeIntervalSince(pausedAt)
+            state.start = state.start.addingTimeInterval(delta)
+            intervalState = state
             self.pausedAt = nil
         }
         startTimer()
@@ -120,24 +128,22 @@ class VO2MaxTrainingManager: ObservableObject {
         
         if isHighIntensity {
             currentPhase = .highIntensity
-            currentPhaseDuration = highIntensityDuration
-            phaseStartTime = Date()
-            timeRemaining = currentPhaseDuration
+            intervalState = IntervalState(phase: .highIntensity, start: timeProvider.now(), duration: highIntensityDuration)
+            timeRemaining = highIntensityDuration
             
             // Skip playing playlist for first interval since it should already be playing from device activation
             if currentInterval == 1 {
                 print("First high intensity interval - playlist should already be playing from device activation")
             } else {
                 print("High intensity interval - attempting to play playlist...")
-                spotifyManager.playHighIntensityPlaylist()
+                switchPlaylistIfNeeded(for: .highIntensity)
             }
         } else {
             currentPhase = .rest
-            currentPhaseDuration = restDuration
-            phaseStartTime = Date()
-            timeRemaining = currentPhaseDuration
+            intervalState = IntervalState(phase: .rest, start: timeProvider.now(), duration: restDuration)
+            timeRemaining = restDuration
             print("Rest interval - attempting to play playlist...")
-            spotifyManager.playRestPlaylist()
+            switchPlaylistIfNeeded(for: .rest)
         }
         
         startTimer()
@@ -151,13 +157,13 @@ class VO2MaxTrainingManager: ObservableObject {
     }
     
     private func updateTimer() {
-        updateTimerUsingWallClock(now: Date())
+        updateTimerUsingWallClock(now: timeProvider.now())
     }
 
     private func updateTimerUsingWallClock(now: Date) {
-        guard isTraining, !isPaused, let start = phaseStartTime else { return }
-        let elapsed = max(0, now.timeIntervalSince(start))
-        let remaining = max(0, currentPhaseDuration - elapsed)
+        guard isTraining, !isPaused, let state = intervalState else { return }
+        let elapsed = max(0, now.timeIntervalSince(state.start))
+        let remaining = max(0, state.duration - elapsed)
         // Display rounds down, but phase change uses exact remaining to avoid extra 1s of delay
         timeRemaining = floor(remaining)
         print("⏱️ VO2 tick - phase: \(currentPhase) interval: \(currentInterval) elapsed: \(Int(elapsed))s remaining: \(Int(remaining))s")
@@ -172,6 +178,19 @@ class VO2MaxTrainingManager: ObservableObject {
     // Public tick for background event drivers (e.g., HR updates)
     func tick(now: Date = Date()) {
         updateTimerUsingWallClock(now: now)
+    }
+
+    private func switchPlaylistIfNeeded(for phase: TrainingPhase) {
+        guard lastIssuedCommandInterval != currentInterval else { return }
+        lastIssuedCommandInterval = currentInterval
+        switch phase {
+        case .highIntensity:
+            spotifyManager.playHighIntensityPlaylist()
+        case .rest:
+            spotifyManager.playRestPlaylist()
+        default:
+            break
+        }
     }
     
     private func completeTraining() {
