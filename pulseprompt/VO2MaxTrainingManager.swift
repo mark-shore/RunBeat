@@ -16,7 +16,7 @@ class VO2MaxTrainingManager: ObservableObject {
     @Published var currentPhase: TrainingPhase = .notStarted
     @Published var timeRemaining: TimeInterval = 0
     @Published var currentInterval = 0
-    @Published var totalIntervals = 8 // 4 high-intensity + 4 rest intervals
+    @Published var totalIntervals = VO2Config.totalIntervals
     
     private var timer: Timer?
     private var spotifyManager = SpotifyManager.shared
@@ -38,8 +38,8 @@ class VO2MaxTrainingManager: ObservableObject {
         case completed
     }
     
-    private let highIntensityDuration: TimeInterval = 4 * 60 // 4 minutes
-    private let restDuration: TimeInterval = 3 * 60 // 3 minutes
+    private let highIntensityDuration: TimeInterval = VO2Config.highIntensityDuration
+    private let restDuration: TimeInterval = VO2Config.restDuration
     
     private init() {}
     
