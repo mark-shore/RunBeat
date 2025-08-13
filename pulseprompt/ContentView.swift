@@ -150,6 +150,7 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingVO2MaxTraining) {
                 VO2MaxTrainingView()
+                    .environmentObject(appState)
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())

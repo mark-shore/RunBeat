@@ -1,4 +1,5 @@
 import Foundation
+import NotificationCenter
 import AVFoundation
 
 class AppState: ObservableObject {
@@ -51,6 +52,7 @@ class AppState: ObservableObject {
 
         hrManager.onNewHeartRate = { [weak self] bpm in
             self?.handle(bpm: bpm)
+            VO2MaxTrainingManager.shared.tick(now: Date())
         }
         
         announcer.onAnnouncementFinished = { [weak self] in

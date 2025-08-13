@@ -20,6 +20,9 @@ class VO2MaxTrainingManager: ObservableObject {
     
     private var timer: Timer?
     private var spotifyManager = SpotifyManager.shared
+    private var phaseStartTime: Date?
+    private var currentPhaseDuration: TimeInterval = 0
+    private var pausedAt: Date?
     
     enum TrainingPhase {
         case notStarted
@@ -40,23 +43,25 @@ class VO2MaxTrainingManager: ObservableObject {
         isTraining = true
         currentInterval = 1
         currentPhase = .highIntensity
-        timeRemaining = highIntensityDuration
-        
-        // Start timer immediately for responsive UX
+        currentPhaseDuration = highIntensityDuration
+        phaseStartTime = Date()
+        timeRemaining = currentPhaseDuration
+
+        // Start timer immediately for responsive UI (foreground only)
         startTimer()
         
         // Activate device and start music in parallel (non-blocking)
-        if spotifyManager.isConnected {
-            let firstPlaylistID = ConfigurationManager.shared.spotifyHighIntensityPlaylistID
-            spotifyManager.activateDeviceForTraining(playlistID: firstPlaylistID) { success in
-                if success {
-                    print("✅ Training music started during first interval")
-                } else {
-                    print("ℹ️ Using fallback music control during first interval")
+        // Always attempt activation; this will authorize if needed and start playback.
+        let firstPlaylistID = ConfigurationManager.shared.spotifyHighIntensityPlaylistID
+        spotifyManager.activateDeviceForTraining(playlistID: firstPlaylistID) { [weak self] success in
+            if success {
+                print("✅ Training music started during first interval")
+            } else {
+                print("ℹ️ Using fallback music control during first interval")
+                DispatchQueue.main.async {
+                    self?.spotifyManager.playHighIntensityPlaylist()
                 }
             }
-        } else {
-            print("No Spotify connected - starting silent training")
         }
     }
     
@@ -64,11 +69,17 @@ class VO2MaxTrainingManager: ObservableObject {
         timer?.invalidate()
         timer = nil
         isPaused = true
+        pausedAt = Date()
         spotifyManager.pause()
     }
     
     func resumeTraining() {
         isPaused = false
+        if let pausedAt = pausedAt, let start = phaseStartTime {
+            let delta = Date().timeIntervalSince(pausedAt)
+            phaseStartTime = start.addingTimeInterval(delta)
+            self.pausedAt = nil
+        }
         startTimer()
         // Robust resume: if AppRemote/Web API resume fails due to device not active,
         // explicitly start the expected playlist for the current phase.
@@ -109,7 +120,9 @@ class VO2MaxTrainingManager: ObservableObject {
         
         if isHighIntensity {
             currentPhase = .highIntensity
-            timeRemaining = highIntensityDuration
+            currentPhaseDuration = highIntensityDuration
+            phaseStartTime = Date()
+            timeRemaining = currentPhaseDuration
             
             // Skip playing playlist for first interval since it should already be playing from device activation
             if currentInterval == 1 {
@@ -120,7 +133,9 @@ class VO2MaxTrainingManager: ObservableObject {
             }
         } else {
             currentPhase = .rest
-            timeRemaining = restDuration
+            currentPhaseDuration = restDuration
+            phaseStartTime = Date()
+            timeRemaining = currentPhaseDuration
             print("Rest interval - attempting to play playlist...")
             spotifyManager.playRestPlaylist()
         }
@@ -136,13 +151,27 @@ class VO2MaxTrainingManager: ObservableObject {
     }
     
     private func updateTimer() {
-        if timeRemaining > 0 {
-            timeRemaining -= 1
-        } else {
-            // Current interval completed
+        updateTimerUsingWallClock(now: Date())
+    }
+
+    private func updateTimerUsingWallClock(now: Date) {
+        guard isTraining, !isPaused, let start = phaseStartTime else { return }
+        let elapsed = max(0, now.timeIntervalSince(start))
+        let remaining = max(0, currentPhaseDuration - elapsed)
+        // Display rounds down, but phase change uses exact remaining to avoid extra 1s of delay
+        timeRemaining = floor(remaining)
+        print("⏱️ VO2 tick - phase: \(currentPhase) interval: \(currentInterval) elapsed: \(Int(elapsed))s remaining: \(Int(remaining))s")
+
+        if remaining <= 0 {
             currentInterval += 1
+            print("🚦 VO2 boundary reached → advancing to interval \(currentInterval)")
             startNextInterval()
         }
+    }
+
+    // Public tick for background event drivers (e.g., HR updates)
+    func tick(now: Date = Date()) {
+        updateTimerUsingWallClock(now: now)
     }
     
     private func completeTraining() {

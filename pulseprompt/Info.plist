@@ -23,5 +23,9 @@
 		<string>spotify</string>
 		<string>spotify-action</string>
 	</array>
+	<key>NSHealthShareUsageDescription</key>
+	<string>This app logs your workouts and reads heart rate to keep timers running in the background.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>This app writes workout summaries for your training sessions.</string>
 </dict>
 </plist>

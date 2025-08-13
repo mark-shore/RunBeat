@@ -10,7 +10,9 @@ import SwiftUI
 struct VO2MaxTrainingView: View {
     @StateObject private var trainingManager = VO2MaxTrainingManager.shared
     @StateObject private var spotifyManager = SpotifyManager.shared
+    @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
+    @State private var startedHRSession = false
     
     var body: some View {
         NavigationView {
@@ -118,6 +120,10 @@ struct VO2MaxTrainingView: View {
                             // Stop button
                             Button(action: {
                                 trainingManager.stopTraining()
+                                if startedHRSession {
+                                    appState.stopSession()
+                                    startedHRSession = false
+                                }
                             }) {
                                 Image(systemName: "stop.fill")
                                     .font(.title2)
@@ -135,6 +141,10 @@ struct VO2MaxTrainingView: View {
                                 .controlSize(.large)
                             } else {
                                 Button("Start Training") {
+                                    if !appState.isSessionActive {
+                                        appState.startSession()
+                                        startedHRSession = true
+                                    }
                                     trainingManager.startTraining()
                                 }
                                 .buttonStyle(.borderedProminent)

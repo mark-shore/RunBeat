@@ -369,6 +369,25 @@ class SpotifyManager: NSObject, ObservableObject {
         }
         
         print("Attempting to play high intensity playlist...")
+        let isBackground = UIApplication.shared.applicationState != .active
+        if isBackground, let accessToken = accessToken {
+            // Force Web API path in background and ensure we have time to finish
+            var bgTask: UIBackgroundTaskIdentifier = .invalid
+            bgTask = UIApplication.shared.beginBackgroundTask(withName: "PlayHighIntensityBG") { 
+                UIApplication.shared.endBackgroundTask(bgTask)
+                bgTask = .invalid
+            }
+            activateIPhoneDeviceForPlayback { [weak self] success in
+                guard let self = self else { return }
+                if success {
+                    self.playHighIntensityPlaylistViaWebAPI(playlistID: playlistID, accessToken: accessToken)
+                } else {
+                    print("Background: Could not activate device; skipping URL scheme (not allowed in background)")
+                }
+                UIApplication.shared.endBackgroundTask(bgTask)
+            }
+            return
+        }
         
         // Check if this playlist might already be playing from device activation
         if deviceActivationCompleted && isPlaying && currentTrack.contains("Training Playlist") {
@@ -654,6 +673,24 @@ class SpotifyManager: NSObject, ObservableObject {
         }
         
         print("Attempting to play rest playlist...")
+        let isBackground = UIApplication.shared.applicationState != .active
+        if isBackground, let accessToken = accessToken {
+            var bgTask: UIBackgroundTaskIdentifier = .invalid
+            bgTask = UIApplication.shared.beginBackgroundTask(withName: "PlayRestBG") { 
+                UIApplication.shared.endBackgroundTask(bgTask)
+                bgTask = .invalid
+            }
+            activateIPhoneDeviceForPlayback { [weak self] success in
+                guard let self = self else { return }
+                if success {
+                    self.playRestPlaylistViaWebAPI(playlistID: playlistID, accessToken: accessToken)
+                } else {
+                    print("Background: Could not activate device; skipping URL scheme (not allowed in background)")
+                }
+                UIApplication.shared.endBackgroundTask(bgTask)
+            }
+            return
+        }
         
         // Try AppRemote first if connected
         if isConnected, let appRemote = appRemote, appRemote.isConnected {

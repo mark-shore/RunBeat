@@ -18,7 +18,8 @@ class HeartRateManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
             CBCentralManagerOptionRestoreIdentifierKey: "PulsePromptCentralManager",
             CBCentralManagerOptionShowPowerAlertKey: true
         ]
-        centralManager = CBCentralManager(delegate: self, queue: nil, options: options)
+        let bleQueue = DispatchQueue(label: "com.pulseprompt.ble", qos: .userInitiated)
+        centralManager = CBCentralManager(delegate: self, queue: bleQueue, options: options)
     }
     
     func startMonitoring() {
