@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var appState = AppState()
+    @StateObject private var appVM = AppViewModel()
     @State private var showingSettings = false
     @State private var showingVO2MaxTraining = false
     
@@ -27,19 +27,19 @@ struct ContentView: View {
                     // Session button section
                     VStack(spacing: 24) {
                         Button(action: {
-                            if appState.isSessionActive {
-                                appState.stopSession()
+                            if appVM.isSessionActive {
+                                appVM.stopSession()
                             } else {
-                                appState.startSession()
+                                appVM.startSession()
                             }
                         }) {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(appState.isSessionActive ? "Training Session Active" : "Start Training Session")
+                                    Text(appVM.isSessionActive ? "Training Session Active" : "Start Training Session")
                                         .font(.system(size: 18, weight: .semibold))
                                         .foregroundColor(.white)
                                     
-                                    Text(appState.isSessionActive ? "Tap to stop monitoring" : "Heart rate monitoring & zone announcements")
+                                    Text(appVM.isSessionActive ? "Tap to stop monitoring" : "Heart rate monitoring & zone announcements")
                                         .font(.system(size: 14, weight: .regular))
                                         .foregroundColor(.gray)
                                 }
@@ -49,10 +49,10 @@ struct ContentView: View {
                                 // Session status icon
                                 ZStack {
                                     Circle()
-                                        .fill(appState.isSessionActive ? Color.red : Color.green)
+                                        .fill(appVM.isSessionActive ? Color.red : Color.green)
                                         .frame(width: 50, height: 50)
                                     
-                                    Image(systemName: appState.isSessionActive ? "stop.fill" : "play.fill")
+                                    Image(systemName: appVM.isSessionActive ? "stop.fill" : "play.fill")
                                         .font(.system(size: 20, weight: .bold))
                                         .foregroundColor(.white)
                                 }
@@ -61,11 +61,11 @@ struct ContentView: View {
                             .padding(.vertical, 20)
                             .background(
                                 RoundedRectangle(cornerRadius: 16)
-                                    .fill(appState.isSessionActive ? Color.red.opacity(0.1) : Color.green.opacity(0.1))
+                                    .fill(appVM.isSessionActive ? Color.red.opacity(0.1) : Color.green.opacity(0.1))
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16)
-                                    .stroke(appState.isSessionActive ? Color.red.opacity(0.3) : Color.green.opacity(0.3), lineWidth: 2)
+                                    .stroke(appVM.isSessionActive ? Color.red.opacity(0.3) : Color.green.opacity(0.3), lineWidth: 2)
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -118,13 +118,13 @@ struct ContentView: View {
                     // Status indicator
                     VStack(spacing: 8) {
                         Circle()
-                            .fill(appState.isSessionActive ? Color.green : Color.gray.opacity(0.3))
+                            .fill(appVM.isSessionActive ? Color.green : Color.gray.opacity(0.3))
                             .frame(width: 12, height: 12)
-                            .animation(.easeInOut(duration: 0.3), value: appState.isSessionActive)
+                            .animation(.easeInOut(duration: 0.3), value: appVM.isSessionActive)
                         
-                        Text(appState.isSessionActive ? "SESSION ACTIVE" : "READY TO START")
+                        Text(appVM.isSessionActive ? "SESSION ACTIVE" : "READY TO START")
                             .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(appState.isSessionActive ? .green : .gray)
+                            .foregroundColor(appVM.isSessionActive ? .green : .gray)
                             .tracking(1)
                     }
                     .padding(.bottom, 60)
@@ -145,12 +145,12 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingSettings) {
                 NavigationView {
-                    SettingsView(appState: appState)
+                    SettingsView(appState: appVM.appState)
                 }
             }
             .sheet(isPresented: $showingVO2MaxTraining) {
                 VO2MaxTrainingView()
-                    .environmentObject(appState)
+                    .environmentObject(appVM.appState)
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
