@@ -43,7 +43,6 @@ class AppState: ObservableObject {
     private var currentZone: Int?
     private var lastAnnouncementTime: Date?
     private var lastAnnouncedZone: Int?
-    private var pendingZoneAnnouncement: Int?
     private var cooldownTimer: Timer?
     private let announcementCooldown: TimeInterval = 5.0 // 5 seconds between announcements
 
@@ -69,10 +68,9 @@ class AppState: ObservableObject {
     
     private func startHeartRateMonitoring() {
         hrManager.startMonitoring()
-        // Reset all announcement state for new workout session
+		// Reset all announcement state for new workout session
         lastAnnouncementTime = nil
         lastAnnouncedZone = nil
-        pendingZoneAnnouncement = nil
         cooldownTimer?.invalidate()
         cooldownTimer = nil
         print("💓 Training session started - heart rate monitoring active")
@@ -81,11 +79,10 @@ class AppState: ObservableObject {
     private func stopHeartRateMonitoring() {
         hrManager.stopMonitoring()
         deactivateAudioSession()
-        // Clean up all state when stopping
+		// Clean up all state when stopping
         currentZone = nil
         lastAnnouncementTime = nil
         lastAnnouncedZone = nil
-        pendingZoneAnnouncement = nil
         cooldownTimer?.invalidate()
         cooldownTimer = nil
         print("🔋 Training session ended - heart rate monitoring stopped")
@@ -96,18 +93,17 @@ class AppState: ObservableObject {
             currentZone = newZone
             
             if isSessionActive {
-                if shouldAnnounce() {
-                    // Announce immediately and start cooldown
-                    announceZone(newZone)
-                } else {
-                    // Only set as pending if it's different from the last announced zone
-                    if newZone != lastAnnouncedZone {
-                        pendingZoneAnnouncement = newZone
-                        print("🔇 Zone \(newZone) detected, will announce when cooldown expires if still in this zone")
-                    } else {
-                        print("🔇 Zone \(newZone) detected but was recently announced, skipping")
-                    }
-                }
+				if shouldAnnounce() {
+					// Announce immediately only if zone changed from last announced
+					if newZone != lastAnnouncedZone {
+						announceZone(newZone)
+					} else {
+						print("🔇 Zone \(newZone) equals last announced; skipping immediate announce")
+					}
+				} else {
+					// In cooldown; announce will be evaluated at expiry based on current zone
+					print("🔇 Zone \(newZone) detected during cooldown; will evaluate at cooldown expiry")
+				}
             }
         }
     }
@@ -128,31 +124,32 @@ class AppState: ObservableObject {
         announcer.announceZone(zone)
         lastAnnouncementTime = Date()
         lastAnnouncedZone = zone
-        pendingZoneAnnouncement = nil // Clear any pending announcement
         
-        // Cancel existing timer and start new cooldown timer
-        cooldownTimer?.invalidate()
-        cooldownTimer = Timer.scheduledTimer(withTimeInterval: announcementCooldown, repeats: false) { [weak self] _ in
-            self?.handleCooldownExpired()
-        }
+		// Cancel existing timer and start new cooldown timer on main runloop
+		cooldownTimer?.invalidate()
+		DispatchQueue.main.async { [weak self] in
+			guard let self = self else { return }
+			self.cooldownTimer?.invalidate()
+			let timer = Timer(timeInterval: self.announcementCooldown, repeats: false) { [weak self] _ in
+				self?.handleCooldownExpired()
+			}
+			self.cooldownTimer = timer
+			RunLoop.main.add(timer, forMode: .common)
+		}
         
         print("🔊 Zone \(zone) announced (cooldown active for \(Int(announcementCooldown))s)")
     }
     
-    private func handleCooldownExpired() {
-        print("⏰ Announcement cooldown expired")
-        
-        // If there's a pending announcement and user is still in that zone, announce it
-        if let pendingZone = pendingZoneAnnouncement,
-           pendingZone == currentZone,
-           isSessionActive {
-            announceZone(pendingZone)
-            print("🔊 Announcing pending zone \(pendingZone) after cooldown")
-        } else {
-            pendingZoneAnnouncement = nil
-            print("🔇 No pending announcement or user moved to different zone")
-        }
-    }
+	private func handleCooldownExpired() {
+		print("⏰ Announcement cooldown expired")
+		guard isSessionActive else { return }
+		if let cz = currentZone, cz != lastAnnouncedZone {
+			announceZone(cz)
+			print("🔊 Announced current zone \(cz) at cooldown expiry")
+		} else {
+			print("🔇 Cooldown expired; no new zone to announce")
+		}
+	}
     
     // MARK: - Zone Settings Persistence
     
