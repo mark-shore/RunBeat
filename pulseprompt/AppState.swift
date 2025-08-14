@@ -49,10 +49,12 @@ class AppState: ObservableObject {
     init() {
         loadZoneSettings()
 
-        hrManager.onNewHeartRate = { [weak self] bpm in
-            self?.handle(bpm: bpm)
-            VO2MaxTrainingManager.shared.tick(now: Date())
-        }
+		hrManager.onNewHeartRate = { [weak self] bpm in
+			DispatchQueue.main.async {
+				self?.handle(bpm: bpm)
+				VO2MaxTrainingManager.shared.tick(now: Date())
+			}
+		}
         
         announcer.onAnnouncementFinished = { [weak self] in
             self?.restoreMusicVolume()
@@ -117,28 +119,24 @@ class AppState: ObservableObject {
         return timeSinceLastAnnouncement >= announcementCooldown
     }
     
-    private func announceZone(_ zone: Int) {
-        // Reactivate audio session before announcement
-        setupAudioSession()
-        
-        announcer.announceZone(zone)
-        lastAnnouncementTime = Date()
-        lastAnnouncedZone = zone
-        
-		// Cancel existing timer and start new cooldown timer on main runloop
-		cooldownTimer?.invalidate()
+	private func announceZone(_ zone: Int) {
 		DispatchQueue.main.async { [weak self] in
 			guard let self = self else { return }
+			// Reactivate audio session before announcement
+			self.setupAudioSession()
+			self.announcer.announceZone(zone)
+			self.lastAnnouncementTime = Date()
+			self.lastAnnouncedZone = zone
+			// Cancel existing timer and start new cooldown timer on main runloop
 			self.cooldownTimer?.invalidate()
 			let timer = Timer(timeInterval: self.announcementCooldown, repeats: false) { [weak self] _ in
 				self?.handleCooldownExpired()
 			}
 			self.cooldownTimer = timer
 			RunLoop.main.add(timer, forMode: .common)
+			print("🔊 Zone \(zone) announced (cooldown active for \(Int(self.announcementCooldown))s)")
 		}
-        
-        print("🔊 Zone \(zone) announced (cooldown active for \(Int(announcementCooldown))s)")
-    }
+	}
     
 	private func handleCooldownExpired() {
 		print("⏰ Announcement cooldown expired")
