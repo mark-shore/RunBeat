@@ -39,117 +39,51 @@ class AppState: ObservableObject {
 
     private let hrManager = HeartRateManager()
     private let announcer = SpeechAnnouncer()
-
-    private var currentZone: Int?
-    private var lastAnnouncementTime: Date?
-    private var lastAnnouncedZone: Int?
-    private var cooldownTimer: Timer?
-    private let announcementCooldown: TimeInterval = 5.0 // 5 seconds between announcements
+    private let audioService = AudioService()
+    private let trainingManager = HeartRateTrainingManager()
 
     init() {
         loadZoneSettings()
 
         hrManager.onNewHeartRate = { [weak self] bpm in
-            self?.handle(bpm: bpm)
+            self?.trainingManager.processHeartRate(bpm)
             VO2MaxTrainingManager.shared.tick(now: Date())
         }
         
         announcer.onAnnouncementFinished = { [weak self] in
-            self?.restoreMusicVolume()
+            guard let self = self else { return }
+            self.audioService.restoreMusicVolume(isTrainingSessionActive: self.isSessionActive)
         }
+        
+        audioService.delegate = self
+        trainingManager.delegate = self
 
         print("🚀 AppState initialized – ready to start training session")
     }
     
     deinit {
-        cooldownTimer?.invalidate()
-        deactivateAudioSession()
+        audioService.deactivateAudioSession()
     }
     
     private func startHeartRateMonitoring() {
         hrManager.startMonitoring()
-		// Reset all announcement state for new workout session
-        lastAnnouncementTime = nil
-        lastAnnouncedZone = nil
-        cooldownTimer?.invalidate()
-        cooldownTimer = nil
+        trainingManager.resetSessionState()
         print("💓 Training session started - heart rate monitoring active")
     }
     
     private func stopHeartRateMonitoring() {
         hrManager.stopMonitoring()
-        deactivateAudioSession()
-		// Clean up all state when stopping
-        currentZone = nil
-        lastAnnouncementTime = nil
-        lastAnnouncedZone = nil
-        cooldownTimer?.invalidate()
-        cooldownTimer = nil
+        audioService.deactivateAudioSession()
+        trainingManager.resetSessionState()
         print("🔋 Training session ended - heart rate monitoring stopped")
     }
 
-    private func handle(bpm: Int) {
-        if let newZone = calculateZone(for: bpm), newZone != currentZone {
-            currentZone = newZone
-            
-            if isSessionActive {
-				if shouldAnnounce() {
-					// Announce immediately only if zone changed from last announced
-					if newZone != lastAnnouncedZone {
-						announceZone(newZone)
-					} else {
-						print("🔇 Zone \(newZone) equals last announced; skipping immediate announce")
-					}
-				} else {
-					// In cooldown; announce will be evaluated at expiry based on current zone
-					print("🔇 Zone \(newZone) detected during cooldown; will evaluate at cooldown expiry")
-				}
-            }
-        }
-    }
-    
-    private func shouldAnnounce() -> Bool {
-        guard let lastTime = lastAnnouncementTime else {
-            return true // First announcement, always allow
-        }
-        
-        let timeSinceLastAnnouncement = Date().timeIntervalSince(lastTime)
-        return timeSinceLastAnnouncement >= announcementCooldown
-    }
-    
     private func announceZone(_ zone: Int) {
         // Reactivate audio session before announcement
-        setupAudioSession()
-        
+        audioService.setupAudioSessionForAnnouncement()
         announcer.announceZone(zone)
-        lastAnnouncementTime = Date()
-        lastAnnouncedZone = zone
-        
-		// Cancel existing timer and start new cooldown timer on main runloop
-		cooldownTimer?.invalidate()
-		DispatchQueue.main.async { [weak self] in
-			guard let self = self else { return }
-			self.cooldownTimer?.invalidate()
-			let timer = Timer(timeInterval: self.announcementCooldown, repeats: false) { [weak self] _ in
-				self?.handleCooldownExpired()
-			}
-			self.cooldownTimer = timer
-			RunLoop.main.add(timer, forMode: .common)
-		}
-        
-        print("🔊 Zone \(zone) announced (cooldown active for \(Int(announcementCooldown))s)")
+        print("🔊 Zone \(zone) announced")
     }
-    
-	private func handleCooldownExpired() {
-		print("⏰ Announcement cooldown expired")
-		guard isSessionActive else { return }
-		if let cz = currentZone, cz != lastAnnouncedZone {
-			announceZone(cz)
-			print("🔊 Announced current zone \(cz) at cooldown expiry")
-		} else {
-			print("🔇 Cooldown expired; no new zone to announce")
-		}
-	}
     
     // MARK: - Zone Settings Persistence
     
@@ -167,12 +101,18 @@ class AppState: ObservableObject {
         zone4Upper = userDefaults.object(forKey: "zone4Upper") as? Int ?? 100
         zone5Upper = userDefaults.object(forKey: "zone5Upper") as? Int ?? 110
         
-        if useAutoZones {
-            let autoZones = calculateAutoZones()
-            print("📊 Auto heart rate zones loaded: RHR=\(restingHR), MaxHR=\(maxHR), Zones: Z1(\(autoZones.0)-\(autoZones.1)), Z2(\(autoZones.1+1)-\(autoZones.2)), Z3(\(autoZones.2+1)-\(autoZones.3)), Z4(\(autoZones.3+1)-\(autoZones.4)), Z5(\(autoZones.4+1)-\(autoZones.5))")
-        } else {
-            print("📊 Manual heart rate zones loaded: Z1(\(zone1Lower)-\(zone1Upper)), Z2(\(zone1Upper+1)-\(zone2Upper)), Z3(\(zone2Upper+1)-\(zone3Upper)), Z4(\(zone3Upper+1)-\(zone4Upper)), Z5(\(zone4Upper+1)-\(zone5Upper))")
-        }
+        // Update the training manager with the loaded settings
+        trainingManager.updateZoneSettings(
+            restingHR: restingHR,
+            maxHR: maxHR,
+            useAutoZones: useAutoZones,
+            zone1Lower: zone1Lower,
+            zone1Upper: zone1Upper,
+            zone2Upper: zone2Upper,
+            zone3Upper: zone3Upper,
+            zone4Upper: zone4Upper,
+            zone5Upper: zone5Upper
+        )
     }
     
     func saveZoneSettings() {
@@ -189,54 +129,25 @@ class AppState: ObservableObject {
         userDefaults.set(zone4Upper, forKey: "zone4Upper")
         userDefaults.set(zone5Upper, forKey: "zone5Upper")
         
-        if useAutoZones {
-            let autoZones = calculateAutoZones()
-            print("💾 Auto heart rate zones saved: RHR=\(restingHR), MaxHR=\(maxHR), Zones: Z1(\(autoZones.0)-\(autoZones.1)), Z2(\(autoZones.1+1)-\(autoZones.2)), Z3(\(autoZones.2+1)-\(autoZones.3)), Z4(\(autoZones.3+1)-\(autoZones.4)), Z5(\(autoZones.4+1)-\(autoZones.5))")
-        } else {
-            print("💾 Manual heart rate zones saved: Z1(\(zone1Lower)-\(zone1Upper)), Z2(\(zone1Upper+1)-\(zone2Upper)), Z3(\(zone2Upper+1)-\(zone3Upper)), Z4(\(zone3Upper+1)-\(zone4Upper)), Z5(\(zone4Upper+1)-\(zone5Upper))")
-        }
+        // Update the training manager with the new settings
+        trainingManager.updateZoneSettings(
+            restingHR: restingHR,
+            maxHR: maxHR,
+            useAutoZones: useAutoZones,
+            zone1Lower: zone1Lower,
+            zone1Upper: zone1Upper,
+            zone2Upper: zone2Upper,
+            zone3Upper: zone3Upper,
+            zone4Upper: zone4Upper,
+            zone5Upper: zone5Upper
+        )
     }
     
-    // MARK: - Heart Rate Zone Calculations
-    
-    /// Calculate auto zones using heart rate reserve formula
-    /// Returns tuple of (zone1Lower, zone1Upper, zone2Upper, zone3Upper, zone4Upper, zone5Upper)
-    private func calculateAutoZones() -> (Int, Int, Int, Int, Int, Int) {
-        let hrReserve = maxHR - restingHR
-        
-        // Heart rate zone percentages based on HRR (Karvonen formula) - Whoop methodology
-        let zone1Lower = restingHR + Int(floor(Double(hrReserve) * 0.40)) // 40% HRR (floor for minimums)
-        let zone1Upper = restingHR + Int(round(Double(hrReserve) * 0.60)) // 60% HRR (round for maximums)
-        let zone2Upper = restingHR + Int(round(Double(hrReserve) * 0.70)) // 70% HRR  
-        let zone3Upper = restingHR + Int(round(Double(hrReserve) * 0.80)) // 80% HRR
-        let zone4Upper = restingHR + Int(round(Double(hrReserve) * 0.90)) // 90% HRR
-        let zone5Upper = restingHR + Int(round(Double(hrReserve) * 1.00)) // 100% HRR
-        
-        return (zone1Lower, zone1Upper, zone2Upper, zone3Upper, zone4Upper, zone5Upper)
-    }
-    
-    /// Get the current zone upper limits (either auto-calculated or manual)
-    private func getCurrentZoneUpperLimits() -> (Int, Int, Int, Int, Int) {
-        if useAutoZones {
-            let autoZones = calculateAutoZones()
-            return (autoZones.1, autoZones.2, autoZones.3, autoZones.4, autoZones.5) // Skip zone1Lower, return the upper limits
-        } else {
-            return (zone1Upper, zone2Upper, zone3Upper, zone4Upper, zone5Upper)
-        }
-    }
-    
-    /// Get the zone 1 lower limit for auto zones
-    private func getZone1Lower() -> Int {
-        if useAutoZones {
-            return calculateAutoZones().0
-        } else {
-            return zone1Lower // For manual zones, use the custom zone 1 lower
-        }
-    }
+
     
     /// Update manual zone values from current auto calculations
     private func updateManualZonesFromAuto() {
-        let autoZones = calculateAutoZones()
+        let autoZones = HeartRateZoneCalculator.calculateAutoZones(restingHR: restingHR, maxHR: maxHR)
         zone1Lower = autoZones.0 // zone1Lower
         zone1Upper = autoZones.1 // zone1Upper
         zone2Upper = autoZones.2 // zone2Upper
@@ -246,65 +157,31 @@ class AppState: ObservableObject {
         print("📊 Manual zones updated from auto calculation: Z1(\(zone1Lower)-\(zone1Upper)), Z2(\(zone1Upper+1)-\(zone2Upper)), Z3(\(zone2Upper+1)-\(zone3Upper)), Z4(\(zone3Upper+1)-\(zone4Upper)), Z5(\(zone4Upper+1)-\(zone5Upper))")
     }
 
-    private func setupAudioSession() {
-        #if os(iOS)
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers, .duckOthers])
-            try AVAudioSession.sharedInstance().setActive(true)
-            print("🔊 Audio session activated with mixing and ducking")
-        } catch {
-            print("❌ Failed to set audio session: \(error)")
-        }
-        #else
-        print("🔊 Audio session setup (iOS only)")
-        #endif
-    }
-    
-    private func deactivateAudioSession() {
-        #if os(iOS)
-        do {
-            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-            print("🔇 Audio session deactivated - music restored to normal volume")
-        } catch {
-            print("❌ Failed to deactivate audio session: \(error)")
-        }
-        #else
-        print("🔇 Audio session deactivated (iOS only)")
-        #endif
-    }
-    
-    private func restoreMusicVolume() {
-        // Only restore music volume if we're still in an active training session
-        guard isSessionActive else { return }
-        
-        #if os(iOS)
-        do {
-            // Deactivate to restore music volume - don't reactivate until next announcement
-            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-            print("🎵 Music volume restored - session inactive until next announcement")
-        } catch {
-            print("❌ Failed to restore music volume: \(error)")
-        }
-        #else
-        print("🎵 Music volume restored (iOS only)")
-        #endif
-    }
 
-    private func calculateZone(for bpm: Int) -> Int? {
-        let zones = getCurrentZoneUpperLimits()
-        let (z1Upper, z2Upper, z3Upper, z4Upper, z5Upper) = zones
-        let z1Lower = getZone1Lower()
-        
-        switch bpm {
-        case ..<z1Lower: return nil  // Below zone 1 minimum
-        case z1Lower...z1Upper: return 1
-        case (z1Upper + 1)...z2Upper: return 2
-        case (z2Upper + 1)...z3Upper: return 3
-        case (z3Upper + 1)...z4Upper: return 4
-        case (z4Upper + 1)...z5Upper: return 5
-        case (z5Upper + 1)...: return 5  // Max zone for very high heart rates
-        default: return nil
-        }
+}
+
+// MARK: - HeartRateTrainingDelegate
+extension AppState: HeartRateTrainingDelegate {
+    func heartRateTraining(_ manager: HeartRateTrainingManager, didDetectZoneChange newZone: Int, fromZone oldZone: Int?) {
+        // Zone change detected - no additional action needed here
+    }
+    
+    func heartRateTraining(_ manager: HeartRateTrainingManager, shouldAnnounceZone zone: Int) -> Bool {
+        // Only announce if we're in an active session
+        return isSessionActive
+    }
+    
+    func heartRateTraining(_ manager: HeartRateTrainingManager, didRequestZoneAnnouncement zone: Int) {
+        // Perform the actual announcement
+        announceZone(zone)
+    }
+}
+
+// MARK: - AudioServiceDelegate
+extension AppState: AudioServiceDelegate {
+    func audioServiceDidRestoreMusicVolume() {
+        // Hook for future audio-related state updates if needed
+        print("🎵 Audio service restored music volume")
     }
 }
 
