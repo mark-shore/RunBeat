@@ -277,7 +277,7 @@ class SpotifyService: NSObject {
             print("Using AppRemote to play \(playlistName)...")
             let playlistURI = "spotify:playlist:\(playlistID)"
             playPlaylistViaAppRemote(playlistURI: playlistURI, playlistName: playlistName)
-        } else if let accessToken = accessToken {
+        } else if accessToken != nil {
             print("Using Web API to start playback...")
             playPlaylistViaWebAPI(playlistID: playlistID, playlistName: playlistName)
         } else {
@@ -364,7 +364,7 @@ class SpotifyService: NSObject {
     }
     
     private func handleBackgroundPlayback(playlistID: String, isHighIntensity: Bool) {
-        guard let accessToken = accessToken else { return }
+        guard accessToken != nil else { return }
         
         var bgTask: UIBackgroundTaskIdentifier = .invalid
         let taskName = isHighIntensity ? "PlayHighIntensityBG" : "PlayRestBG"
@@ -454,7 +454,7 @@ extension SpotifyService {
     }
     
     private func playPlaylistViaWebAPI(playlistID: String, playlistName: String) {
-        guard let accessToken = accessToken else { return }
+        guard accessToken != nil else { return }
         
         activateIPhoneDeviceForPlayback { [weak self] success in
             if success {
