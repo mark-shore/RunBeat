@@ -145,7 +145,7 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingSettings) {
                 NavigationView {
-                    SettingsView(appState: appState)
+                    SettingsView(appState: appState, heartRateViewModel: appState.heartRateViewModel)
                 }
             }
             .sheet(isPresented: $showingVO2MaxTraining) {

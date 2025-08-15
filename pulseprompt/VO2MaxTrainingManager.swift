@@ -56,11 +56,15 @@ class VO2MaxTrainingManager: ObservableObject {
         print("Starting VO2 Max training...")
         print("Spotify connected: \(spotifyViewModel.isConnected)")
         
-        isTraining = true
-        currentInterval = 1
-        currentPhase = .highIntensity
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.isTraining = true
+            self.currentInterval = 1
+            self.currentPhase = .highIntensity
+            self.timeRemaining = self.highIntensityDuration
+        }
+        
         intervalState = IntervalState(phase: .highIntensity, start: timeProvider.now(), duration: highIntensityDuration)
-        timeRemaining = highIntensityDuration
 
         // Reset switch guard and start timer immediately for responsive UI (foreground only)
         lastIssuedCommandInterval = nil
@@ -83,13 +87,17 @@ class VO2MaxTrainingManager: ObservableObject {
     func pauseTraining() {
         timer?.invalidate()
         timer = nil
-        isPaused = true
+        DispatchQueue.main.async { [weak self] in
+            self?.isPaused = true
+        }
         pausedAt = timeProvider.now()
         spotifyViewModel.pause()
     }
     
     func resumeTraining() {
-        isPaused = false
+        DispatchQueue.main.async { [weak self] in
+            self?.isPaused = false
+        }
         if let pausedAt = pausedAt, var state = intervalState {
             let delta = timeProvider.now().timeIntervalSince(pausedAt)
             state.start = state.start.addingTimeInterval(delta)
@@ -112,11 +120,13 @@ class VO2MaxTrainingManager: ObservableObject {
     func stopTraining() {
         timer?.invalidate()
         timer = nil
-        isTraining = false
-        isPaused = false
-        currentPhase = .notStarted
-        timeRemaining = 0
-        currentInterval = 0
+        DispatchQueue.main.async { [weak self] in
+            self?.isTraining = false
+            self?.isPaused = false
+            self?.currentPhase = .notStarted
+            self?.timeRemaining = 0
+            self?.currentInterval = 0
+        }
         spotifyViewModel.pause()
         
         // Reset device activation state so next training session can start fresh
@@ -135,9 +145,11 @@ class VO2MaxTrainingManager: ObservableObject {
         let isHighIntensity = currentInterval % 2 == 1 // Odd intervals are high-intensity
         
         if isHighIntensity {
-            currentPhase = .highIntensity
+            DispatchQueue.main.async { [weak self] in
+                self?.currentPhase = .highIntensity
+                self?.timeRemaining = self?.highIntensityDuration ?? 0
+            }
             intervalState = IntervalState(phase: .highIntensity, start: timeProvider.now(), duration: highIntensityDuration)
-            timeRemaining = highIntensityDuration
             
             // Skip playing playlist for first interval since it should already be playing from device activation
             if currentInterval == 1 {
@@ -147,9 +159,11 @@ class VO2MaxTrainingManager: ObservableObject {
                 switchPlaylistIfNeeded(for: .highIntensity)
             }
         } else {
-            currentPhase = .rest
+            DispatchQueue.main.async { [weak self] in
+                self?.currentPhase = .rest
+                self?.timeRemaining = self?.restDuration ?? 0
+            }
             intervalState = IntervalState(phase: .rest, start: timeProvider.now(), duration: restDuration)
-            timeRemaining = restDuration
             print("Rest interval - attempting to play playlist...")
             switchPlaylistIfNeeded(for: .rest)
         }
@@ -172,14 +186,21 @@ class VO2MaxTrainingManager: ObservableObject {
         guard isTraining, !isPaused, let state = intervalState else { return }
         let elapsed = max(0, now.timeIntervalSince(state.start))
         let remaining = max(0, state.duration - elapsed)
-        // Display rounds down, but phase change uses exact remaining to avoid extra 1s of delay
-        timeRemaining = floor(remaining)
+        
+        // Ensure UI updates happen on main thread
+        DispatchQueue.main.async { [weak self] in
+            // Display rounds down, but phase change uses exact remaining to avoid extra 1s of delay
+            self?.timeRemaining = floor(remaining)
+        }
+        
         print("⏱️ VO2 tick - phase: \(currentPhase) interval: \(currentInterval) elapsed: \(Int(elapsed))s remaining: \(Int(remaining))s")
 
         if remaining <= 0 {
-            currentInterval += 1
-            print("🚦 VO2 boundary reached → advancing to interval \(currentInterval)")
-            startNextInterval()
+            DispatchQueue.main.async { [weak self] in
+                self?.currentInterval += 1
+                print("🚦 VO2 boundary reached → advancing to interval \(self?.currentInterval ?? 0)")
+                self?.startNextInterval()
+            }
         }
     }
 
@@ -204,8 +225,10 @@ class VO2MaxTrainingManager: ObservableObject {
     private func completeTraining() {
         timer?.invalidate()
         timer = nil
-        isTraining = false
-        currentPhase = .completed
+        DispatchQueue.main.async { [weak self] in
+            self?.isTraining = false
+            self?.currentPhase = .completed
+        }
         spotifyViewModel.pause()
         
         // Reset device activation state so next training session can start fresh

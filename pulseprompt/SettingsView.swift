@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var appState: AppState
+    @ObservedObject var heartRateViewModel: HeartRateViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showingRestingHRPicker = false
     @State private var showingMaxHRPicker = false
@@ -62,7 +63,7 @@ struct SettingsView: View {
                                     Button(action: {
                                         showingRestingHRPicker = true
                                     }) {
-                                        Text("\(appState.restingHR)")
+                                        Text("\(heartRateViewModel.restingHR)")
                                             .font(.system(size: 24, weight: .bold))
                                             .foregroundColor(.white)
                                             .frame(width: 80, height: 40)
@@ -101,7 +102,7 @@ struct SettingsView: View {
                                     Button(action: {
                                         showingMaxHRPicker = true
                                     }) {
-                                        Text("\(appState.maxHR)")
+                                        Text("\(heartRateViewModel.maxHR)")
                                             .font(.system(size: 24, weight: .bold))
                                             .foregroundColor(.white)
                                             .frame(width: 80, height: 40)
@@ -141,8 +142,8 @@ struct SettingsView: View {
                             Spacer()
                             
                             Toggle("", isOn: Binding(
-                                get: { !appState.useAutoZones },
-                                set: { appState.useAutoZones = !$0 }
+                                get: { !heartRateViewModel.useAutoZones },
+                                set: { heartRateViewModel.useAutoZones = !$0 }
                             ))
                                 .labelsHidden()
                                 .toggleStyle(SwitchToggleStyle(tint: .gray))
@@ -152,12 +153,12 @@ struct SettingsView: View {
                     .padding(.horizontal, 20)
                     
                     // Zone Display/Settings
-                    if appState.useAutoZones {
-                        AutoZonesDisplay(appState: appState)
+                    if heartRateViewModel.useAutoZones {
+                        AutoZonesDisplay(heartRateViewModel: heartRateViewModel)
                             .padding(.horizontal, 20)
                     } else {
                         ManualZonesSettings(
-                            appState: appState,
+                            heartRateViewModel: heartRateViewModel,
                             showingZone1LowerPicker: $showingZone1LowerPicker,
                             showingZone1Picker: $showingZone1Picker,
                             showingZone2Picker: $showingZone2Picker,
@@ -170,7 +171,7 @@ struct SettingsView: View {
                     
                     // Save Button
                     Button(action: {
-                        appState.saveZoneSettings()
+                        // Settings are automatically saved via ViewModel
                         dismiss()
                     }) {
                         HStack {
@@ -198,51 +199,44 @@ struct SettingsView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Done") {
-                    appState.saveZoneSettings()
+                    // Settings are automatically saved via ViewModel
                     dismiss()
                 }
                 .foregroundColor(.white)
             }
         }
         .sheet(isPresented: $showingRestingHRPicker) {
-            RestingHRPickerView(restingHR: $appState.restingHR)
+            RestingHRPickerView(restingHR: $heartRateViewModel.restingHR)
         }
         .sheet(isPresented: $showingMaxHRPicker) {
-            MaxHRPickerView(maxHR: $appState.maxHR)
+            MaxHRPickerView(maxHR: $heartRateViewModel.maxHR)
         }
         .sheet(isPresented: $showingZone1LowerPicker) {
-            Zone1LowerPickerView(zone1Lower: $appState.zone1Lower)
+            Zone1LowerPickerView(zone1Lower: $heartRateViewModel.zone1Lower)
         }
         .sheet(isPresented: $showingZone1Picker) {
-            ZonePickerView(zoneNumber: 1, zoneUpper: $appState.zone1Upper)
+            ZonePickerView(zoneNumber: 1, zoneUpper: $heartRateViewModel.zone1Upper)
         }
         .sheet(isPresented: $showingZone2Picker) {
-            ZonePickerView(zoneNumber: 2, zoneUpper: $appState.zone2Upper)
+            ZonePickerView(zoneNumber: 2, zoneUpper: $heartRateViewModel.zone2Upper)
         }
         .sheet(isPresented: $showingZone3Picker) {
-            ZonePickerView(zoneNumber: 3, zoneUpper: $appState.zone3Upper)
+            ZonePickerView(zoneNumber: 3, zoneUpper: $heartRateViewModel.zone3Upper)
         }
         .sheet(isPresented: $showingZone4Picker) {
-            ZonePickerView(zoneNumber: 4, zoneUpper: $appState.zone4Upper)
+            ZonePickerView(zoneNumber: 4, zoneUpper: $heartRateViewModel.zone4Upper)
         }
         .sheet(isPresented: $showingZone5Picker) {
-            ZonePickerView(zoneNumber: 5, zoneUpper: $appState.zone5Upper)
+            ZonePickerView(zoneNumber: 5, zoneUpper: $heartRateViewModel.zone5Upper)
         }
     }
 }
 
 struct AutoZonesDisplay: View {
-    @ObservedObject var appState: AppState
+    @ObservedObject var heartRateViewModel: HeartRateViewModel
     
     private var autoZones: (Int, Int, Int, Int, Int, Int) {
-        let hrReserve = appState.maxHR - appState.restingHR
-        let zone1Lower = appState.restingHR + Int(floor(Double(hrReserve) * 0.40)) // 40% HRR (floor for minimums)
-        let zone1Upper = appState.restingHR + Int(round(Double(hrReserve) * 0.60)) // 60% HRR (round for maximums)
-        let zone2Upper = appState.restingHR + Int(round(Double(hrReserve) * 0.70)) // 70% HRR
-        let zone3Upper = appState.restingHR + Int(round(Double(hrReserve) * 0.80)) // 80% HRR
-        let zone4Upper = appState.restingHR + Int(round(Double(hrReserve) * 0.90)) // 90% HRR
-        let zone5Upper = appState.restingHR + Int(round(Double(hrReserve) * 1.00)) // 100% HRR
-        return (zone1Lower, zone1Upper, zone2Upper, zone3Upper, zone4Upper, zone5Upper)
+        return heartRateViewModel.currentZoneLimits
     }
     
     var body: some View {
@@ -314,7 +308,7 @@ struct AutoZonesDisplay: View {
 }
 
 struct ManualZonesSettings: View {
-    @ObservedObject var appState: AppState
+    @ObservedObject var heartRateViewModel: HeartRateViewModel
     @Binding var showingZone1LowerPicker: Bool
     @Binding var showingZone1Picker: Bool
     @Binding var showingZone2Picker: Bool
@@ -325,7 +319,7 @@ struct ManualZonesSettings: View {
     var body: some View {
         VStack(spacing: 24) {
             Zone1SettingRow(
-                appState: appState,
+                heartRateViewModel: heartRateViewModel,
                 onLowerTap: { showingZone1LowerPicker = true },
                 onUpperTap: { showingZone1Picker = true }
             )
@@ -335,7 +329,7 @@ struct ManualZonesSettings: View {
                 title: "Zone 2 - Aerobic Base",
                 subtitle: "Base training, fat burning",
                 color: .green,
-                upperLimit: appState.zone2Upper,
+                upperLimit: heartRateViewModel.zone2Upper,
                 onTap: { showingZone2Picker = true }
             )
             
@@ -344,7 +338,7 @@ struct ManualZonesSettings: View {
                 title: "Zone 3 - Aerobic Threshold",
                 subtitle: "Moderate intensity",
                 color: .yellow,
-                upperLimit: appState.zone3Upper,
+                upperLimit: heartRateViewModel.zone3Upper,
                 onTap: { showingZone3Picker = true }
             )
             
@@ -353,7 +347,7 @@ struct ManualZonesSettings: View {
                 title: "Zone 4 - Lactate Threshold",
                 subtitle: "Hard intensity",
                 color: .orange,
-                upperLimit: appState.zone4Upper,
+                upperLimit: heartRateViewModel.zone4Upper,
                 onTap: { showingZone4Picker = true }
             )
             
@@ -362,7 +356,7 @@ struct ManualZonesSettings: View {
                 title: "Zone 5 - VO2 Max",
                 subtitle: "Very hard, neuromuscular",
                 color: .red,
-                upperLimit: appState.zone5Upper,
+                upperLimit: heartRateViewModel.zone5Upper,
                 onTap: { showingZone5Picker = true }
             )
         }
@@ -370,7 +364,7 @@ struct ManualZonesSettings: View {
 }
 
 struct Zone1SettingRow: View {
-    @ObservedObject var appState: AppState
+    @ObservedObject var heartRateViewModel: HeartRateViewModel
     let onLowerTap: () -> Void
     let onUpperTap: () -> Void
     
@@ -410,7 +404,7 @@ struct Zone1SettingRow: View {
                 
                 HStack(spacing: 4) {
                     Button(action: onLowerTap) {
-                        Text("\(appState.zone1Lower)")
+                        Text("\(heartRateViewModel.zone1Lower)")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
                             .frame(width: 80, height: 32)
@@ -439,7 +433,7 @@ struct Zone1SettingRow: View {
                 
                 HStack(spacing: 4) {
                     Button(action: onUpperTap) {
-                        Text("\(appState.zone1Upper)")
+                        Text("\(heartRateViewModel.zone1Upper)")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
                             .frame(width: 80, height: 32)
