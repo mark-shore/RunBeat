@@ -19,7 +19,7 @@ class VO2MaxTrainingManager: ObservableObject {
     @Published var totalIntervals = VO2Config.totalIntervals
     
     private var timer: Timer?
-    private var spotifyManager = SpotifyManager.shared
+    private var spotifyViewModel: SpotifyViewModel
     private struct IntervalState {
         var phase: TrainingPhase
         var start: Date
@@ -41,11 +41,20 @@ class VO2MaxTrainingManager: ObservableObject {
     private let highIntensityDuration: TimeInterval = VO2Config.highIntensityDuration
     private let restDuration: TimeInterval = VO2Config.restDuration
     
-    private init() {}
+    private init() {
+        // Initialize with shared SpotifyViewModel for consistent state
+        self.spotifyViewModel = SpotifyViewModel.shared
+    }
+    
+    // Dependency injection for testing
+    init(spotifyViewModel: SpotifyViewModel, timeProvider: TimeProvider = SystemTimeProvider()) {
+        self.spotifyViewModel = spotifyViewModel
+        self.timeProvider = timeProvider
+    }
     
     func startTraining() {
         print("Starting VO2 Max training...")
-        print("Spotify connected: \(spotifyManager.isConnected)")
+        print("Spotify connected: \(spotifyViewModel.isConnected)")
         
         isTraining = true
         currentInterval = 1
@@ -59,14 +68,13 @@ class VO2MaxTrainingManager: ObservableObject {
         
         // Activate device and start music in parallel (non-blocking)
         // Always attempt activation; this will authorize if needed and start playback.
-        let firstPlaylistID = ConfigurationManager.shared.spotifyHighIntensityPlaylistID
-        spotifyManager.activateDeviceForTraining(playlistID: firstPlaylistID) { [weak self] success in
+        spotifyViewModel.activateDeviceForTraining { [weak self] success in
             if success {
                 print("✅ Training music started during first interval")
             } else {
                 print("ℹ️ Using fallback music control during first interval")
                 DispatchQueue.main.async {
-                    self?.spotifyManager.playHighIntensityPlaylist()
+                    self?.spotifyViewModel.playHighIntensityPlaylist()
                 }
             }
         }
@@ -77,7 +85,7 @@ class VO2MaxTrainingManager: ObservableObject {
         timer = nil
         isPaused = true
         pausedAt = timeProvider.now()
-        spotifyManager.pause()
+        spotifyViewModel.pause()
     }
     
     func resumeTraining() {
@@ -92,12 +100,12 @@ class VO2MaxTrainingManager: ObservableObject {
         // Robust resume: if AppRemote/Web API resume fails due to device not active,
         // explicitly start the expected playlist for the current phase.
         if currentPhase == .highIntensity {
-            spotifyManager.playHighIntensityPlaylist()
+            spotifyViewModel.playHighIntensityPlaylist()
         } else if currentPhase == .rest {
-            spotifyManager.playRestPlaylist()
+            spotifyViewModel.playRestPlaylist()
         } else {
             // Fallback to basic resume if phase is unexpected
-            spotifyManager.resume()
+            spotifyViewModel.resume()
         }
     }
     
@@ -109,10 +117,10 @@ class VO2MaxTrainingManager: ObservableObject {
         currentPhase = .notStarted
         timeRemaining = 0
         currentInterval = 0
-        spotifyManager.pause()
+        spotifyViewModel.pause()
         
         // Reset device activation state so next training session can start fresh
-        spotifyManager.resetDeviceActivationState()
+        spotifyViewModel.resetDeviceActivationState()
     }
     
     private func startNextInterval() {
@@ -185,9 +193,9 @@ class VO2MaxTrainingManager: ObservableObject {
         lastIssuedCommandInterval = currentInterval
         switch phase {
         case .highIntensity:
-            spotifyManager.playHighIntensityPlaylist()
+            spotifyViewModel.playHighIntensityPlaylist()
         case .rest:
-            spotifyManager.playRestPlaylist()
+            spotifyViewModel.playRestPlaylist()
         default:
             break
         }
@@ -198,10 +206,10 @@ class VO2MaxTrainingManager: ObservableObject {
         timer = nil
         isTraining = false
         currentPhase = .completed
-        spotifyManager.pause()
+        spotifyViewModel.pause()
         
         // Reset device activation state so next training session can start fresh
-        spotifyManager.resetDeviceActivationState()
+        spotifyViewModel.resetDeviceActivationState()
     }
     
     // MARK: - Helper Methods

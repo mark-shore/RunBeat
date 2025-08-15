@@ -9,7 +9,7 @@ import SwiftUI
 
 struct VO2MaxTrainingView: View {
     @StateObject private var trainingManager = VO2MaxTrainingManager.shared
-    @StateObject private var spotifyManager = SpotifyManager.shared
+    @StateObject private var spotifyViewModel = SpotifyViewModel.shared
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var startedHRSession = false
@@ -73,7 +73,7 @@ struct VO2MaxTrainingView: View {
                     Spacer()
                     
                     // Spotify Status
-                    if spotifyManager.isConnected {
+                    if spotifyViewModel.isConnected {
                         VStack(spacing: 5) {
                             HStack {
                                 Image(systemName: "music.note")
@@ -83,8 +83,8 @@ struct VO2MaxTrainingView: View {
                                     .foregroundColor(.green)
                             }
                             
-                            if !spotifyManager.currentTrack.isEmpty {
-                                Text(spotifyManager.currentTrack)
+                            if !spotifyViewModel.currentTrack.isEmpty {
+                                Text(spotifyViewModel.currentTrack)
                                     .font(.caption)
                                     .foregroundColor(.gray)
                                     .lineLimit(1)
@@ -92,7 +92,7 @@ struct VO2MaxTrainingView: View {
                         }
                     } else {
                         Button("Connect Spotify") {
-                            spotifyManager.connect()
+                            spotifyViewModel.connect()
                         }
                         .buttonStyle(.bordered)
                         .foregroundColor(.green)
