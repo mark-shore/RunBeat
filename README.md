@@ -1,10 +1,10 @@
-# PulsePrompt
+# RunBeat
 
 A SwiftUI iOS app for heart rate-based training with Spotify integration and VO2 max interval training.
 
 ## Architecture Overview
 
-PulsePrompt follows the **MVVM (Model-View-ViewModel)** architecture pattern with clean separation of concerns:
+RunBeat follows the **MVVM (Model-View-ViewModel)** architecture pattern with clean separation of concerns:
 
 - **Models**: Data structures and business logic
 - **Views**: SwiftUI UI components
@@ -14,7 +14,7 @@ PulsePrompt follows the **MVVM (Model-View-ViewModel)** architecture pattern wit
 ## Project Structure
 
 ```
-pulseprompt/
+RunBeat/
 ├── Core/                          # Core application services and utilities
 │   ├── Services/                  # Core business services
 │   │   ├── AudioService.swift     # Audio session management
@@ -50,7 +50,7 @@ pulseprompt/
 │       ├── zone4.mp3
 │       └── zone5.mp3
 ├── AppState.swift                # App coordinator and state management
-├── pulsepromptApp.swift          # App entry point
+├── RunBeatApp.swift          # App entry point
 ├── Info.plist                    # App configuration
 ├── Config.plist                  # Feature configuration
 └── Assets.xcassets/              # App assets

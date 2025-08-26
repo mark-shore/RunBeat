@@ -12,10 +12,10 @@ This guide will help you set up the Spotify integration for the VO2 Max training
 1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
 2. Click "Create App"
 3. Fill in the app details:
-   - **App name**: PulsePrompt
+   - **App name**: RunBeat
    - **App description**: Heart rate zone training app with Spotify integration
    - **Website**: (optional)
-   - **Redirect URIs**: `pulseprompt://spotify-login-callback`
+   - **Redirect URIs**: `runbeat://spotify-login-callback`
    - **API/SDKs**: Select "iOS SDK"
 4. Click "Save"
 
@@ -44,7 +44,7 @@ SPOTIFY_REST_PLAYLIST_ID=your_rest_playlist_id_here
 
 ### Option B: Using Config.plist (Production)
 
-1. Copy `pulseprompt/Config.sample.plist` to `pulseprompt/Config.plist`
+1. Copy `RunBeat/Config.sample.plist` to `RunBeat/Config.plist`
 2. Replace the placeholder values in `Config.plist` with your actual credentials
 
 ## Step 4: Create Spotify Playlists
@@ -97,7 +97,7 @@ The app automatically:
 
 ### "Spotify connection failed"
 - Make sure your Client ID is correct
-- Verify the redirect URI matches exactly: `pulseprompt://spotify-login-callback`
+- Verify the redirect URI matches exactly: `runbeat://spotify-login-callback`
 - Check that you've authorized the app in Spotify
 
 ### "Playlist not found"

@@ -27,5 +27,5 @@ xcuserdata/
 # Carthage/Build/
 
 # Environment variables and app config (do not commit secrets)
-pulseprompt/.env
-pulseprompt/Config.plist
+RunBeat/.env
+RunBeat/Config.plist
