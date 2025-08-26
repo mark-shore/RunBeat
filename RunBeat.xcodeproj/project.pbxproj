@@ -16,50 +16,37 @@
 			containerPortal = 6DBD7F5A2E343DF300608F0D /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 6DBD7F612E343DF300608F0D;
-			remoteInfo = pulseprompt;
+			remoteInfo = RunBeat;
 		};
 		6DBD7F7B2E343DF600608F0D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 6DBD7F5A2E343DF300608F0D /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 6DBD7F612E343DF300608F0D;
-			remoteInfo = pulseprompt;
+			remoteInfo = RunBeat;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		6DBD7F622E343DF300608F0D /* pulseprompt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = pulseprompt.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		6DBD7F702E343DF600608F0D /* pulsepromptTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = pulsepromptTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		6DBD7F7A2E343DF600608F0D /* pulsepromptUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = pulsepromptUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6DBD7F622E343DF300608F0D /* RunBeat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RunBeat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6DBD7F702E343DF600608F0D /* RunBeatTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunBeatTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6DBD7F7A2E343DF600608F0D /* RunBeatUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunBeatUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		6DBA79C22E354F4800EDDAAE /* Exceptions for "pulseprompt" folder in "pulseprompt" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = 6DBD7F612E343DF300608F0D /* pulseprompt */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		6DBD7F642E343DF300608F0D /* pulseprompt */ = {
+		6DBD7F642E343DF300608F0D /* RunBeat */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				6DBA79C22E354F4800EDDAAE /* Exceptions for "pulseprompt" folder in "pulseprompt" target */,
-			);
-			path = pulseprompt;
+			path = RunBeat;
 			sourceTree = "<group>";
 		};
-		6DBD7F732E343DF600608F0D /* pulsepromptTests */ = {
+		6DBD7F732E343DF600608F0D /* RunBeatTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = pulsepromptTests;
+			path = RunBeatTests;
 			sourceTree = "<group>";
 		};
-		6DBD7F7D2E343DF600608F0D /* pulsepromptUITests */ = {
+		6DBD7F7D2E343DF600608F0D /* RunBeatUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = pulsepromptUITests;
+			path = RunBeatUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -93,9 +80,9 @@
 		6DBD7F592E343DF300608F0D = {
 			isa = PBXGroup;
 			children = (
-				6DBD7F642E343DF300608F0D /* pulseprompt */,
-				6DBD7F732E343DF600608F0D /* pulsepromptTests */,
-				6DBD7F7D2E343DF600608F0D /* pulsepromptUITests */,
+				6DBD7F642E343DF300608F0D /* RunBeat */,
+				6DBD7F732E343DF600608F0D /* RunBeatTests */,
+				6DBD7F7D2E343DF600608F0D /* RunBeatUITests */,
 				6DBD7F632E343DF300608F0D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -103,9 +90,9 @@
 		6DBD7F632E343DF300608F0D /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				6DBD7F622E343DF300608F0D /* pulseprompt.app */,
-				6DBD7F702E343DF600608F0D /* pulsepromptTests.xctest */,
-				6DBD7F7A2E343DF600608F0D /* pulsepromptUITests.xctest */,
+				6DBD7F622E343DF300608F0D /* RunBeat.app */,
+				6DBD7F702E343DF600608F0D /* RunBeatTests.xctest */,
+				6DBD7F7A2E343DF600608F0D /* RunBeatUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -113,9 +100,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		6DBD7F612E343DF300608F0D /* pulseprompt */ = {
+		6DBD7F612E343DF300608F0D /* RunBeat */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 6DBD7F842E343DF600608F0D /* Build configuration list for PBXNativeTarget "pulseprompt" */;
+			buildConfigurationList = 6DBD7F842E343DF600608F0D /* Build configuration list for PBXNativeTarget "RunBeat" */;
 			buildPhases = (
 				6DBD7F5E2E343DF300608F0D /* Sources */,
 				6DBD7F5F2E343DF300608F0D /* Frameworks */,
@@ -126,19 +113,19 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				6DBD7F642E343DF300608F0D /* pulseprompt */,
+				6DBD7F642E343DF300608F0D /* RunBeat */,
 			);
-			name = pulseprompt;
+			name = RunBeat;
 			packageProductDependencies = (
 				6D34307E2E4511D7003F0058 /* SpotifyiOS */,
 			);
-			productName = pulseprompt;
-			productReference = 6DBD7F622E343DF300608F0D /* pulseprompt.app */;
+			productName = RunBeat;
+			productReference = 6DBD7F622E343DF300608F0D /* RunBeat.app */;
 			productType = "com.apple.product-type.application";
 		};
-		6DBD7F6F2E343DF600608F0D /* pulsepromptTests */ = {
+		6DBD7F6F2E343DF600608F0D /* RunBeatTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 6DBD7F872E343DF600608F0D /* Build configuration list for PBXNativeTarget "pulsepromptTests" */;
+			buildConfigurationList = 6DBD7F872E343DF600608F0D /* Build configuration list for PBXNativeTarget "RunBeatTests" */;
 			buildPhases = (
 				6DBD7F6C2E343DF600608F0D /* Sources */,
 				6DBD7F6D2E343DF600608F0D /* Frameworks */,
@@ -150,18 +137,18 @@
 				6DBD7F722E343DF600608F0D /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				6DBD7F732E343DF600608F0D /* pulsepromptTests */,
+				6DBD7F732E343DF600608F0D /* RunBeatTests */,
 			);
-			name = pulsepromptTests;
+			name = RunBeatTests;
 			packageProductDependencies = (
 			);
-			productName = pulsepromptTests;
-			productReference = 6DBD7F702E343DF600608F0D /* pulsepromptTests.xctest */;
+			productName = RunBeatTests;
+			productReference = 6DBD7F702E343DF600608F0D /* RunBeatTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		6DBD7F792E343DF600608F0D /* pulsepromptUITests */ = {
+		6DBD7F792E343DF600608F0D /* RunBeatUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 6DBD7F8A2E343DF600608F0D /* Build configuration list for PBXNativeTarget "pulsepromptUITests" */;
+			buildConfigurationList = 6DBD7F8A2E343DF600608F0D /* Build configuration list for PBXNativeTarget "RunBeatUITests" */;
 			buildPhases = (
 				6DBD7F762E343DF600608F0D /* Sources */,
 				6DBD7F772E343DF600608F0D /* Frameworks */,
@@ -173,13 +160,13 @@
 				6DBD7F7C2E343DF600608F0D /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				6DBD7F7D2E343DF600608F0D /* pulsepromptUITests */,
+				6DBD7F7D2E343DF600608F0D /* RunBeatUITests */,
 			);
-			name = pulsepromptUITests;
+			name = RunBeatUITests;
 			packageProductDependencies = (
 			);
-			productName = pulsepromptUITests;
-			productReference = 6DBD7F7A2E343DF600608F0D /* pulsepromptUITests.xctest */;
+			productName = RunBeatUITests;
+			productReference = 6DBD7F7A2E343DF600608F0D /* RunBeatUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -205,7 +192,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 6DBD7F5D2E343DF300608F0D /* Build configuration list for PBXProject "pulseprompt" */;
+			buildConfigurationList = 6DBD7F5D2E343DF300608F0D /* Build configuration list for PBXProject "RunBeat" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -222,9 +209,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				6DBD7F612E343DF300608F0D /* pulseprompt */,
-				6DBD7F6F2E343DF600608F0D /* pulsepromptTests */,
-				6DBD7F792E343DF600608F0D /* pulsepromptUITests */,
+				6DBD7F612E343DF300608F0D /* RunBeat */,
+				6DBD7F6F2E343DF600608F0D /* RunBeatTests */,
+				6DBD7F792E343DF600608F0D /* RunBeatUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -280,12 +267,12 @@
 /* Begin PBXTargetDependency section */
 		6DBD7F722E343DF600608F0D /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 6DBD7F612E343DF300608F0D /* pulseprompt */;
+			target = 6DBD7F612E343DF300608F0D /* RunBeat */;
 			targetProxy = 6DBD7F712E343DF600608F0D /* PBXContainerItemProxy */;
 		};
 		6DBD7F7C2E343DF600608F0D /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 6DBD7F612E343DF300608F0D /* pulseprompt */;
+			target = 6DBD7F612E343DF300608F0D /* RunBeat */;
 			targetProxy = 6DBD7F7B2E343DF600608F0D /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -410,14 +397,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = pulseprompt/pulseprompt.entitlements;
+				CODE_SIGN_ENTITLEMENTS = RunBeat/runbeat.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 4BLMB9VVQ8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = pulseprompt/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = PulsePrompt;
+				INFOPLIST_FILE = RunBeat/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = RunBeat;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "This app uses Bluetooth to read your heart rate";
 				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "This app connects to WHOOP to monitor heart rate zones";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -434,7 +421,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markshore.pulseprompt;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markshore.runbeat;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
@@ -451,14 +438,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = pulseprompt/pulseprompt.entitlements;
+				CODE_SIGN_ENTITLEMENTS = RunBeat/runbeat.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 4BLMB9VVQ8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = pulseprompt/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = PulsePrompt;
+				INFOPLIST_FILE = RunBeat/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = RunBeat;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "This app uses Bluetooth to read your heart rate";
 				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "This app connects to WHOOP to monitor heart rate zones";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -475,7 +462,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markshore.pulseprompt;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markshore.runbeat;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
@@ -497,14 +484,14 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markshore.pulsepromptTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markshore.runbeat;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/pulseprompt.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/pulseprompt";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RunBeat.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RunBeat";
 				XROS_DEPLOYMENT_TARGET = 2.5;
 			};
 			name = Debug;
@@ -519,14 +506,14 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markshore.pulsepromptTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markshore.runbeat;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/pulseprompt.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/pulseprompt";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RunBeat.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RunBeat";
 				XROS_DEPLOYMENT_TARGET = 2.5;
 			};
 			name = Release;
@@ -540,14 +527,14 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markshore.pulsepromptUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markshore.runbeat;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = pulseprompt;
+				TEST_TARGET_NAME = RunBeat;
 				XROS_DEPLOYMENT_TARGET = 2.5;
 			};
 			name = Debug;
@@ -561,14 +548,14 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markshore.pulsepromptUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markshore.runbeat;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = pulseprompt;
+				TEST_TARGET_NAME = RunBeat;
 				XROS_DEPLOYMENT_TARGET = 2.5;
 			};
 			name = Release;
@@ -576,7 +563,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		6DBD7F5D2E343DF300608F0D /* Build configuration list for PBXProject "pulseprompt" */ = {
+		6DBD7F5D2E343DF300608F0D /* Build configuration list for PBXProject "RunBeat" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6DBD7F822E343DF600608F0D /* Debug */,
@@ -585,7 +572,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		6DBD7F842E343DF600608F0D /* Build configuration list for PBXNativeTarget "pulseprompt" */ = {
+		6DBD7F842E343DF600608F0D /* Build configuration list for PBXNativeTarget "RunBeat" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6DBD7F852E343DF600608F0D /* Debug */,
@@ -594,7 +581,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		6DBD7F872E343DF600608F0D /* Build configuration list for PBXNativeTarget "pulsepromptTests" */ = {
+		6DBD7F872E343DF600608F0D /* Build configuration list for PBXNativeTarget "RunBeatTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6DBD7F882E343DF600608F0D /* Debug */,
@@ -603,7 +590,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		6DBD7F8A2E343DF600608F0D /* Build configuration list for PBXNativeTarget "pulsepromptUITests" */ = {
+		6DBD7F8A2E343DF600608F0D /* Build configuration list for PBXNativeTarget "RunBeatUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6DBD7F8B2E343DF600608F0D /* Debug */,
