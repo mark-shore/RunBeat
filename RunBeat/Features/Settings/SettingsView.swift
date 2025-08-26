@@ -133,7 +133,7 @@ struct SettingsView: View {
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundColor(.white)
                                 
-                                Text("As your fitness and RHR change, your HR zone ranges are adjusted automatically. You can manually update them if they don't feel normal to you.")
+                                Text("You can manually update your HR zone ranges if they don't feel normal to you.")
                                     .font(.system(size: 12, weight: .regular))
                                     .foregroundColor(.gray)
                                     .multilineTextAlignment(.leading)
@@ -573,7 +573,7 @@ struct RestingHRPickerView: View {
                             Image(systemName: "info.circle.fill")
                                 .foregroundColor(.blue)
                             
-                            Text("WHOOP determines your default resting HR based on recent data. Change it if you know it to be a different value.")
+                            Text("Update your resting HR if you know it to be a different value.")
                                 .font(.system(size: 14, weight: .regular))
                                 .foregroundColor(.gray)
                                 .multilineTextAlignment(.leading)
@@ -649,7 +649,7 @@ struct MaxHRPickerView: View {
                             Image(systemName: "info.circle.fill")
                                 .foregroundColor(.blue)
                             
-                            Text("WHOOP determines your default max HR based on your age. Change it if you know it to be a different value.")
+                            Text("Update your max HR if you know it to be a different value.")
                                 .font(.system(size: 14, weight: .regular))
                                 .foregroundColor(.gray)
                                 .multilineTextAlignment(.leading)
