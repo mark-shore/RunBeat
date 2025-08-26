@@ -403,7 +403,6 @@
 				DEVELOPMENT_TEAM = 4BLMB9VVQ8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = RunBeat/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = RunBeat;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "This app uses Bluetooth to read your heart rate";
 				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "This app connects to WHOOP to monitor heart rate zones";
@@ -444,7 +443,6 @@
 				DEVELOPMENT_TEAM = 4BLMB9VVQ8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = RunBeat/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = RunBeat;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "This app uses Bluetooth to read your heart rate";
 				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "This app connects to WHOOP to monitor heart rate zones";
