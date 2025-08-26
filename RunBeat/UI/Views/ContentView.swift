@@ -130,7 +130,7 @@ struct ContentView: View {
                     .padding(.bottom, 60)
                 }
             }
-            .navigationTitle("PULSE PROMPT")
+            .navigationTitle("RUN BEAT")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
