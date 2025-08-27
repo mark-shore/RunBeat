@@ -718,3 +718,167 @@ extension SpotifyService: SPTAppRemotePlayerStateDelegate {
         notifyPlayerStateChange(isPlaying: isPlaying, trackName: trackName)
     }
 }
+
+// MARK: - Playlist Management
+extension SpotifyService {
+    func fetchUserPlaylists(completion: @escaping (Result<[SpotifyPlaylist], Error>) -> Void) {
+        guard let accessToken = accessToken else {
+            print("❌ No access token available for playlist fetch")
+            completion(.failure(SpotifyError.notAuthenticated))
+            return
+        }
+        
+        guard isAuthenticated else {
+            print("❌ Not authenticated with Spotify")
+            completion(.failure(SpotifyError.notAuthenticated))
+            return
+        }
+        
+        let playlistsURL = URL(string: "https://api.spotify.com/v1/me/playlists?limit=50&offset=0")!
+        var request = URLRequest(url: playlistsURL)
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpMethod = "GET"
+        
+        print("🎵 Fetching user playlists from Spotify Web API...")
+        print("🔑 Using access token: \(accessToken.prefix(20))...")
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            // Handle network errors
+            if let error = error {
+                print("❌ Network error fetching playlists: \(error.localizedDescription)")
+                completion(.failure(SpotifyError.networkError(error.localizedDescription)))
+                return
+            }
+            
+            guard let data = data else {
+                print("❌ No data received from playlists API")
+                completion(.failure(SpotifyError.noData))
+                return
+            }
+            
+            // Log response for debugging
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("📄 Playlist API Response: \(responseString.prefix(500))...")
+            }
+            
+            // Handle HTTP errors
+            if let httpResponse = response as? HTTPURLResponse {
+                print("📊 Playlists API response status: \(httpResponse.statusCode)")
+                
+                switch httpResponse.statusCode {
+                case 200:
+                    // Success - continue to parsing
+                    break
+                case 401:
+                    print("❌ Unauthorized - access token expired or invalid")
+                    self?.handleTokenExpired()
+                    completion(.failure(SpotifyError.tokenExpired))
+                    return
+                case 403:
+                    print("❌ Forbidden - insufficient permissions")
+                    completion(.failure(SpotifyError.insufficientPermissions))
+                    return
+                case 429:
+                    print("❌ Rate limited")
+                    completion(.failure(SpotifyError.rateLimited))
+                    return
+                default:
+                    print("❌ API Error - Status: \(httpResponse.statusCode)")
+                    completion(.failure(SpotifyError.apiError(httpResponse.statusCode)))
+                    return
+                }
+            }
+            
+            // Parse JSON response
+            do {
+                let decoder = JSONDecoder()
+                let apiResponse = try decoder.decode(SpotifyPlaylist.APIResponse.self, from: data)
+                let playlists = apiResponse.items.map { SpotifyPlaylist.from($0) }
+                
+                print("✅ Successfully fetched \(playlists.count) playlists")
+                for playlist in playlists.prefix(5) {
+                    print("   - \(playlist.name) (\(playlist.trackCount) tracks)")
+                }
+                
+                completion(.success(playlists))
+            } catch let decodingError {
+                print("❌ Error decoding playlists response: \(decodingError)")
+                if let decodingError = decodingError as? DecodingError {
+                    self?.logDecodingError(decodingError)
+                }
+                completion(.failure(SpotifyError.decodingError(decodingError.localizedDescription)))
+            }
+        }.resume()
+    }
+    
+    private func handleTokenExpired() {
+        print("🔄 Access token expired - clearing authentication state")
+        accessToken = nil
+        isAuthenticated = false
+        delegate?.spotifyServiceDidDisconnect(error: SpotifyError.tokenExpired)
+    }
+    
+    private func logDecodingError(_ error: DecodingError) {
+        switch error {
+        case .typeMismatch(let type, let context):
+            print("Type mismatch for type \(type): \(context.debugDescription)")
+            print("Coding path: \(context.codingPath)")
+        case .valueNotFound(let type, let context):
+            print("Value not found for type \(type): \(context.debugDescription)")
+            print("Coding path: \(context.codingPath)")
+        case .keyNotFound(let key, let context):
+            print("Key not found: \(key.stringValue): \(context.debugDescription)")
+            print("Coding path: \(context.codingPath)")
+        case .dataCorrupted(let context):
+            print("Data corrupted: \(context.debugDescription)")
+            print("Coding path: \(context.codingPath)")
+        @unknown default:
+            print("Unknown decoding error: \(error)")
+        }
+    }
+}
+
+// MARK: - Error Types
+enum SpotifyError: LocalizedError {
+    case notAuthenticated
+    case noData
+    case apiError(Int)
+    case networkError(String)
+    case tokenExpired
+    case insufficientPermissions
+    case rateLimited
+    case decodingError(String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .notAuthenticated:
+            return "Not authenticated with Spotify"
+        case .noData:
+            return "No data received from Spotify"
+        case .apiError(let code):
+            return "Spotify API error (code: \(code))"
+        case .networkError(let message):
+            return "Network error: \(message)"
+        case .tokenExpired:
+            return "Spotify session expired. Please reconnect."
+        case .insufficientPermissions:
+            return "Insufficient Spotify permissions"
+        case .rateLimited:
+            return "Too many requests. Please try again later."
+        case .decodingError(let message):
+            return "Data parsing error: \(message)"
+        }
+    }
+    
+    var isRecoverable: Bool {
+        switch self {
+        case .tokenExpired, .networkError, .rateLimited:
+            return true
+        case .notAuthenticated, .insufficientPermissions:
+            return false
+        case .noData, .apiError, .decodingError:
+            return true
+        }
+    }
+}

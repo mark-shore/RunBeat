@@ -14,3 +14,30 @@ struct AppSpacing {
     static let minTouchTarget: CGFloat = 44
     static let cornerRadius: CGFloat = 12
 }
+
+// MARK: - Container Responsibility System
+
+enum ContainerType {
+    case screen        // Top-level screen container
+    case modal         // Modal/sheet presentation
+    case section       // Content sections within screens
+    case component     // Individual UI components
+    
+    var horizontalPadding: CGFloat {
+        switch self {
+        case .screen: return 4      // Minimal for full-screen
+        case .modal: return 4       // Same as screen for consistency
+        case .section: return 0     // No additional padding
+        case .component: return 0   // Internal spacing only
+        }
+    }
+    
+    var verticalPadding: CGFloat {
+        switch self {
+        case .screen: return 8      // Minimal top/bottom
+        case .modal: return 8       // Same as screen
+        case .section: return 0     // No additional padding
+        case .component: return 0   // Internal spacing only
+        }
+    }
+}

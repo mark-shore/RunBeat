@@ -1,0 +1,29 @@
+---
+description: RunBeat development rules for SwiftUI + MVVM iOS app
+globs: ["**/*.swift"]
+alwaysApply: true
+---
+
+# RunBeat Development Rules
+
+## Context
+This is an audio-first iOS app for heart rate training with SwiftUI + MVVM architecture.
+
+## Critical Rules
+- NEVER modify HeartRateManager's core Bluetooth logic
+- ALWAYS preserve background execution functionality
+- Keep all audio announcement timing unchanged
+- Use the design system components (AppButton, AppCard, etc.)
+- Test on physical device (background modes don't work in simulator)
+
+## Current State
+- Heart rate monitoring: WORKING
+- Audio announcements: WORKING
+- VO2 training: NEEDS playlist selection UI
+- Design system: IMPLEMENTED
+
+## When Making Changes
+- UI updates must use @MainActor or DispatchQueue.main.async
+- Preserve all UserDefaults keys
+- Don't break Spotify authentication flow
+- Keep ViewModels as @StateObject or @ObservedObject

@@ -135,6 +135,8 @@ struct ContentView: View {
             .sheet(isPresented: $showingVO2MaxTraining) {
                 VO2MaxTrainingView()
                     .environmentObject(appState)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.hidden)
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())

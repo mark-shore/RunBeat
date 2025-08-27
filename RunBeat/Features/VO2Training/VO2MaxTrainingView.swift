@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import Foundation
+import Combine
 
 struct VO2MaxTrainingView: View {
     @StateObject private var trainingManager = VO2MaxTrainingManager.shared
@@ -13,11 +15,12 @@ struct VO2MaxTrainingView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var startedHRSession = false
+    @State private var showingPlaylistSelection = false
     
     var body: some View {
         NavigationView {
             ZStack {
-                // Dark background using design system
+                // Dark background
                 AppColors.background
                     .ignoresSafeArea()
                 
@@ -70,28 +73,47 @@ struct VO2MaxTrainingView: View {
                     
                     Spacer()
                     
-                    // Spotify Status
+                    // Spotify Training Cards - Side-by-Side Layout
                     if spotifyViewModel.isConnected {
-                        VStack(spacing: AppSpacing.xs) {
+                        HStack(spacing: 16) {
+                            // High Intensity Section
+                            VStack(alignment: .leading, spacing: 8) {
+                                SpotifyTrainingCard(
+                                    title: "High Intensity",
+                                    displayInfo: spotifyViewModel.highIntensityDisplayInfo
+                                ) {
+                                    showingPlaylistSelection = true
+                                }
+                            }
+                            .frame(maxWidth: .infinity) // Equal width distribution
+                            
+                            // Rest Section  
+                            VStack(alignment: .leading, spacing: 8) {
+                                SpotifyTrainingCard(
+                                    title: "Rest",
+                                    displayInfo: spotifyViewModel.restDisplayInfo
+                                ) {
+                                    showingPlaylistSelection = true
+                                }
+                            }
+                            .frame(maxWidth: .infinity) // Equal width distribution
+                        }
+                        .padding(.horizontal, 0) // No additional padding - use screen margin only
+                    } else {
+                        VStack(spacing: 12) {
                             HStack {
                                 Image(systemName: "music.note")
-                                    .foregroundColor(AppColors.success)
-                                Text("Spotify Connected")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.success)
+                                    .foregroundColor(.orange)
+                                Text("Connect Spotify to Start Training")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.orange)
                             }
                             
-                            if !spotifyViewModel.currentTrack.isEmpty {
-                                Text(spotifyViewModel.currentTrack)
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondary)
-                                    .lineLimit(1)
+                            AppButton("Connect Spotify", style: .spotify) {
+                                spotifyViewModel.connect()
                             }
                         }
-                    } else {
-                        AppButton("Connect Spotify", style: .spotify) {
-                            spotifyViewModel.connect()
-                        }
+                        .padding(.horizontal, 20)
                     }
                     
                     // Control Buttons
@@ -147,7 +169,8 @@ struct VO2MaxTrainingView: View {
                     
                     Spacer()
                 }
-                .padding(AppSpacing.screenMargin)
+                .padding(.horizontal, 12) // Reduced horizontal padding for wider cards
+                .padding(.vertical, AppSpacing.screenMargin)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -159,9 +182,23 @@ struct VO2MaxTrainingView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingPlaylistSelection) {
+            PlaylistSelectionView()
+        }
         .onAppear {
-            // Don't automatically connect - let user tap the button
             print("VO2 Max Training view appeared")
+            
+            // Ensure playlist fetch happens if connected
+            if spotifyViewModel.isConnected {
+                if spotifyViewModel.availablePlaylists.isEmpty {
+                    print("🎵 Auto-fetching playlists for training view")
+                    spotifyViewModel.fetchPlaylists()
+                } else if (spotifyViewModel.selectedHighIntensityPlaylist == nil || spotifyViewModel.selectedRestPlaylist == nil) &&
+                          (spotifyViewModel.playlistSelection.highIntensityPlaylistID != nil || spotifyViewModel.playlistSelection.restPlaylistID != nil) {
+                    print("🎵 Refreshing playlists to resolve missing selections")
+                    spotifyViewModel.fetchPlaylists()
+                }
+            }
         }
     }
     
