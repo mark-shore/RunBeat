@@ -8,24 +8,24 @@ struct ContentView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Dark background similar to WHOOP
-                Color.black
+                // Dark background using design system
+                AppColors.background
                     .ignoresSafeArea()
                 
-                VStack(spacing: 40) {
+                VStack(spacing: AppSpacing.xxl) {
                     // Header subtitle
-                    VStack(spacing: 8) {
+                    VStack(spacing: AppSpacing.sm) {
                         Text("Heart Rate Zone Training")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.gray)
+                            .font(AppTypography.headline)
+                            .foregroundColor(AppColors.secondary)
                             .tracking(1)
                     }
-                    .padding(.top, 40)
+                    .padding(.top, AppSpacing.xxl)
                     
                     Spacer()
                     
                     // Session button section
-                    VStack(spacing: 24) {
+                    VStack(spacing: AppSpacing.lg) {
                         Button(action: {
                             if appState.isSessionActive {
                                 appState.stopSession()
@@ -33,40 +33,32 @@ struct ContentView: View {
                                 appState.startSession()
                             }
                         }) {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(appState.isSessionActive ? "Training Session Active" : "Start Training Session")
-                                        .font(.system(size: 18, weight: .semibold))
-                                        .foregroundColor(.white)
+                            AppCard(style: appState.isSessionActive ? .active : .default) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                                        Text(appState.isSessionActive ? "Training Session Active" : "Start Training Session")
+                                            .font(AppTypography.title2)
+                                            .foregroundColor(AppColors.onBackground)
+                                        
+                                        Text(appState.isSessionActive ? "Tap to stop monitoring" : "Heart rate monitoring & zone announcements")
+                                            .font(AppTypography.callout)
+                                            .foregroundColor(AppColors.secondary)
+                                    }
                                     
-                                    Text(appState.isSessionActive ? "Tap to stop monitoring" : "Heart rate monitoring & zone announcements")
-                                        .font(.system(size: 14, weight: .regular))
-                                        .foregroundColor(.gray)
-                                }
-                                
-                                Spacer()
-                                
-                                // Session status icon
-                                ZStack {
-                                    Circle()
-                                        .fill(appState.isSessionActive ? Color.red : Color.green)
-                                        .frame(width: 50, height: 50)
+                                    Spacer()
                                     
-                                    Image(systemName: appState.isSessionActive ? "stop.fill" : "play.fill")
-                                        .font(.system(size: 20, weight: .bold))
-                                        .foregroundColor(.white)
+                                    // Session status icon
+                                    ZStack {
+                                        Circle()
+                                            .fill(appState.isSessionActive ? AppColors.error : AppColors.success)
+                                            .frame(width: 50, height: 50)
+                                        
+                                        Image(systemName: appState.isSessionActive ? "stop.fill" : "play.fill")
+                                            .font(AppTypography.title2)
+                                            .foregroundColor(AppColors.onBackground)
+                                    }
                                 }
                             }
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 20)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(appState.isSessionActive ? Color.red.opacity(0.1) : Color.green.opacity(0.1))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(appState.isSessionActive ? Color.red.opacity(0.3) : Color.green.opacity(0.3), lineWidth: 2)
-                            )
                         }
                         .buttonStyle(PlainButtonStyle())
                         
@@ -74,60 +66,52 @@ struct ContentView: View {
                         Button(action: {
                             showingVO2MaxTraining = true
                         }) {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("VO₂ Max Training")
-                                        .font(.system(size: 18, weight: .semibold))
-                                        .foregroundColor(.white)
+                            AppCard(style: .highlighted) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                                        Text("VO₂ Max Training")
+                                            .font(AppTypography.title2)
+                                            .foregroundColor(AppColors.onBackground)
+                                        
+                                        Text("4 min high-intensity intervals with Spotify")
+                                            .font(AppTypography.callout)
+                                            .foregroundColor(AppColors.secondary)
+                                    }
                                     
-                                    Text("4 min high-intensity intervals with Spotify")
-                                        .font(.system(size: 14, weight: .regular))
-                                        .foregroundColor(.gray)
-                                }
-                                
-                                Spacer()
-                                
-                                // VO2 Max icon
-                                ZStack {
-                                    Circle()
-                                        .fill(Color.orange)
-                                        .frame(width: 50, height: 50)
+                                    Spacer()
                                     
-                                    Image(systemName: "flame.fill")
-                                        .font(.system(size: 20, weight: .bold))
-                                        .foregroundColor(.white)
+                                    // VO2 Max icon
+                                    ZStack {
+                                        Circle()
+                                            .fill(AppColors.primary)
+                                            .frame(width: 50, height: 50)
+                                        
+                                        Image(systemName: "flame.fill")
+                                            .font(AppTypography.title2)
+                                            .foregroundColor(AppColors.onBackground)
+                                    }
                                 }
                             }
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 20)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color.orange.opacity(0.1))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color.orange.opacity(0.3), lineWidth: 2)
-                            )
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, AppSpacing.screenMargin)
                     
                     Spacer()
                     
                     // Status indicator
-                    VStack(spacing: 8) {
+                    VStack(spacing: AppSpacing.sm) {
                         Circle()
-                            .fill(appState.isSessionActive ? Color.green : Color.gray.opacity(0.3))
+                            .fill(appState.isSessionActive ? AppColors.success : AppColors.secondary.opacity(0.3))
                             .frame(width: 12, height: 12)
                             .animation(.easeInOut(duration: 0.3), value: appState.isSessionActive)
                         
                         Text(appState.isSessionActive ? "SESSION ACTIVE" : "READY TO START")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(appState.isSessionActive ? .green : .gray)
+                            .font(AppTypography.caption.weight(.bold))
+                            .foregroundColor(appState.isSessionActive ? AppColors.success : AppColors.secondary)
                             .tracking(1)
                     }
-                    .padding(.bottom, 60)
+                    .padding(.bottom, AppSpacing.xxl + AppSpacing.lg)
                 }
             }
             .navigationTitle("RUN BEAT")
@@ -138,8 +122,8 @@ struct ContentView: View {
                         showingSettings = true
                     }) {
                         Image(systemName: "gearshape.fill")
-                            .font(.system(size: 18))
-                            .foregroundColor(.white)
+                            .font(AppTypography.title2)
+                            .foregroundColor(AppColors.onBackground)
                     }
                 }
             }

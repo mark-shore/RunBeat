@@ -17,55 +17,53 @@ struct VO2MaxTrainingView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Dark background similar to WHOOP
-                Color.black
+                // Dark background using design system
+                AppColors.background
                     .ignoresSafeArea()
                 
-                VStack(spacing: 30) {
+                VStack(spacing: AppSpacing.xl) {
                     // Header
-                    VStack(spacing: 10) {
+                    VStack(spacing: AppSpacing.sm) {
                         Text("VO₂ Max Training")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
+                            .font(AppTypography.largeTitle)
+                            .foregroundColor(AppColors.onBackground)
                         
                         Text("4 min High Intensity • 3 min Rest • 4 Intervals")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
+                            .font(AppTypography.callout)
+                            .foregroundColor(AppColors.secondary)
                     }
                     
                     Spacer()
                     
                     // Timer Display
-                    VStack(spacing: 20) {
+                    VStack(spacing: AppSpacing.lg) {
                         ZStack {
                             Circle()
-                                .stroke(Color.gray.opacity(0.3), lineWidth: 15)
+                                .stroke(AppColors.surface, lineWidth: 15)
                                 .frame(width: 250, height: 250)
                             
                             Circle()
                                 .trim(from: 0, to: trainingManager.getProgressPercentage())
                                 .stroke(
-                                    trainingManager.currentPhase == .highIntensity ? Color.red : Color.green,
+                                    getPhaseColor(for: trainingManager.currentPhase),
                                     style: StrokeStyle(lineWidth: 15, lineCap: .round)
                                 )
                                 .frame(width: 250, height: 250)
                                 .rotationEffect(.degrees(-90))
                                 .animation(.easeInOut(duration: 1), value: trainingManager.getProgressPercentage())
                             
-                            VStack(spacing: 5) {
+                            VStack(spacing: AppSpacing.xs) {
                                 Text(trainingManager.formattedTimeRemaining())
-                                    .font(.system(size: 48, weight: .bold, design: .monospaced))
-                                    .foregroundColor(trainingManager.currentPhase == .highIntensity ? .red : .green)
+                                    .font(AppTypography.timerDisplay)
+                                    .foregroundColor(getPhaseColor(for: trainingManager.currentPhase))
                                 
                                 Text(trainingManager.getPhaseDescription())
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(trainingManager.currentPhase == .highIntensity ? .red : .green)
+                                    .font(AppTypography.title2)
+                                    .foregroundColor(getPhaseColor(for: trainingManager.currentPhase))
                                 
                                 Text("Interval \(trainingManager.currentInterval)/\(trainingManager.totalIntervals)")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondary)
                             }
                         }
                     }
@@ -74,32 +72,30 @@ struct VO2MaxTrainingView: View {
                     
                     // Spotify Status
                     if spotifyViewModel.isConnected {
-                        VStack(spacing: 5) {
+                        VStack(spacing: AppSpacing.xs) {
                             HStack {
                                 Image(systemName: "music.note")
-                                    .foregroundColor(.green)
+                                    .foregroundColor(AppColors.success)
                                 Text("Spotify Connected")
-                                    .font(.caption)
-                                    .foregroundColor(.green)
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.success)
                             }
                             
                             if !spotifyViewModel.currentTrack.isEmpty {
                                 Text(spotifyViewModel.currentTrack)
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondary)
                                     .lineLimit(1)
                             }
                         }
                     } else {
-                        Button("Connect Spotify") {
+                        AppButton("Connect Spotify", style: .spotify) {
                             spotifyViewModel.connect()
                         }
-                        .buttonStyle(.bordered)
-                        .foregroundColor(.green)
                     }
                     
                     // Control Buttons
-                    HStack(spacing: 20) {
+                    HStack(spacing: AppSpacing.lg) {
                         if trainingManager.isTraining {
                             // Pause/Resume button
                             Button(action: {
@@ -110,10 +106,10 @@ struct VO2MaxTrainingView: View {
                                 }
                             }) {
                                 Image(systemName: trainingManager.isPaused ? "play.fill" : "pause.fill")
-                                    .font(.title2)
-                                    .foregroundColor(.white)
+                                    .font(AppTypography.title2)
+                                    .foregroundColor(AppColors.onBackground)
                                     .frame(width: 60, height: 60)
-                                    .background(trainingManager.isPaused ? Color.green : Color.orange)
+                                    .background(trainingManager.isPaused ? AppColors.success : AppColors.warning)
                                     .clipShape(Circle())
                             }
                             
@@ -126,36 +122,32 @@ struct VO2MaxTrainingView: View {
                                 }
                             }) {
                                 Image(systemName: "stop.fill")
-                                    .font(.title2)
-                                    .foregroundColor(.white)
+                                    .font(AppTypography.title2)
+                                    .foregroundColor(AppColors.onBackground)
                                     .frame(width: 60, height: 60)
-                                    .background(Color.red)
+                                    .background(AppColors.error)
                                     .clipShape(Circle())
                             }
                         } else {
                             if trainingManager.currentPhase == .completed {
-                                Button("Start New Session") {
+                                AppButton("Start New Session", style: .primary) {
                                     trainingManager.startTraining()
                                 }
-                                .buttonStyle(.borderedProminent)
-                                .controlSize(.large)
                             } else {
-                                Button("Start Training") {
+                                AppButton("Start Training", style: .primary) {
                                     if !appState.isSessionActive {
                                         appState.startSession()
                                         startedHRSession = true
                                     }
                                     trainingManager.startTraining()
                                 }
-                                .buttonStyle(.borderedProminent)
-                                .controlSize(.large)
                             }
                         }
                     }
                     
                     Spacer()
                 }
-                .padding()
+                .padding(AppSpacing.screenMargin)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -163,13 +155,28 @@ struct VO2MaxTrainingView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(AppColors.onBackground)
                 }
             }
         }
         .onAppear {
             // Don't automatically connect - let user tap the button
             print("VO2 Max Training view appeared")
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func getPhaseColor(for phase: VO2MaxTrainingManager.TrainingPhase) -> Color {
+        switch phase {
+        case .notStarted:
+            return AppColors.success // Green for ready state
+        case .highIntensity:
+            return AppColors.primary // Red-orange for high intensity
+        case .rest:
+            return AppColors.zone1 // Blue for rest periods
+        case .completed:
+            return AppColors.success // Green for completed
         }
     }
 }

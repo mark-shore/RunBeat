@@ -37,11 +37,11 @@
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>This app uses Bluetooth to read your heart rate</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>This app connects to WHOOP to monitor heart rate zones</string>
+	<string>RunBeat connects to Bluetooth heart rate monitors to provide real-time heart rate data and training zone guidance during workouts.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>This app logs your workouts and reads heart rate to keep timers running in the background.</string>
+	<string>RunBeat reads your heart rate data to calculate training zones and provide personalized workout guidance.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>This app writes workout summaries for your training sessions.</string>
+	<string>RunBeat saves your workout data to Apple Health to track your training progress and performance over time.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
