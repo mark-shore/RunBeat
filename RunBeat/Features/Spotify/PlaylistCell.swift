@@ -411,7 +411,7 @@ struct SpotifyTrainingCard: View {
                         
                         HStack {
                             Text(displayInfo.displayText)
-                                .font(.system(size: 13, weight: .medium)) // Smaller font to match Spotify
+                                .font(.system(size: 13, weight: .bold)) // Bold font to match Spotify
                                 .foregroundColor(.white)
                                 .lineLimit(2) // Allow wrapping to 2 lines like Spotify
                                 .multilineTextAlignment(.leading)
@@ -700,6 +700,338 @@ struct CondensedPlaylistRow: View {
 
 
 
+// MARK: - Selection Type Enum
+
+enum SelectionType {
+    case highIntensity
+    case rest
+    
+    var title: String {
+        switch self {
+        case .highIntensity: return "High Intensity"
+        case .rest: return "Rest"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .highIntensity: return Color(red: 1.0, green: 0.27, blue: 0.0) // Brand red-orange
+        case .rest: return .blue
+        }
+    }
+    
+    var backgroundColor: Color {
+        switch self {
+        case .highIntensity: return Color(red: 1.0, green: 0.27, blue: 0.0).opacity(0.15) // Brand red-orange
+        case .rest: return Color.blue.opacity(0.15)
+        }
+    }
+}
+
+// MARK: - Selected Playlist Card (with color accent)
+
+struct SelectedPlaylistCard: View {
+    let playlist: SpotifyPlaylist
+    let type: SelectionType
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 0) {
+                // Square artwork fills entire card height (60x60pt)
+                artworkImage
+                
+                // Playlist info
+                VStack(alignment: .leading) {
+                    Spacer()
+                    
+                    HStack {
+                        Text(playlist.name)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .lineSpacing(1)
+                        
+                        Spacer()
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.leading, 8)
+                .padding(.trailing, 12)
+            }
+            .frame(height: 60)
+            .background(type.backgroundColor)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(type.color, lineWidth: 2)
+            )
+            .cornerRadius(8)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private var artworkImage: some View {
+        ZStack {
+            if let imageURL = playlist.imageURL,
+               let url = URL(string: imageURL) {
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    artworkPlaceholder
+                }
+                .frame(width: 60, height: 60)
+                .clipped()
+                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 8, bottomLeadingRadius: 8, bottomTrailingRadius: 0, topTrailingRadius: 0))
+            } else {
+                artworkPlaceholder
+                    .frame(width: 60, height: 60)
+                    .clipShape(UnevenRoundedRectangle(topLeadingRadius: 8, bottomLeadingRadius: 8, bottomTrailingRadius: 0, topTrailingRadius: 0))
+            }
+        }
+    }
+    
+    private var artworkPlaceholder: some View {
+        Rectangle()
+            .fill(type.color.opacity(0.3))
+            .overlay(
+                Image(systemName: "music.note")
+                    .font(.system(size: 20))
+                    .foregroundColor(type.color)
+            )
+    }
+}
+
+// MARK: - Empty Selection Card (minimal dashed border)
+
+struct EmptySelectionCard: View {
+    let type: SelectionType
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            // Centered plus icon only
+            Image(systemName: "plus")
+                .font(.system(size: 24, weight: .medium))
+                .foregroundColor(type.color)
+                .frame(width: 60, height: 60)
+                .background(Color.clear)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(
+                            type.color,
+                            style: StrokeStyle(
+                                lineWidth: 2,
+                                dash: [6, 4] // Dashed pattern: 6pt dash, 4pt gap
+                            )
+                        )
+                )
+                .opacity(0.7) // Subtle opacity for refined look
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Available Playlist Card (standard)
+
+struct AvailablePlaylistCard: View {
+    let playlist: SpotifyPlaylist
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 0) {
+                // Square artwork fills entire card height (60x60pt)
+                artworkImage
+                
+                // Playlist info
+                VStack(alignment: .leading) {
+                    Spacer()
+                    
+                    HStack {
+                        Text(playlist.name)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .lineSpacing(1)
+                        
+                        Spacer()
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.leading, 8)
+                .padding(.trailing, 12)
+            }
+            .frame(height: 60)
+            .background(Color.gray.opacity(0.2))
+            .cornerRadius(8)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private var artworkImage: some View {
+        ZStack {
+            if let imageURL = playlist.imageURL,
+               let url = URL(string: imageURL) {
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    artworkPlaceholder
+                }
+                .frame(width: 60, height: 60)
+                .clipped()
+                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 8, bottomLeadingRadius: 8, bottomTrailingRadius: 0, topTrailingRadius: 0))
+            } else {
+                artworkPlaceholder
+                    .frame(width: 60, height: 60)
+                    .clipShape(UnevenRoundedRectangle(topLeadingRadius: 8, bottomLeadingRadius: 8, bottomTrailingRadius: 0, topTrailingRadius: 0))
+            }
+        }
+    }
+    
+    private var artworkPlaceholder: some View {
+        Rectangle()
+            .fill(.gray.opacity(0.3))
+            .overlay(
+                Image(systemName: "music.note")
+                    .font(.system(size: 20))
+                    .foregroundColor(.gray)
+            )
+    }
+}
+
+// MARK: - Playlist Selection Card (for selection screen)
+
+struct PlaylistSelectionCard: View {
+    let playlist: SpotifyPlaylist
+    let assignment: PlaylistAssignment
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 0) {
+                // Square artwork fills entire card height (60x60pt)
+                artworkImage
+                
+                // Playlist info with selection indicator
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(playlist.name)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .lineSpacing(1)
+                        
+                        if playlist.trackCount > 0 {
+                            Text("\(playlist.trackCount) songs")
+                                .font(.system(size: 11, weight: .regular))
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    // Selection indicator
+                    if assignment != .none {
+                        selectionIndicator
+                    }
+                }
+                .padding(.leading, 8)
+                .padding(.trailing, 12)
+            }
+            .frame(height: 60)
+            .background(backgroundColor)
+            .cornerRadius(8)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private var artworkImage: some View {
+        ZStack {
+            if let imageURL = playlist.imageURL,
+               let url = URL(string: imageURL) {
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    artworkPlaceholder
+                }
+                .frame(width: 60, height: 60)
+                .clipped()
+                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 8, bottomLeadingRadius: 8, bottomTrailingRadius: 0, topTrailingRadius: 0))
+            } else {
+                artworkPlaceholder
+                    .frame(width: 60, height: 60)
+                    .clipShape(UnevenRoundedRectangle(topLeadingRadius: 8, bottomLeadingRadius: 8, bottomTrailingRadius: 0, topTrailingRadius: 0))
+            }
+        }
+    }
+    
+    private var artworkPlaceholder: some View {
+        Rectangle()
+            .fill(.gray.opacity(0.3))
+            .overlay(
+                Image(systemName: "music.note")
+                    .font(.system(size: 20))
+                    .foregroundColor(.gray)
+            )
+    }
+    
+    private var selectionIndicator: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 16))
+                .foregroundColor(selectionColor)
+            
+            Text(selectionText)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(selectionColor)
+        }
+    }
+    
+    private var backgroundColor: Color {
+        switch assignment {
+        case .none:
+            return Color.gray.opacity(0.2)
+        case .highIntensity:
+            return Color.orange.opacity(0.15)
+        case .rest:
+            return Color.blue.opacity(0.15)
+        }
+    }
+    
+    private var selectionColor: Color {
+        switch assignment {
+        case .none:
+            return .clear
+        case .highIntensity:
+            return .orange
+        case .rest:
+            return .blue
+        }
+    }
+    
+    private var selectionText: String {
+        switch assignment {
+        case .none:
+            return ""
+        case .highIntensity:
+            return "HIGH"
+        case .rest:
+            return "REST"
+        }
+    }
+}
+
 #Preview {
     let samplePlaylist = SpotifyPlaylist(
         id: "123",
@@ -721,6 +1053,25 @@ struct CondensedPlaylistRow: View {
         SpotifyTrainingCard(
             title: "Rest", 
             displayInfo: .notSelected
+        ) { }
+        
+        // Test selection cards
+        PlaylistSelectionCard(
+            playlist: samplePlaylist,
+            assignment: .highIntensity
+        ) { }
+        
+        PlaylistSelectionCard(
+            playlist: SpotifyPlaylist(
+                id: "456",
+                name: "Chill Beats for Recovery",
+                description: "Perfect for cool down",
+                trackCount: 32,
+                imageURL: nil,
+                isPublic: true,
+                owner: "Mark Shore"
+            ),
+            assignment: .rest
         ) { }
     }
     .padding()

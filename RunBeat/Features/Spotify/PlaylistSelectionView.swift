@@ -30,13 +30,7 @@ struct PlaylistSelectionView: View {
                             // Compact Header
                             compactHeaderSection
                             
-                            // Compact Selection Status (15% of screen)
-                            if spotifyViewModel.isConnected {
-                                compactSelectionStatus
-                                    .padding(.bottom, 12)
-                            }
-                            
-                            // Main Content (80% of screen)
+                            // Main Content
                             if !spotifyViewModel.isConnected {
                                 connectionSection
                             } else {
@@ -202,26 +196,32 @@ struct PlaylistSelectionView: View {
         }
     }
     
-    // MARK: - Spotify-Style Browsing Section (80% of screen)
+    // MARK: - Playlist Grid Browsing Section
     
     private var playlistBrowsingSection: some View {
-        VStack(spacing: 0) {
-            // Recently Played Section (First 8 playlists, Spotify-style)
-            recentlyPlayedSection
-            
-            // Browse Library Button
-            browseLibraryButton
-                .padding(.top, 12)
+        ScrollView {
+            VStack(spacing: 20) {
+                // Selected Playlists Section
+                selectedPlaylistsSection
+                
+                // Available Playlists Section  
+                availablePlaylistsSection
+                
+                // Browse Library Button
+                browseLibraryButton
+                    .padding(.top, 12)
+            }
+            .padding(.horizontal, 4)
         }
     }
     
-    // MARK: - Recently Played Section (Spotify Layout)
+    // MARK: - Selected Playlists Section
     
-    private var recentlyPlayedSection: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.md) {
+    private var selectedPlaylistsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
             // Section header
             HStack {
-                Text("Recently Played [DEBUG]")
+                Text("Selected Playlists")
                     .font(AppTypography.title2)
                     .foregroundColor(AppColors.onBackground)
                     .fontWeight(.medium)
@@ -229,12 +229,81 @@ struct PlaylistSelectionView: View {
                 Spacer()
             }
             
-            // Spotify-style 2-column grid (first 8 playlists)
-            recentlyPlayedGrid
+            // Selected playlists grid (High Intensity | Rest)
+            selectedPlaylistsGrid
         }
     }
     
-    private var recentlyPlayedGrid: some View {
+    // MARK: - Available Playlists Section
+    
+    private var availablePlaylistsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Section header
+            HStack {
+                Text("Choose Playlists")
+                    .font(AppTypography.title2)
+                    .foregroundColor(AppColors.onBackground)
+                    .fontWeight(.medium)
+                
+                Spacer()
+            }
+            
+            // Available playlists grid (2 columns)
+            availablePlaylistsGrid
+        }
+    }
+    
+    private var selectedPlaylistsGrid: some View {
+        HStack(spacing: 16) {
+            // High Intensity Section
+            VStack(alignment: .leading, spacing: 8) {
+                Text("High Intensity")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+                
+                if let highIntensityPlaylist = spotifyViewModel.selectedHighIntensityPlaylist {
+                    SelectedPlaylistCard(
+                        playlist: highIntensityPlaylist,
+                        type: .highIntensity
+                    ) {
+                        selectedPlaylistForAction = highIntensityPlaylist
+                        showingActionSheet = true
+                    }
+                } else {
+                    Text("Choose from playlists below")
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundColor(.gray)
+                        .frame(height: 60, alignment: .center) // Maintain spacing for when card appears
+                }
+            }
+            .frame(maxWidth: .infinity)
+            
+            // Rest Section
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Rest")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+                
+                if let restPlaylist = spotifyViewModel.selectedRestPlaylist {
+                    SelectedPlaylistCard(
+                        playlist: restPlaylist,
+                        type: .rest
+                    ) {
+                        selectedPlaylistForAction = restPlaylist
+                        showingActionSheet = true
+                    }
+                } else {
+                    Text("Choose from playlists below")
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundColor(.gray)
+                        .frame(height: 60, alignment: .center) // Maintain spacing for when card appears
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+    
+    private var availablePlaylistsGrid: some View {
         Group {
             switch spotifyViewModel.playlistFetchStatus {
             case .notStarted, .fetching:
@@ -243,7 +312,7 @@ struct PlaylistSelectionView: View {
                 if spotifyViewModel.availablePlaylists.isEmpty {
                     emptyPlaylistsView
                 } else {
-                    spotifyStyleGrid
+                    availablePlaylistsContent
                 }
             case .error(let message):
                 errorView(message: message)
@@ -251,22 +320,21 @@ struct PlaylistSelectionView: View {
         }
     }
     
-    private var spotifyStyleGrid: some View {
-        let recentPlaylists = Array(spotifyViewModel.availablePlaylists.prefix(8)) // First 8 like Spotify
+    private var availablePlaylistsContent: some View {
+        let availablePlaylists = spotifyViewModel.availablePlaylists.filter { playlist in
+            // Only show playlists that aren't currently selected
+            playlist.id != spotifyViewModel.playlistSelection.highIntensityPlaylistID &&
+            playlist.id != spotifyViewModel.playlistSelection.restPlaylistID
+        }
         
-        return ScrollView {
-            LazyVGrid(columns: [
-                GridItem(.flexible(), spacing: 2), // DEBUG: Very tight spacing
-                GridItem(.flexible())
-            ], spacing: 6) { // DEBUG: Very tight rows
-                ForEach(recentPlaylists) { playlist in
-                    PlaylistCard(
-                        playlist: playlist,
-                        selectionBadge: getBadgeForAssignment(getPlaylistAssignment(playlist))
-                    ) {
-                        selectedPlaylistForAction = playlist
-                        showingActionSheet = true
-                    }
+        return LazyVGrid(columns: [
+            GridItem(.flexible(), spacing: 12),
+            GridItem(.flexible(), spacing: 12)
+        ], spacing: 12) {
+            ForEach(availablePlaylists) { playlist in
+                AvailablePlaylistCard(playlist: playlist) {
+                    selectedPlaylistForAction = playlist
+                    showingActionSheet = true
                 }
             }
         }
@@ -424,18 +492,18 @@ struct PlaylistSelectionView: View {
     
     private var fullPlaylistList: some View {
         ScrollView {
-            LazyVStack(spacing: 8) {
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 12),
+                GridItem(.flexible(), spacing: 12)
+            ], spacing: 12) {
                 ForEach(spotifyViewModel.availablePlaylists) { playlist in
-                    CondensedPlaylistRow(
-                        playlist: playlist,
-                        assignment: getPlaylistAssignment(playlist)
-                    ) {
+                    AvailablePlaylistCard(playlist: playlist) {
                         selectedPlaylistForAction = playlist
                         showingActionSheet = true
                     }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 12)
             .padding(.bottom, 16)
         }
     }
