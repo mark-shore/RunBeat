@@ -117,6 +117,26 @@ class SpotifyService: NSObject {
         connectionManager.startAppRemoteConnectionWithToken(token)
     }
     
+    /// Connects to AppRemote on-demand when actually needed
+    private func ensureAppRemoteConnection() {
+        guard let appRemote = appRemote,
+              let token = accessToken else {
+            print("⚠️ [SpotifyService] Cannot ensure AppRemote connection - missing app remote or token")
+            return
+        }
+        
+        // Only connect if not already connected or connecting
+        guard !appRemote.isConnected && !isAppRemoteConnectionInProgress else {
+            print("✅ [SpotifyService] AppRemote already connected or connecting")
+            return
+        }
+        
+        print("🔄 [SpotifyService] Connecting AppRemote on-demand...")
+        isAppRemoteConnectionInProgress = true
+        startAppRemoteConnectionWithToken(token)
+        appRemote.connect()
+    }
+    
     private func handleConnectionStateChange(_ state: SpotifyConnectionState) {
         print("🔄 [SpotifyService] Connection state changed to: \(state.statusMessage)")
         
@@ -126,21 +146,12 @@ class SpotifyService: NSObject {
         // Handle state-specific logic
         switch state {
         case .authenticated(let token):
-            // When we have a token, prepare AppRemote but don't auto-connect during restoration
+            // When we have a token, prepare AppRemote but don't auto-connect
+            // AppRemote connection will happen on-demand when user needs it
             if let appRemote = appRemote {
                 appRemote.connectionParameters.accessToken = token
                 appRemote.delegate = self
-                
-                if !isAppRemoteConnectionInProgress && !appRemote.isConnected {
-                    print("🔄 [SpotifyService] Starting AppRemote connection with token")
-                    isAppRemoteConnectionInProgress = true
-                    // Use a helper method that doesn't rely on reading current state
-                    startAppRemoteConnectionWithToken(token)
-                    appRemote.connect()
-                } else if appRemote.isConnected {
-                    print("✅ [SpotifyService] AppRemote already connected, updating connection state")
-                    connectionManager.appRemoteConnectionSucceeded()
-                }
+                print("✅ [SpotifyService] AppRemote configured with token - ready for on-demand connection")
             }
             
         case .connected:
@@ -437,9 +448,9 @@ class SpotifyService: NSObject {
             }
         }
         
-        if accessToken != nil && !isAppRemoteConnected {
-            print("🔄 Attempting to reconnect AppRemote after returning to foreground...")
-            attemptAppRemoteReconnection()
+        // Don't auto-connect AppRemote on foreground - let it connect on-demand when needed
+        if accessToken != nil {
+            print("✅ [SpotifyService] Token available - AppRemote ready for on-demand connection")
         }
     }
     
@@ -455,10 +466,7 @@ class SpotifyService: NSObject {
         
         // First, check if we already have a valid session
         if isAuthenticated && accessToken != nil {
-            print("✅ [SpotifyService] Already authenticated, attempting AppRemote connection...")
-            if let appRemote = appRemote {
-                appRemote.connect()
-            }
+            print("✅ [SpotifyService] Already authenticated - ready for on-demand connection")
             delegate?.spotifyServiceDidConnect()
             return
         }
@@ -1434,6 +1442,9 @@ class SpotifyService: NSObject {
     }
     
     private func playPlaylist(playlistID: String, playlistName: String) {
+        // Ensure AppRemote connection first (on-demand)
+        ensureAppRemoteConnection()
+        
         // Try AppRemote first
         if let appRemote = appRemote, appRemote.isConnected {
             print("Using AppRemote to play \(playlistName)...")
@@ -1449,6 +1460,7 @@ class SpotifyService: NSObject {
     }
     
     func pause() {
+        // Only connect if we're not already connected
         if let appRemote = appRemote, appRemote.isConnected {
             print("Pausing via AppRemote...")
             appRemote.playerAPI?.pause { _, error in
