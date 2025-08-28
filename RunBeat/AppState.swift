@@ -4,23 +4,21 @@ import AVFoundation
 import Combine
 
 class AppState: ObservableObject {
-    @Published var isSessionActive = false
     @Published var currentBPM: Int = 0
+    @Published var activeTrainingMode: TrainingMode = .none
     
-    func startSession() {
-        isSessionActive = true
-        startHeartRateMonitoring()
-    }
-    
-    func stopSession() {
-        isSessionActive = false
-        stopHeartRateMonitoring()
+    // Legacy compatibility for existing UI
+    var isSessionActive: Bool {
+        return activeTrainingMode == .free
     }
 
     private let hrManager = HeartRateManager()
     private let announcer = SpeechAnnouncer()
     private let audioService = AudioService()
-    private let trainingManager = HeartRateTrainingManager()
+    
+    // NEW: Replace HeartRateTrainingManager with FreeTrainingManager
+    private let freeTrainingManager = FreeTrainingManager()
+    private let vo2TrainingManager = VO2MaxTrainingManager.shared
     
     // Heart rate zone settings ViewModel
     let heartRateViewModel = HeartRateViewModel()
@@ -28,10 +26,10 @@ class AppState: ObservableObject {
     init() {
         setupHeartRateMonitoring()
         setupAudioManagement()
-        setupTrainingManager()
+        setupAnnouncementHandling() // NEW: NotificationCenter observer
         observeHeartRateSettings()
 
-        print("🚀 AppState initialized – ready to start training session")
+        print("🚀 AppState initialized – ready for dual training mode architecture")
     }
     
     private func setupHeartRateMonitoring() {
@@ -39,22 +37,99 @@ class AppState: ObservableObject {
             DispatchQueue.main.async {
                 self?.currentBPM = bpm
             }
-            self?.trainingManager.processHeartRate(bpm)
-            VO2MaxTrainingManager.shared.tick(now: Date())
+            self?.routeHeartRateData(bpm)
+        }
+    }
+    
+    private func routeHeartRateData(_ bpm: Int) {
+        switch activeTrainingMode {
+        case .free:
+            freeTrainingManager.processHeartRate(bpm)
+        case .vo2Max:
+            vo2TrainingManager.processHeartRate(bpm)
+            vo2TrainingManager.tick(now: Date())
+        case .none:
+            break // No training active
         }
     }
     
     private func setupAudioManagement() {
         announcer.onAnnouncementFinished = { [weak self] in
             guard let self = self else { return }
-            self.audioService.restoreMusicVolume(isTrainingSessionActive: self.isSessionActive)
+            self.audioService.restoreMusicVolume(isTrainingSessionActive: self.activeTrainingMode != .none)
         }
         audioService.delegate = self
     }
     
-    private func setupTrainingManager() {
-        trainingManager.delegate = self
-        updateTrainingManagerSettings()
+    private func setupAnnouncementHandling() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleZoneAnnouncement(_:)),
+            name: .announceZone,
+            object: nil
+        )
+    }
+    
+    @objc private func handleZoneAnnouncement(_ notification: Notification) {
+        guard let zone = notification.object as? Int else { return }
+        announceZone(zone)
+    }
+    
+    // MARK: - Training Mode Management
+    
+    func startFreeTraining() {
+        guard activeTrainingMode == .none else {
+            print("⚠️ Cannot start free training - another mode is active: \(activeTrainingMode)")
+            return
+        }
+        
+        activeTrainingMode = .free
+        freeTrainingManager.start()
+        hrManager.startMonitoring()
+        updateZoneSettings()
+        print("🏃 Free training mode started")
+    }
+    
+    func stopFreeTraining() {
+        guard activeTrainingMode == .free else { return }
+        
+        freeTrainingManager.stop()
+        hrManager.stopMonitoring()
+        audioService.deactivateAudioSession()
+        activeTrainingMode = .none
+        print("⏹️ Free training mode stopped")
+    }
+    
+    func startVO2Training() {
+        guard activeTrainingMode == .none else {
+            print("⚠️ Cannot start VO2 training - another mode is active: \(activeTrainingMode)")
+            return
+        }
+        
+        activeTrainingMode = .vo2Max
+        hrManager.startMonitoring()
+        updateZoneSettings()
+        vo2TrainingManager.startTraining()
+        print("🏃 VO2 Max training mode started")
+    }
+    
+    func stopVO2Training() {
+        guard activeTrainingMode == .vo2Max else { return }
+        
+        vo2TrainingManager.stopTraining()
+        hrManager.stopMonitoring()
+        audioService.deactivateAudioSession()
+        activeTrainingMode = .none
+        print("⏹️ VO2 Max training mode stopped")
+    }
+    
+    // LEGACY: Keep for backward compatibility during migration
+    func startSession() {
+        startFreeTraining()
+    }
+    
+    func stopSession() {
+        stopFreeTraining()
     }
     
     private func observeHeartRateSettings() {
@@ -66,7 +141,7 @@ class AppState: ObservableObject {
         )
         .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
         .sink { [weak self] _, _, _ in
-            self?.updateTrainingManagerSettings()
+            self?.updateZoneSettings()
         }
         .store(in: &cancellables)
         
@@ -78,7 +153,7 @@ class AppState: ObservableObject {
         )
         .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
         .sink { [weak self] _, _, _ in
-            self?.updateTrainingManagerSettings()
+            self?.updateZoneSettings()
         }
         .store(in: &cancellables)
     }
@@ -86,33 +161,32 @@ class AppState: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     
     deinit {
+        NotificationCenter.default.removeObserver(self)
         audioService.deactivateAudioSession()
     }
     
-    private func startHeartRateMonitoring() {
-        hrManager.startMonitoring()
-        trainingManager.resetSessionState()
-        updateTrainingManagerSettings() // Ensure latest settings are applied
-        print("💓 Training session started - heart rate monitoring active")
-    }
-    
-    private func stopHeartRateMonitoring() {
-        hrManager.stopMonitoring()
-        audioService.deactivateAudioSession()
-        trainingManager.resetSessionState()
-        print("🔋 Training session ended - heart rate monitoring stopped")
-    }
-
     private func announceZone(_ zone: Int) {
-        // Reactivate audio session before announcement
         audioService.setupAudioSessionForAnnouncement()
         announcer.announceZone(zone)
         print("🔊 Zone \(zone) announced")
     }
     
-    private func updateTrainingManagerSettings() {
+    private func updateZoneSettings() {
         let settings = heartRateViewModel.getCurrentZoneSettings()
-        trainingManager.updateZoneSettings(
+        
+        freeTrainingManager.updateZoneSettings(
+            restingHR: settings.restingHR,
+            maxHR: settings.maxHR,
+            useAutoZones: settings.useAutoZones,
+            zone1Lower: settings.manualZones.zone1Lower,
+            zone1Upper: settings.manualZones.zone1Upper,
+            zone2Upper: settings.manualZones.zone2Upper,
+            zone3Upper: settings.manualZones.zone3Upper,
+            zone4Upper: settings.manualZones.zone4Upper,
+            zone5Upper: settings.manualZones.zone5Upper
+        )
+        
+        vo2TrainingManager.updateZoneSettings(
             restingHR: settings.restingHR,
             maxHR: settings.maxHR,
             useAutoZones: settings.useAutoZones,
@@ -128,27 +202,9 @@ class AppState: ObservableObject {
 
 }
 
-// MARK: - HeartRateTrainingDelegate
-extension AppState: HeartRateTrainingDelegate {
-    func heartRateTraining(_ manager: HeartRateTrainingManager, didDetectZoneChange newZone: Int, fromZone oldZone: Int?) {
-        // Zone change detected - no additional action needed here
-    }
-    
-    func heartRateTraining(_ manager: HeartRateTrainingManager, shouldAnnounceZone zone: Int) -> Bool {
-        // Only announce if we're in an active session
-        return isSessionActive
-    }
-    
-    func heartRateTraining(_ manager: HeartRateTrainingManager, didRequestZoneAnnouncement zone: Int) {
-        // Perform the actual announcement
-        announceZone(zone)
-    }
-}
-
 // MARK: - AudioServiceDelegate
 extension AppState: AudioServiceDelegate {
     func audioServiceDidRestoreMusicVolume() {
-        // Hook for future audio-related state updates if needed
         print("🎵 Audio service restored music volume")
     }
 }

@@ -20,6 +20,10 @@ class VO2MaxTrainingManager: ObservableObject {
     
     private var timer: Timer?
     private var spotifyViewModel: SpotifyViewModel
+    
+    // NEW: Shared services for HR processing and announcements
+    private let hrService = HeartRateService()
+    private let announcements = ZoneAnnouncementCoordinator()
     private struct IntervalState {
         var phase: TrainingPhase
         var start: Date
@@ -49,12 +53,14 @@ class VO2MaxTrainingManager: ObservableObject {
     private init() {
         // Initialize with shared SpotifyViewModel for consistent state
         self.spotifyViewModel = SpotifyViewModel.shared
+        self.announcements.delegate = self // NEW: Set up announcement delegation
     }
     
     // Dependency injection for testing
     init(spotifyViewModel: SpotifyViewModel, timeProvider: TimeProvider = SystemTimeProvider()) {
         self.spotifyViewModel = spotifyViewModel
         self.timeProvider = timeProvider
+        self.announcements.delegate = self // NEW: Set up announcement delegation
     }
     
     // MARK: - Computed Properties
@@ -64,9 +70,14 @@ class VO2MaxTrainingManager: ObservableObject {
         return trainingState == .active
     }
     
+    
     func startTraining() {
         print("🏃 Starting VO2 Max training...")
         print("🎵 Spotify connected: \(spotifyViewModel.isConnected)")
+        
+        // NEW: Reset HR services
+        hrService.resetState()
+        announcements.resetState()
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
@@ -139,6 +150,10 @@ class VO2MaxTrainingManager: ObservableObject {
         
         // Reset device activation state for next training session
         spotifyViewModel.resetDeviceActivationState()
+        
+        // NEW: Reset services
+        hrService.resetState()
+        announcements.resetState()
     }
     
     /// Resets the training session to setup state (for completed training)
@@ -156,6 +171,10 @@ class VO2MaxTrainingManager: ObservableObject {
         // Clean up any remaining state
         lastIssuedCommandInterval = nil
         intervalState = nil
+        
+        // NEW: Reset services  
+        hrService.resetState()
+        announcements.resetState()
     }
     
     private func startNextInterval() {
@@ -293,5 +312,52 @@ class VO2MaxTrainingManager: ObservableObject {
     
     func getProgressPercentage() -> Double {
         return Double(currentInterval - 1) / Double(totalIntervals)
+    }
+    
+    // MARK: - Heart Rate Processing
+    
+    /// NEW: Heart rate processing using shared service
+    func processHeartRate(_ bpm: Int) {
+        let result = hrService.processHeartRate(bpm)
+        
+        if let newZone = result.currentZone, result.didChangeZone {
+            announcements.handleZoneChange(newZone, from: result.oldZone, for: .vo2Max)
+        }
+    }
+    
+    /// NEW: Announcement controls
+    func setAnnouncementsEnabled(_ enabled: Bool) {
+        announcements.setAnnouncementsEnabled(enabled, for: .vo2Max)
+    }
+    
+    /// NEW: Zone settings management
+    func updateZoneSettings(restingHR: Int, maxHR: Int, useAutoZones: Bool, 
+                          zone1Lower: Int = 60, zone1Upper: Int = 70, 
+                          zone2Upper: Int = 80, zone3Upper: Int = 90, 
+                          zone4Upper: Int = 100, zone5Upper: Int = 110) {
+        hrService.updateZoneSettings(
+            restingHR: restingHR,
+            maxHR: maxHR,
+            useAutoZones: useAutoZones,
+            zone1Lower: zone1Lower,
+            zone1Upper: zone1Upper,
+            zone2Upper: zone2Upper,
+            zone3Upper: zone3Upper,
+            zone4Upper: zone4Upper,
+            zone5Upper: zone5Upper
+        )
+    }
+    
+    /// NEW: Get current HR zone
+    func getCurrentZone() -> Int? {
+        return hrService.getCurrentZone()
+    }
+}
+
+// NEW: ZoneAnnouncementDelegate implementation
+extension VO2MaxTrainingManager: ZoneAnnouncementDelegate {
+    func announceZone(_ zone: Int) {
+        NotificationCenter.default.post(name: .announceZone, object: zone)
+        print("🔊 VO2 Max training requesting zone \(zone) announcement")
     }
 }

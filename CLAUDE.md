@@ -42,9 +42,17 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 
 #### Heart Rate Module (`Features/HeartRate/`)
 - `HeartRateManager.swift`: CoreBluetooth integration for HR monitoring
-- `HeartRateTrainingManager.swift`: Training session state management
 - `HeartRateZoneCalculator.swift`: Pure zone calculation logic
 - `HeartRateViewModel.swift`: UI state and settings persistence
+
+#### Core Services (`Core/Services/`)
+- `HeartRateService.swift`: Shared HR processing and zone calculation service
+- `ZoneAnnouncementCoordinator.swift`: Per-training-mode announcement management
+- `SpeechAnnouncer.swift`: Audio announcement execution
+- `AudioService.swift`: Audio session and volume management
+
+#### Free Training Module (`Features/FreeTraining/`)
+- `FreeTrainingManager.swift`: Simple background HR monitoring with announcements
 
 #### Spotify Module (`Features/Spotify/`)
 - `SpotifyService.swift`: Core orchestration and business logic
@@ -56,9 +64,9 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - Features: Seamless training integration, reliable background playlist switching, automatic activation tracking
 
 #### VO2 Training Module (`Features/VO2Training/`)
-- `VO2MaxTrainingManager.swift`: 4x4 interval training coordination
+- `VO2MaxTrainingManager.swift`: 4x4 interval training coordination with shared HR services
 - `VO2MaxTrainingView.swift`: Training UI with design system integration
-- Automatic playlist switching during intervals
+- Features: Structured intervals, Spotify playlist switching, configurable zone announcements
 
 ### Design System (`UI/DesignSystem/`)
 - `AppColors.swift`: Brand colors (primary: #FF4500)
@@ -79,6 +87,9 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - Maintain dark theme consistency
 
 ### State Management
+- **Dual Training Architecture**: Free Training and VO2 Max Training are independent modes
+- **AppState**: Coordinates training mode mutual exclusion (only one active at a time)
+- **Shared Services**: HeartRateService and ZoneAnnouncementCoordinator used by both training modes
 - ViewModels manage UI state with `@Published` properties
 - Services handle business logic and external integrations
 - UserDefaults for settings persistence (preserve existing keys)

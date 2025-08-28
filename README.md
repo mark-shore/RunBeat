@@ -66,8 +66,9 @@ RunBeat/
 │   ├── HeartRate/                 # Heart rate monitoring and training
 │   │   ├── HeartRateManager.swift        # CoreBluetooth heart rate monitoring
 │   │   ├── HeartRateViewModel.swift      # Heart rate settings UI state
-│   │   ├── HeartRateTrainingManager.swift # Training session management
 │   │   └── HeartRateZoneCalculator.swift # Zone calculation logic
+│   ├── FreeTraining/              # Free training mode
+│   │   └── FreeTrainingManager.swift    # Simple background HR monitoring
 │   ├── Spotify/                   # Spotify integration
 │   │   ├── SpotifyService.swift          # Core orchestration and business logic
 │   │   ├── SpotifyConnectionManager.swift # Unified connection state management
@@ -128,11 +129,11 @@ RunBeat/
 - Provides validation for heart rate calculations
 - Supports both automatic (Karvonen) and manual zone configuration
 
-#### HeartRateTrainingManager
-- Manages active training session state
-- Handles zone announcement timing and cooldowns
-- Coordinates with AudioService for voice prompts
-- Tracks time in zones and session statistics
+#### FreeTrainingManager  
+- Simple background HR monitoring with zone announcements
+- Uses shared HeartRateService and ZoneAnnouncementCoordinator
+- Independent announcement controls
+- Lightweight training mode for general HR monitoring
 
 #### HeartRateZoneCalculator
 - Pure, stateless heart rate zone calculations

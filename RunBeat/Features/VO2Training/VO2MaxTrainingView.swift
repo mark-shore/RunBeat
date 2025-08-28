@@ -14,7 +14,6 @@ struct VO2MaxTrainingView: View {
     @StateObject private var spotifyViewModel = SpotifyViewModel.shared
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
-    @State private var startedHRSession = false
     @State private var showingPlaylistSelection = false
     
     var body: some View {
@@ -93,10 +92,7 @@ struct VO2MaxTrainingView: View {
                         case .setup:
                             // Setup State: Show start button
                             AppButton("Start Training", style: .primary) {
-                                if !appState.isSessionActive {
-                                    appState.startSession()
-                                    startedHRSession = true
-                                }
+                                appState.startVO2Training()
                                 trainingManager.startTraining()
                             }
                             
@@ -105,10 +101,7 @@ struct VO2MaxTrainingView: View {
                             HStack(spacing: AppSpacing.lg) {
                                 Button(action: {
                                     trainingManager.stopTraining()
-                                    if startedHRSession {
-                                        appState.stopSession()
-                                        startedHRSession = false
-                                    }
+                                    appState.stopVO2Training()
                                 }) {
                                     Image(systemName: "stop.fill")
                                         .font(AppTypography.title2)
@@ -129,10 +122,7 @@ struct VO2MaxTrainingView: View {
                                 
                                 AppButton("Start New Session", style: .primary) {
                                     trainingManager.resetToSetup()
-                                    if !appState.isSessionActive {
-                                        appState.startSession()
-                                        startedHRSession = true
-                                    }
+                                    appState.startVO2Training()
                                     trainingManager.startTraining()
                                 }
                             }
