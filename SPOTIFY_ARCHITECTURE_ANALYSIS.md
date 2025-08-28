@@ -251,20 +251,24 @@ case .rest:
 - ✅ Structured error recovery with retry strategies
 - ✅ Training music flow without restarts
 - ✅ Clean duplicate connection prevention
+- ✅ Background execution reliability (playlist switching during phone-away training)
 
 **Architecture Benefits**:
-- **User Experience**: Seamless authentication and music control
+- **User Experience**: Seamless authentication and music control in foreground and background
 - **Maintainability**: Clear separation of concerns and single responsibilities
-- **Reliability**: Robust error handling and state management
+- **Reliability**: Robust error handling and state management across all execution contexts
 - **Performance**: Optimized data processing and connection management
+- **Background Training**: Reliable playlist switching during phone-away workouts
 
 ## Implementation Roadmap Status
 
 - ✅ **Phase 1: Authentication Persistence** - Complete
 - ✅ **Phase 2: Connection State Consolidation** - Complete  
 - ✅ **Phase 3: Data Source Simplification** - Complete
-- ✅ **Phase 4: Error Handling Enhancement** - Complete
+- ✅ **Phase 4: Error Handling Enhancement** - Complete (includes background execution regression fix)
 - ⏸️ **Phase 5: Dependency Injection** - Deferred
+
+**Phase 4 Completion Notes**: The error handling enhancement phase successfully resolved a background execution regression that was introduced during the architectural refactor. The implementation now includes background-aware error recovery, authentication state preservation during background AppRemote failures, and robust background task management for playlist switching.
 
 **Phase 5 Status**: Dependency injection (removing singleton patterns, protocol-based dependencies) has been deferred as the current architecture provides excellent functionality and maintainability. The singleton pattern works well for this app's scale and use case.
 
@@ -292,4 +296,10 @@ Current architecture supports:
 - Selection persistence after app restart
 - Training validation with missing playlist selections
 
-The Spotify integration is now architecturally sound, user-friendly, and ready for long-term maintenance.
+### Background Execution Testing
+- **Background Playlist Switching**: Verify multiple playlist changes during backgrounded training
+- **Authentication Persistence**: Confirm auth state maintained across background/foreground cycles
+- **Error Recovery**: Test background timeout handling and graceful Web API fallback
+- **State Machine Integrity**: Validate connection state transitions during background execution
+
+The Spotify integration is now architecturally sound, user-friendly, background-execution reliable, and ready for long-term maintenance.

@@ -8,6 +8,8 @@ struct AppTypography {
     static let title3 = Font.title3.weight(.semibold)
     static let headline = Font.headline.weight(.medium)
     static let body = Font.body
+    static let bodyLarge = Font.body.weight(.medium)
+    static let bodyMedium = Font.callout.weight(.medium)
     static let callout = Font.callout
     static let caption = Font.caption
     static let caption2 = Font.caption2

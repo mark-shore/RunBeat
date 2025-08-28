@@ -8,6 +8,7 @@
 
 import Foundation
 import Combine
+import UIKit
 
 /// Recovery actions that can be taken for different error types
 enum ErrorRecoveryAction {
@@ -278,24 +279,45 @@ class SpotifyErrorHandler: ObservableObject {
     }
     
     private func handleAppRemoteError(attempts: Int, context: ErrorContext) -> ErrorRecoveryAction {
+        let appState = UIApplication.shared.applicationState
+        let isBackground = appState == .background
+        
         if attempts < maxRetryAttempts {
-            // During training, be more aggressive with reconnection
+            // During training, be more aggressive with reconnection but gentle in background
             if context.isTrainingActive {
-                return .reconnectAppRemote
+                if isBackground {
+                    // In background during training, use Web API fallback instead of aggressive reconnection
+                    return .degradeToWebAPIOnly
+                } else {
+                    return .reconnectAppRemote
+                }
             } else {
                 return .retryWithExponentialBackoff
             }
         } else {
-            // After max retries, degrade gracefully
+            // After max retries, degrade gracefully without clearing auth
             return .degradeToWebAPIOnly
         }
     }
     
     private func handleNetworkError(attempts: Int, context: ErrorContext) -> ErrorRecoveryAction {
+        let appState = UIApplication.shared.applicationState
+        let isBackground = appState == .background
+        
         if attempts < maxRetryAttempts {
-            return .retryWithExponentialBackoff
+            if isBackground {
+                // In background, be more conservative with retries to preserve battery/resources
+                return .degradeToWebAPIOnly
+            } else {
+                return .retryWithExponentialBackoff
+            }
         } else {
-            return .showUserErrorMessage("Check your internet connection")
+            // Don't show user messages during background operations
+            if isBackground {
+                return .degradeToWebAPIOnly
+            } else {
+                return .showUserErrorMessage("Check your internet connection")
+            }
         }
     }
     

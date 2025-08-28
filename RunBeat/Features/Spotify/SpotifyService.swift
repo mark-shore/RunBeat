@@ -108,6 +108,11 @@ class SpotifyService: NSObject {
             .store(in: &cancellables)
     }
     
+    /// Helper method to start AppRemote connection without race conditions
+    private func startAppRemoteConnectionWithToken(_ token: String) {
+        connectionManager.startAppRemoteConnectionWithToken(token)
+    }
+    
     private func handleConnectionStateChange(_ state: SpotifyConnectionState) {
         print("🔄 [SpotifyService] Connection state changed to: \(state.statusMessage)")
         
@@ -125,7 +130,8 @@ class SpotifyService: NSObject {
                 if !isAppRemoteConnectionInProgress && !appRemote.isConnected {
                     print("🔄 [SpotifyService] Starting AppRemote connection with token")
                     isAppRemoteConnectionInProgress = true
-                    connectionManager.startAppRemoteConnection()
+                    // Use a helper method that doesn't rely on reading current state
+                    startAppRemoteConnectionWithToken(token)
                     appRemote.connect()
                 } else if appRemote.isConnected {
                     print("✅ [SpotifyService] AppRemote already connected, updating connection state")
@@ -1325,25 +1331,59 @@ class SpotifyService: NSObject {
     }
     
     private func handleBackgroundPlayback(playlistID: String, isHighIntensity: Bool) {
-        guard accessToken != nil else { return }
+        guard accessToken != nil else { 
+            print("❌ [Background] No access token for playlist switch")
+            return 
+        }
         
         var bgTask: UIBackgroundTaskIdentifier = .invalid
-        let taskName = isHighIntensity ? "PlayHighIntensityBG" : "PlayRestBG"
+        let playlistType = isHighIntensity ? "HighIntensity" : "Rest"
+        let taskName = "PlaylistSwitch_\(playlistType)_\(Date().timeIntervalSince1970)"
         
+        print("📱 [Background] Starting background task: \(taskName)")
         bgTask = UIApplication.shared.beginBackgroundTask(withName: taskName) { 
-            UIApplication.shared.endBackgroundTask(bgTask)
-            bgTask = .invalid
+            print("⏰ [Background] Background task \(taskName) expired - cleaning up")
+            if bgTask != .invalid {
+                UIApplication.shared.endBackgroundTask(bgTask)
+                bgTask = .invalid
+            }
+        }
+        
+        guard bgTask != .invalid else {
+            print("❌ [Background] Failed to start background task for playlist switch")
+            return
+        }
+        
+        // Use longer timeout for background playlist switches
+        let timeoutDelay: TimeInterval = 15.0
+        let timeoutTimer = Timer.scheduledTimer(withTimeInterval: timeoutDelay, repeats: false) { _ in
+            print("⏰ [Background] Playlist switch timeout after \(timeoutDelay)s")
+            if bgTask != .invalid {
+                UIApplication.shared.endBackgroundTask(bgTask)
+                bgTask = .invalid
+            }
         }
         
         activateIPhoneDeviceForPlayback { [weak self] success in
+            defer {
+                timeoutTimer.invalidate()
+                if bgTask != .invalid {
+                    print("✅ [Background] Completing background task: \(taskName)")
+                    UIApplication.shared.endBackgroundTask(bgTask)
+                    bgTask = .invalid
+                }
+            }
+            
             guard let self = self else { return }
+            
             if success {
                 let playlistName = isHighIntensity ? "High Intensity Playlist" : "Rest Playlist"
+                print("🎵 [Background] Switching to \(playlistName) via Web API")
                 self.playPlaylistViaWebAPI(playlistID: playlistID, playlistName: playlistName)
             } else {
-                print("Background: Could not activate device; skipping URL scheme (not allowed in background)")
+                print("📱 [Background] Device activation failed - playlist switch skipped")
+                // In background, this is expected behavior, not an error
             }
-            UIApplication.shared.endBackgroundTask(bgTask)
         }
     }
     
@@ -1813,7 +1853,7 @@ extension SpotifyService: SPTAppRemoteDelegate {
             attemptNumber: 1,
             lastSuccessTime: nil,
             connectionState: connectionManager.connectionState,
-            isTrainingActive: false // Could be determined dynamically
+            isTrainingActive: isTrackPollingActive // Use polling status as proxy for training activity
         )
         
         let recoveryAction = errorHandler.handleError(recoverableError, context: context)
@@ -1836,7 +1876,7 @@ extension SpotifyService: SPTAppRemoteDelegate {
                 attemptNumber: 1,
                 lastSuccessTime: nil,
                 connectionState: connectionManager.connectionState,
-                isTrainingActive: false // Could be determined dynamically
+                isTrainingActive: isTrackPollingActive // Use polling status as proxy for training activity
             )
             
             let recoveryAction = errorHandler.handleError(recoverableError, context: context)

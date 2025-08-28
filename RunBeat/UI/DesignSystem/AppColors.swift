@@ -7,6 +7,7 @@ struct AppColors {
     // Backgrounds
     static let background = Color.black
     static let surface = Color(red: 0.17, green: 0.17, blue: 0.18) // #2C2C2E dark gray
+    static let surfaceSecondary = Color(red: 0.11, green: 0.11, blue: 0.12) // #1C1C1E darker gray
     
     // Text
     static let onBackground = Color.white

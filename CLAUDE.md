@@ -48,12 +48,12 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 
 #### Spotify Module (`Features/Spotify/`)
 - `SpotifyService.swift`: Core orchestration and business logic
-- `SpotifyConnectionManager.swift`: Unified connection state management
+- `SpotifyConnectionManager.swift`: Unified connection state management with background-aware error handling
 - `SpotifyDataCoordinator.swift`: Intelligent data source prioritization
-- `SpotifyErrorHandler.swift`: Structured error recovery with retry strategies
+- `SpotifyErrorHandler.swift`: Structured error recovery with background execution support
 - `SpotifyViewModel.swift`: UI state management with persistent authentication
 - `KeychainWrapper.swift`: Secure token storage (eliminates repeated OAuth)
-- Features: Seamless training integration, automatic activation tracking, background-safe operation
+- Features: Seamless training integration, reliable background playlist switching, automatic activation tracking
 
 #### VO2 Training Module (`Features/VO2Training/`)
 - `VO2MaxTrainingManager.swift`: 4x4 interval training coordination
@@ -98,9 +98,10 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 
 ### Test Scenarios
 - Start zone training → background app → verify announcements continue
-- Start VO2 training → verify playlist switches at intervals
+- Start VO2 training → verify playlist switches at intervals (works reliably in background)
 - Connect HR monitor → verify real-time updates
 - Test audio announcements over music playback
+- Background playlist switching during phone-away training sessions
 
 ## Configuration
 
@@ -123,8 +124,8 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 
 ### Development Rules
 - Never modify `HeartRateManager`'s core Bluetooth logic
-- Preserve all background execution functionality
+- Preserve all background execution functionality (working reliably)
 - Keep audio announcement timing unchanged
-- **Don't modify Spotify architecture** - recently refactored and stable
+- **Don't modify Spotify architecture** - fully stable with background execution support
 - Test on physical device for realistic behavior
 - Use design system components consistently

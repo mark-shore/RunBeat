@@ -39,127 +39,21 @@ struct VO2MaxTrainingView: View {
                     Spacer()
                     
                     // Timer Display
-                    VStack(spacing: AppSpacing.lg) {
-                        ZStack {
-                            Circle()
-                                .stroke(AppColors.surface, lineWidth: 15)
-                                .frame(width: 250, height: 250)
-                            
-                            Circle()
-                                .trim(from: 0, to: trainingManager.getProgressPercentage())
-                                .stroke(
-                                    getPhaseColor(for: trainingManager.currentPhase),
-                                    style: StrokeStyle(lineWidth: 15, lineCap: .round)
-                                )
-                                .frame(width: 250, height: 250)
-                                .rotationEffect(.degrees(-90))
-                                .animation(.easeInOut(duration: 1), value: trainingManager.getProgressPercentage())
-                            
-                            VStack(spacing: AppSpacing.xs) {
-                                // Compact Timer (top)
-                                Text(trainingManager.formattedTimeRemaining())
-                                    .font(.system(size: 28, weight: .medium, design: .monospaced))
-                                    .foregroundColor(getPhaseColor(for: trainingManager.currentPhase))
-                                
-                                // Phase Label (below timer)
-                                Text(trainingManager.getPhaseDescription())
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(getPhaseColor(for: trainingManager.currentPhase))
-                                
-                                // Current Song Info with Album Artwork (center section)
-                                VStack(spacing: 6) {
-                                    if spotifyViewModel.isConnected && !spotifyViewModel.currentTrack.isEmpty {
-                                        // Album Artwork
-                                        if !spotifyViewModel.currentAlbumArtwork.isEmpty,
-                                           let artworkURL = URL(string: spotifyViewModel.currentAlbumArtwork) {
-                                            AsyncImage(url: artworkURL) { image in
-                                                image
-                                                    .resizable()
-                                                    .aspectRatio(contentMode: .fill)
-                                            } placeholder: {
-                                                albumArtworkPlaceholder
-                                            }
-                                            .frame(width: 40, height: 40)
-                                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                                        } else {
-                                            albumArtworkPlaceholder
-                                        }
-                                        
-                                        // Song Title
-                                        Text(spotifyViewModel.currentTrack)
-                                            .font(.system(size: 15, weight: .bold))
-                                            .foregroundColor(.white)
-                                            .lineLimit(1)
-                                            .truncationMode(.tail)
-                                            .multilineTextAlignment(.center)
-                                        
-                                        // Artist Name
-                                        if !spotifyViewModel.currentArtist.isEmpty {
-                                            Text(spotifyViewModel.currentArtist)
-                                                .font(.system(size: 13, weight: .regular))
-                                                .foregroundColor(.gray)
-                                                .lineLimit(1)
-                                                .truncationMode(.tail)
-                                        }
-                                    } else {
-                                        // Fallback when no track data available
-                                        albumArtworkPlaceholder
-                                        if spotifyViewModel.isConnected {
-                                            if spotifyViewModel.isFetchingTrackData {
-                                                VStack(spacing: 2) {
-                                                    Text("Loading Track...")
-                                                        .font(.system(size: 13, weight: .regular))
-                                                        .foregroundColor(.orange)
-                                                    Text("Getting current song")
-                                                        .font(.system(size: 10, weight: .regular))
-                                                        .foregroundColor(.gray)
-                                                }
-                                            } else if spotifyViewModel.isPlaying {
-                                                Text("Loading Track...")
-                                                    .font(.system(size: 13, weight: .regular))
-                                                    .foregroundColor(.gray)
-                                            } else {
-                                                Text("No Music Playing")
-                                                    .font(.system(size: 13, weight: .regular))
-                                                    .foregroundColor(.gray)
-                                            }
-                                        } else {
-                                            // Show connection status
-                                            switch spotifyViewModel.connectionStatus {
-                                            case .connecting:
-                                                Text("Connecting...")
-                                                    .font(.system(size: 13, weight: .regular))
-                                                    .foregroundColor(.orange)
-                                            case .connected:
-                                                Text("Connected")
-                                                    .font(.system(size: 13, weight: .regular))
-                                                    .foregroundColor(.green)
-                                            case .disconnected:
-                                                Text("Connect Spotify")
-                                                    .font(.system(size: 13, weight: .regular))
-                                                    .foregroundColor(.gray)
-                                            case .error(let message):
-                                                VStack(spacing: 1) {
-                                                    Text("Connection Error")
-                                                        .font(.system(size: 12, weight: .regular))
-                                                        .foregroundColor(.red)
-                                                    Text(message)
-                                                        .font(.system(size: 10, weight: .regular))
-                                                        .foregroundColor(.gray)
-                                                        .lineLimit(1)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                .padding(.vertical, 8)
-                                
-                                // Interval Counter (bottom)
-                                Text("Interval \(trainingManager.currentInterval)/\(trainingManager.totalIntervals)")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondary)
-                            }
-                        }
+                    VStack(alignment: .center, spacing: AppSpacing.sm) {
+                        // Timer text
+                        Text(trainingManager.formattedTimeRemaining())
+                            .font(.system(size: 28, weight: .medium, design: .monospaced))
+                            .foregroundColor(getPhaseColor(for: trainingManager.currentPhase))
+                        
+                        // Ready to Start text
+                        Text(trainingManager.getPhaseDescription())
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(getPhaseColor(for: trainingManager.currentPhase))
+                        
+                        // Interval counter
+                        Text("Interval \(trainingManager.currentInterval)/\(trainingManager.totalIntervals)")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondary)
                     }
                     
                     Spacer()

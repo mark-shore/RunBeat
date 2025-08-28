@@ -8,6 +8,7 @@
 
 import Foundation
 import Combine
+import UIKit
 
 /// Unified Spotify connection state representing both authentication and connection layers
 enum SpotifyConnectionState: Equatable {
@@ -176,6 +177,12 @@ class SpotifyConnectionManager: ObservableObject {
         }
     }
     
+    /// Starts AppRemote connection with explicit token, bypassing state checks
+    func startAppRemoteConnectionWithToken(_ token: String) {
+        print("🔄 [ConnectionManager] Starting AppRemote connection with explicit token")
+        connectionState = .connecting(token: token)
+    }
+    
     func appRemoteConnectionSucceeded() {
         // Handle AppRemote connection success based on current state
         switch connectionState {
@@ -227,12 +234,44 @@ class SpotifyConnectionManager: ObservableObject {
         }
         
         if let error = error {
-            print("⚠️ [ConnectionManager] AppRemote disconnected with error: \(error.localizedDescription)")
-            connectionState = .connectionError(token: token, error)
+            // Check if this is a background-related error that shouldn't clear auth
+            let isBackgroundError = isBackgroundRelatedError(error)
+            let appState = UIApplication.shared.applicationState
+            
+            if isBackgroundError || appState == .background {
+                print("📱 [ConnectionManager] Background AppRemote disconnection - preserving auth state")
+                print("  - App state: \(appState), Background error: \(isBackgroundError)")
+                print("  - Keeping token: \(token.prefix(10))...")
+                connectionState = .authenticated(token: token)
+            } else {
+                print("⚠️ [ConnectionManager] AppRemote disconnected with error: \(error.localizedDescription)")
+                connectionState = .connectionError(token: token, error)
+            }
         } else {
             print("ℹ️ [ConnectionManager] AppRemote disconnected, reverting to authenticated")
             connectionState = .authenticated(token: token)
         }
+    }
+    
+    /// Determines if an error is related to background execution limitations
+    private func isBackgroundRelatedError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        
+        // Check for background-specific error patterns
+        if nsError.domain == NSURLErrorDomain {
+            switch nsError.code {
+            case NSURLErrorTimedOut, NSURLErrorNetworkConnectionLost:
+                return true
+            default:
+                break
+            }
+        }
+        
+        // Check error description for background-related keywords
+        let errorDescription = error.localizedDescription.lowercased()
+        let backgroundKeywords = ["background", "suspended", "timeout", "connection lost"]
+        
+        return backgroundKeywords.contains { errorDescription.contains($0) }
     }
     
     func tokenExpired() {
