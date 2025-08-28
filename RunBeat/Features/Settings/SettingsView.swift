@@ -459,6 +459,8 @@ struct ZoneSettingRow: View {
     
     private var zoneColor: Color {
         switch zone {
+        case 0: return AppColors.zone0
+        case 1: return AppColors.zone1
         case 2: return AppColors.zone2
         case 3: return AppColors.zone3
         case 4: return AppColors.zone4
@@ -663,6 +665,7 @@ struct ZonePickerView: View {
     
     private var zoneTitle: String {
         switch zoneNumber {
+        case 0: return "Zone 0 - Rest/Recovery"
         case 1: return "Zone 1 - Active Recovery"
         case 2: return "Zone 2 - Aerobic Base"
         case 3: return "Zone 3 - Aerobic Threshold"

@@ -16,6 +16,7 @@ struct ZoneDisplay: View {
     
     private var zoneColor: Color {
         switch zone {
+        case 0: return AppColors.zone0
         case 1: return AppColors.zone1
         case 2: return AppColors.zone2
         case 3: return AppColors.zone3

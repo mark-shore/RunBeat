@@ -19,4 +19,9 @@ struct AppTypography {
     static let timerDisplay = Font.system(size: 36, weight: .medium, design: .monospaced)
     static let zoneLabel = Font.system(size: 20, weight: .semibold)
     static let buttonText = Font.system(size: 17, weight: .semibold)
+    
+    // Additional display sizes
+    static let displayMedium = Font.system(size: 32, weight: .bold, design: .rounded)
+    static let headlineMedium = Font.headline.weight(.medium)
+    static let bodySmall = Font.footnote
 }

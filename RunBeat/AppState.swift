@@ -5,6 +5,7 @@ import Combine
 
 class AppState: ObservableObject {
     @Published var isSessionActive = false
+    @Published var currentBPM: Int = 0
     
     func startSession() {
         isSessionActive = true
@@ -35,6 +36,9 @@ class AppState: ObservableObject {
     
     private func setupHeartRateMonitoring() {
         hrManager.onNewHeartRate = { [weak self] bpm in
+            DispatchQueue.main.async {
+                self?.currentBPM = bpm
+            }
             self?.trainingManager.processHeartRate(bpm)
             VO2MaxTrainingManager.shared.tick(now: Date())
         }

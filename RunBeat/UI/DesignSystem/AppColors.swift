@@ -15,6 +15,7 @@ struct AppColors {
     static let tertiary = Color(UIColor.systemGray2)
     
     // HR Zones - use iOS system colors for accessibility
+    static let zone0 = Color(.systemGray)      // Rest/Recovery
     static let zone1 = Color(.systemBlue)      // Recovery
     static let zone2 = Color(.systemGreen)     // Aerobic Base
     static let zone3 = Color(.systemYellow)    // Aerobic

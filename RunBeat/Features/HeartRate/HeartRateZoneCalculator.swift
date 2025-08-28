@@ -29,7 +29,7 @@ class HeartRateZoneCalculator {
     }
     
     /// Determine which zone a BPM reading falls into
-    /// Returns nil if below zone 1 minimum
+    /// Returns 0 for BPM values below Zone 1 (Recovery/Rest zone)
     static func calculateZone(for bpm: Int, 
                              restingHR: Int, 
                              maxHR: Int, 
@@ -45,14 +45,14 @@ class HeartRateZoneCalculator {
         }
         
         switch bpm {
-        case ..<z1Lower: return nil  // Below zone 1 minimum
+        case ..<z1Lower: return 0  // Zone 0: Recovery/Rest zone
         case z1Lower...z1Upper: return 1
         case (z1Upper + 1)...z2Upper: return 2
         case (z2Upper + 1)...z3Upper: return 3
         case (z3Upper + 1)...z4Upper: return 4
         case (z4Upper + 1)...z5Upper: return 5
         case (z5Upper + 1)...: return 5  // Max zone for very high heart rates
-        default: return nil
+        default: return 0  // Fallback to Zone 0
         }
     }
     
@@ -77,10 +77,10 @@ class HeartRateZoneCalculator {
         
         if useAutoZones {
             let autoZones = calculateAutoZones(restingHR: restingHR, maxHR: maxHR)
-            print("📊 Auto heart rate zones: RHR=\(restingHR), MaxHR=\(maxHR), Zones: Z1(\(autoZones.0)-\(autoZones.1)), Z2(\(autoZones.1+1)-\(autoZones.2)), Z3(\(autoZones.2+1)-\(autoZones.3)), Z4(\(autoZones.3+1)-\(autoZones.4)), Z5(\(autoZones.4+1)-\(autoZones.5))")
+            print("📊 Auto heart rate zones: RHR=\(restingHR), MaxHR=\(maxHR), Zones: Z0(<\(autoZones.0)), Z1(\(autoZones.0)-\(autoZones.1)), Z2(\(autoZones.1+1)-\(autoZones.2)), Z3(\(autoZones.2+1)-\(autoZones.3)), Z4(\(autoZones.3+1)-\(autoZones.4)), Z5(\(autoZones.4+1)-\(autoZones.5))")
         } else {
             let zones = manualZones
-            print("📊 Manual heart rate zones: Z1(\(zones.zone1Lower)-\(zones.zone1Upper)), Z2(\(zones.zone1Upper+1)-\(zones.zone2Upper)), Z3(\(zones.zone2Upper+1)-\(zones.zone3Upper)), Z4(\(zones.zone3Upper+1)-\(zones.zone4Upper)), Z5(\(zones.zone4Upper+1)-\(zones.zone5Upper))")
+            print("📊 Manual heart rate zones: Z0(<\(zones.zone1Lower)), Z1(\(zones.zone1Lower)-\(zones.zone1Upper)), Z2(\(zones.zone1Upper+1)-\(zones.zone2Upper)), Z3(\(zones.zone2Upper+1)-\(zones.zone3Upper)), Z4(\(zones.zone3Upper+1)-\(zones.zone4Upper)), Z5(\(zones.zone4Upper+1)-\(zones.zone5Upper))")
         }
     }
 }

@@ -692,4 +692,22 @@ extension SpotifyViewModel: SpotifyServiceDelegate {
             print("  - isFetchingTrackData: \(self.isFetchingTrackData)")
         }
     }
+    
+    // MARK: - Computed Properties
+    
+    /// Current track as SpotifyTrackInfo for UI components
+    var currentTrackInfo: SpotifyTrackInfo? {
+        guard !currentTrack.isEmpty else { return nil }
+        
+        return SpotifyTrackInfo(
+            name: currentTrack,
+            artist: currentArtist,
+            uri: "", // Not available from current properties
+            artworkURL: currentAlbumArtwork,
+            duration: 0, // Not available from current properties
+            position: 0, // Not available from current properties  
+            isPlaying: isPlaying,
+            source: .webAPI // Default source
+        )
+    }
 }

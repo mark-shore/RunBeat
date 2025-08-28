@@ -11,7 +11,7 @@ import Combine
 import UIKit
 
 /// Recovery actions that can be taken for different error types
-enum ErrorRecoveryAction {
+enum ErrorRecoveryAction: Equatable {
     case reconnectAppRemote          // Try to reconnect AppRemote
     case refreshToken               // Refresh authentication token
     case retryAfterDelay(TimeInterval)  // Retry after specified delay

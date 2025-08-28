@@ -188,7 +188,8 @@ class HeartRateViewModel: ObservableObject {
     var zoneDescriptions: [String] {
         let limits = currentZoneLimits
         return [
-            "Zone 1: \(limits.zone1Lower)-\(limits.zone1Upper) BPM (Recovery)",
+            "Zone 0: <\(limits.zone1Lower) BPM (Rest/Recovery)",
+            "Zone 1: \(limits.zone1Lower)-\(limits.zone1Upper) BPM (Active Recovery)",
             "Zone 2: \(limits.zone1Upper + 1)-\(limits.zone2Upper) BPM (Base)",
             "Zone 3: \(limits.zone2Upper + 1)-\(limits.zone3Upper) BPM (Aerobic)",
             "Zone 4: \(limits.zone3Upper + 1)-\(limits.zone4Upper) BPM (Threshold)", 

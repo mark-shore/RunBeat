@@ -39,16 +39,37 @@ struct VO2MaxTrainingView: View {
                     Spacer()
                     
                     // Timer Display
-                    VStack(alignment: .center, spacing: AppSpacing.sm) {
+                    VStack(alignment: .center, spacing: AppSpacing.md) {
                         // Timer text
                         Text(trainingManager.formattedTimeRemaining())
                             .font(.system(size: 28, weight: .medium, design: .monospaced))
                             .foregroundColor(getPhaseColor(for: trainingManager.currentPhase))
                         
-                        // Ready to Start text
-                        Text(trainingManager.getPhaseDescription())
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(getPhaseColor(for: trainingManager.currentPhase))
+                        if trainingManager.isTraining {
+                            // Heart rate information during training
+                            HStack(spacing: AppSpacing.lg) {
+                                // BPM display
+                                VStack(spacing: AppSpacing.xs) {
+                                    Text("\(appState.currentBPM)")
+                                        .font(AppTypography.displayMedium)
+                                        .foregroundColor(AppColors.onBackground)
+                                    
+                                    Text("BPM")
+                                        .font(AppTypography.bodySmall)
+                                        .foregroundColor(AppColors.secondary)
+                                }
+                                
+                                // Current zone
+                                Text(getCurrentZoneText())
+                                    .font(AppTypography.headlineMedium)
+                                    .foregroundColor(getCurrentZoneColor())
+                            }
+                        } else {
+                            // Ready to Start text when not training
+                            Text(trainingManager.getPhaseDescription())
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(getPhaseColor(for: trainingManager.currentPhase))
+                        }
                         
                         // Interval counter
                         Text("Interval \(trainingManager.currentInterval)/\(trainingManager.totalIntervals)")
@@ -58,51 +79,16 @@ struct VO2MaxTrainingView: View {
                     
                     Spacer()
                     
-                    // Spotify Training Cards - Side-by-Side Layout
-                    if spotifyViewModel.isConnected {
-                        HStack(spacing: 16) {
-                            // High Intensity Section
-                            VStack(alignment: .leading, spacing: 8) {
-                                SpotifyTrainingCard(
-                                    title: "High Intensity",
-                                    displayInfo: spotifyViewModel.highIntensityDisplayInfo
-                                ) {
-                                    showingPlaylistSelection = true
-                                }
-                            }
-                            .frame(maxWidth: .infinity) // Equal width distribution
-                            
-                            // Rest Section  
-                            VStack(alignment: .leading, spacing: 8) {
-                                SpotifyTrainingCard(
-                                    title: "Rest",
-                                    displayInfo: spotifyViewModel.restDisplayInfo
-                                ) {
-                                    showingPlaylistSelection = true
-                                }
-                            }
-                            .frame(maxWidth: .infinity) // Equal width distribution
-                        }
-                        .padding(.horizontal, 0) // No additional padding - use screen margin only
-                    } else {
-                        VStack(spacing: 12) {
-                            HStack {
-                                Image(systemName: "music.note")
-                                    .foregroundColor(.orange)
-                                Text("Connect Spotify to Start Training")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(.orange)
-                            }
-                            
-                            AppButton("Connect Spotify", style: .spotify) {
-                                spotifyViewModel.connect()
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                    }
-                    
-                    // Simplified Control Buttons - 3-State Model
+                    // Buttons Section
                     VStack(spacing: AppSpacing.md) {
+                        // Select Playlists button (only when not training)
+                        if !trainingManager.isTraining {
+                            AppButton("Select Playlists", style: .secondary) {
+                                showingPlaylistSelection = true
+                            }
+                        }
+                        
+                        // Training Control Buttons
                         switch trainingManager.trainingState {
                         case .setup:
                             // Setup State: Show start button
@@ -153,7 +139,10 @@ struct VO2MaxTrainingView: View {
                         }
                     }
                     
-                    Spacer()
+                    Spacer(minLength: AppSpacing.md)
+                    
+                    // Current Track Display (bottommost element)
+                    CurrentTrackView(track: spotifyViewModel.currentTrackInfo)
                 }
                 .padding(.horizontal, 12) // Reduced horizontal padding for wider cards
                 .padding(.vertical, AppSpacing.screenMargin)
@@ -214,6 +203,58 @@ struct VO2MaxTrainingView: View {
     }
     
     // MARK: - Helper Methods
+    
+    private func getCurrentZoneText() -> String {
+        guard appState.currentBPM > 0 else { return "Zone 0" }
+        
+        let currentZone = HeartRateZoneCalculator.calculateZone(
+            for: appState.currentBPM,
+            restingHR: appState.heartRateViewModel.restingHR,
+            maxHR: appState.heartRateViewModel.maxHR,
+            useAutoZones: appState.heartRateViewModel.useAutoZones,
+            manualZones: (
+                zone1Lower: appState.heartRateViewModel.zone1Lower,
+                zone1Upper: appState.heartRateViewModel.zone1Upper,
+                zone2Upper: appState.heartRateViewModel.zone2Upper,
+                zone3Upper: appState.heartRateViewModel.zone3Upper,
+                zone4Upper: appState.heartRateViewModel.zone4Upper,
+                zone5Upper: appState.heartRateViewModel.zone5Upper
+            )
+        )
+        
+        return currentZone != nil ? "Zone \(currentZone!)" : "Zone 0"
+    }
+    
+    private func getCurrentZoneColor() -> Color {
+        guard appState.currentBPM > 0 else { return AppColors.zone0 }
+        
+        let currentZone = HeartRateZoneCalculator.calculateZone(
+            for: appState.currentBPM,
+            restingHR: appState.heartRateViewModel.restingHR,
+            maxHR: appState.heartRateViewModel.maxHR,
+            useAutoZones: appState.heartRateViewModel.useAutoZones,
+            manualZones: (
+                zone1Lower: appState.heartRateViewModel.zone1Lower,
+                zone1Upper: appState.heartRateViewModel.zone1Upper,
+                zone2Upper: appState.heartRateViewModel.zone2Upper,
+                zone3Upper: appState.heartRateViewModel.zone3Upper,
+                zone4Upper: appState.heartRateViewModel.zone4Upper,
+                zone5Upper: appState.heartRateViewModel.zone5Upper
+            )
+        )
+        
+        guard let zone = currentZone else { return AppColors.zone0 }
+        
+        switch zone {
+        case 0: return AppColors.zone0
+        case 1: return AppColors.zone1
+        case 2: return AppColors.zone2
+        case 3: return AppColors.zone3
+        case 4: return AppColors.zone4
+        case 5: return AppColors.zone5
+        default: return AppColors.zone0
+        }
+    }
     
     private func getPhaseColor(for phase: VO2MaxTrainingManager.TrainingPhase) -> Color {
         switch phase {

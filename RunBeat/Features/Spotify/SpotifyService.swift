@@ -47,6 +47,9 @@ class SpotifyService: NSObject {
     private var deviceActivationCompleted = false
     private var isStartingTrainingPlaylist = false
     
+    // Token refresh state
+    private var isTokenRefreshInProgress = false
+    
     // Configuration
     private let clientID: String
     private let clientSecret: String
@@ -58,6 +61,7 @@ class SpotifyService: NSObject {
     // Keychain storage
     private let keychainWrapper = KeychainWrapper.shared
     private let tokenKeychainKey = "spotify_access_token"
+    private let refreshTokenKeychainKey = "spotify_refresh_token"
     
     // Coordinated track data access
     var currentTrack: SpotifyTrackInfo { dataCoordinator.currentTrack }
@@ -167,6 +171,28 @@ class SpotifyService: NSObject {
         }
     }
     
+    /// Stores both access token and refresh token from SPTSession
+    private func storeAuthenticationTokens(session: SPTSession) {
+        // Store access token
+        let accessSuccess = keychainWrapper.store(session.accessToken, forKey: tokenKeychainKey)
+        
+        // Store refresh token if available
+        var refreshSuccess = true
+        let refreshToken = session.refreshToken
+        if !refreshToken.isEmpty {
+            refreshSuccess = keychainWrapper.store(refreshToken, forKey: refreshTokenKeychainKey)
+            print("✅ [SpotifyService] Stored refresh token in keychain: \(refreshSuccess)")
+        } else {
+            print("⚠️ [SpotifyService] No refresh token available in session")
+        }
+        
+        if accessSuccess && refreshSuccess {
+            print("✅ [SpotifyService] Successfully stored authentication tokens in keychain")
+        } else {
+            print("❌ [SpotifyService] Failed to store some authentication tokens in keychain")
+        }
+    }
+    
     private func retrieveStoredToken() -> String? {
         let token = keychainWrapper.retrieve(forKey: tokenKeychainKey)
         if token != nil {
@@ -177,12 +203,24 @@ class SpotifyService: NSObject {
         return token
     }
     
-    private func removeStoredToken() {
-        let success = keychainWrapper.remove(forKey: tokenKeychainKey)
-        if success {
-            print("✅ [SpotifyService] Successfully removed access token from keychain")
+    private func retrieveStoredRefreshToken() -> String? {
+        let token = keychainWrapper.retrieve(forKey: refreshTokenKeychainKey)
+        if token != nil {
+            print("✅ [SpotifyService] Successfully retrieved refresh token from keychain")
         } else {
-            print("❌ [SpotifyService] Failed to remove access token from keychain")
+            print("ℹ️ [SpotifyService] No stored refresh token found in keychain")
+        }
+        return token
+    }
+    
+    private func removeStoredToken() {
+        let accessTokenSuccess = keychainWrapper.remove(forKey: tokenKeychainKey)
+        let refreshTokenSuccess = keychainWrapper.remove(forKey: refreshTokenKeychainKey)
+        
+        if accessTokenSuccess && refreshTokenSuccess {
+            print("✅ [SpotifyService] Successfully removed authentication tokens from keychain")
+        } else {
+            print("❌ [SpotifyService] Failed to remove some authentication tokens from keychain")
         }
     }
     
@@ -247,12 +285,115 @@ class SpotifyService: NSObject {
     }
     
     private func handleInvalidStoredToken() {
-        print("🗑️ [SpotifyService] Removing invalid stored token")
-        removeStoredToken()
+        print("🗑️ [SpotifyService] Access token invalid - attempting refresh...")
         
-        DispatchQueue.main.async {
-            self.connectionManager.disconnect()
+        // Try to refresh the token before giving up
+        if let refreshToken = retrieveStoredRefreshToken() {
+            refreshAccessToken(refreshToken: refreshToken) { [weak self] success in
+                if !success {
+                    // Refresh failed, remove tokens and disconnect
+                    print("🗑️ [SpotifyService] Token refresh failed - removing invalid stored tokens")
+                    self?.removeStoredToken()
+                    DispatchQueue.main.async {
+                        self?.connectionManager.disconnect()
+                    }
+                }
+            }
+        } else {
+            // No refresh token available, remove tokens and disconnect
+            print("🗑️ [SpotifyService] No refresh token available - removing invalid stored token")
+            removeStoredToken()
+            DispatchQueue.main.async {
+                self.connectionManager.disconnect()
+            }
         }
+    }
+    
+    /// Refreshes the access token using the stored refresh token
+    private func refreshAccessToken(refreshToken: String, completion: @escaping (Bool) -> Void) {
+        // Prevent concurrent refresh attempts
+        guard !isTokenRefreshInProgress else {
+            print("🔄 [SpotifyService] Token refresh already in progress, waiting...")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                self.refreshAccessToken(refreshToken: refreshToken, completion: completion)
+            }
+            return
+        }
+        
+        print("🔄 [SpotifyService] Attempting to refresh access token...")
+        isTokenRefreshInProgress = true
+        
+        let tokenURL = URL(string: "https://accounts.spotify.com/api/token")!
+        var request = URLRequest(url: tokenURL)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        
+        // Create credentials for Basic auth (client_id:client_secret base64 encoded)
+        let credentials = "\(clientID):\(clientSecret)"
+        let credentialsData = credentials.data(using: .utf8)!
+        let credentialsBase64 = credentialsData.base64EncodedString()
+        request.setValue("Basic \(credentialsBase64)", forHTTPHeaderField: "Authorization")
+        
+        // Create form data
+        let formData = "grant_type=refresh_token&refresh_token=\(refreshToken)"
+        request.httpBody = formData.data(using: .utf8)
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            defer {
+                self?.isTokenRefreshInProgress = false
+            }
+            
+            guard let self = self else { 
+                completion(false)
+                return 
+            }
+            
+            if let error = error {
+                print("❌ [SpotifyService] Token refresh network error: \(error.localizedDescription)")
+                completion(false)
+                return
+            }
+            
+            guard let data = data,
+                  let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [SpotifyService] Invalid response during token refresh")
+                completion(false)
+                return
+            }
+            
+            if httpResponse.statusCode == 200 {
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let newAccessToken = json["access_token"] as? String {
+                    
+                    print("✅ [SpotifyService] Successfully refreshed access token")
+                    
+                    // Store new access token
+                    self.storeToken(newAccessToken)
+                    
+                    // If there's a new refresh token, store that too
+                    if let newRefreshToken = json["refresh_token"] as? String {
+                        let success = self.keychainWrapper.store(newRefreshToken, forKey: self.refreshTokenKeychainKey)
+                        print("🔄 [SpotifyService] Updated refresh token: \(success)")
+                    }
+                    
+                    // Update connection manager with new token
+                    DispatchQueue.main.async {
+                        self.connectionManager.authenticationSucceeded(token: newAccessToken)
+                    }
+                    
+                    completion(true)
+                } else {
+                    print("❌ [SpotifyService] Invalid JSON in token refresh response")
+                    completion(false)
+                }
+            } else {
+                print("❌ [SpotifyService] Token refresh failed with status: \(httpResponse.statusCode)")
+                if let responseData = String(data: data, encoding: .utf8) {
+                    print("❌ [SpotifyService] Response: \(responseData)")
+                }
+                completion(false)
+            }
+        }.resume()
     }
     
     // MARK: - Setup
@@ -708,9 +849,38 @@ class SpotifyService: NSObject {
                     self.isFetchingFreshData = false
                 }
             case 401:
-                print("❌ Unauthorized - access token expired")
-                self.handleTokenExpired()
-                self.isFetchingFreshData = false
+                print("❌ Unauthorized - access token expired, attempting refresh")
+                // Use error recovery system instead of immediately clearing tokens
+                let recoverableError = SpotifyRecoverableError.tokenExpired
+                let context = ErrorContext(
+                    operation: "Track Fetch",
+                    attemptNumber: attempt,
+                    lastSuccessTime: nil,
+                    connectionState: self.connectionManager.connectionState,
+                    isTrainingActive: self.isPollingActive
+                )
+                
+                let recoveryAction = self.errorHandler.handleError(recoverableError, context: context)
+                if recoveryAction == .refreshToken {
+                    if let refreshToken = self.retrieveStoredRefreshToken() {
+                        self.refreshAccessToken(refreshToken: refreshToken) { [weak self] success in
+                            if success {
+                                // Token refreshed, retry the request
+                                self?.fetchCurrentTrackViaWebAPIWithRetry(attempt: attempt + 1, maxAttempts: maxAttempts, isInitialWorkoutFetch: isInitialWorkoutFetch)
+                            } else {
+                                // Refresh failed, stop trying
+                                self?.isFetchingFreshData = false
+                                self?.handleTokenExpired()
+                            }
+                        }
+                    } else {
+                        self.isFetchingFreshData = false
+                        self.handleTokenExpired()
+                    }
+                } else {
+                    self.isFetchingFreshData = false
+                    self.handleTokenExpired()
+                }
             case 429:
                 print("❌ Rate limited - will retry with longer delay")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
@@ -867,9 +1037,22 @@ class SpotifyService: NSObject {
             }
             
         case .refreshToken:
-            // Trigger token refresh (would need to implement)
-            print("🔄 [Recovery] Token refresh needed - triggering re-authentication")
-            completion(.failure(error))
+            // Trigger token refresh using stored refresh token
+            print("🔄 [Recovery] Token refresh needed - attempting automatic refresh")
+            if let refreshToken = retrieveStoredRefreshToken() {
+                refreshAccessToken(refreshToken: refreshToken) { success in
+                    if success {
+                        print("✅ [Recovery] Token refreshed successfully - retrying original request")
+                        completion(.success(()))
+                    } else {
+                        print("❌ [Recovery] Token refresh failed - authentication required")
+                        completion(.failure(error))
+                    }
+                }
+            } else {
+                print("❌ [Recovery] No refresh token available - authentication required")
+                completion(.failure(error))
+            }
             
         case .degradeToWebAPIOnly:
             print("🔄 [Recovery] Degrading to Web API only mode")
@@ -945,8 +1128,35 @@ class SpotifyService: NSObject {
                 print("ℹ️ [WEB API DEBUG] No music currently playing (204 response)")
                 self.notifyPlayerStateChange(isPlaying: false, trackName: "", artistName: "", artworkURL: "")
             case 401:
-                print("❌ [WEB API DEBUG] Unauthorized - access token expired")
-                self.handleTokenExpired()
+                print("❌ [WEB API DEBUG] Unauthorized - access token expired, attempting refresh")
+                // Use error recovery system for token refresh
+                let recoverableError = SpotifyRecoverableError.tokenExpired
+                let context = ErrorContext(
+                    operation: "Current Track",
+                    attemptNumber: 1,
+                    lastSuccessTime: nil,
+                    connectionState: self.connectionManager.connectionState,
+                    isTrainingActive: self.isPollingActive
+                )
+                
+                let recoveryAction = self.errorHandler.handleError(recoverableError, context: context)
+                if recoveryAction == .refreshToken {
+                    if let refreshToken = self.retrieveStoredRefreshToken() {
+                        self.refreshAccessToken(refreshToken: refreshToken) { [weak self] success in
+                            if success {
+                                // Token refreshed, retry current track request
+                                self?.fetchCurrentTrackViaWebAPI()
+                            } else {
+                                // Refresh failed
+                                self?.handleTokenExpired()
+                            }
+                        }
+                    } else {
+                        self.handleTokenExpired()
+                    }
+                } else {
+                    self.handleTokenExpired()
+                }
             case 429:
                 print("❌ [WEB API DEBUG] Rate limited - will retry later")
             default:
@@ -1724,8 +1934,8 @@ extension SpotifyService: SPTSessionManagerDelegate {
     func sessionManager(manager: SPTSessionManager, didInitiate session: SPTSession) {
         print("✅ [SpotifyService] OAuth authentication successful!")
         
-        // Store the token in keychain for future use
-        storeToken(session.accessToken)
+        // Store both access token and refresh token in keychain for future use
+        storeAuthenticationTokens(session: session)
         
         // Validate token works before updating connection state
         validateAuthenticationAndConnect(session: session)
@@ -1787,8 +1997,8 @@ extension SpotifyService: SPTSessionManagerDelegate {
     func sessionManager(manager: SPTSessionManager, didRenew session: SPTSession) {
         print("✅ [SpotifyService] Session renewed successfully")
         
-        // Update stored token with renewed one
-        storeToken(session.accessToken)
+        // Update stored tokens with renewed ones
+        storeAuthenticationTokens(session: session)
         
         // Update connection manager with new token
         connectionManager.authenticationSucceeded(token: session.accessToken)
@@ -2021,9 +2231,38 @@ extension SpotifyService {
                     // Success - continue to parsing
                     break
                 case 401:
-                    print("❌ Unauthorized - access token expired or invalid")
-                    self?.handleTokenExpired()
-                    completion(.failure(SpotifyError.tokenExpired))
+                    print("❌ Unauthorized - access token expired or invalid, attempting refresh")
+                    // Use error recovery system for token refresh
+                    let recoverableError = SpotifyRecoverableError.tokenExpired
+                    let context = ErrorContext(
+                        operation: "Playlist Fetch",
+                        attemptNumber: 1,
+                        lastSuccessTime: nil,
+                        connectionState: self?.connectionManager.connectionState ?? .disconnected,
+                        isTrainingActive: self?.isPollingActive ?? false
+                    )
+                    
+                    let recoveryAction = self?.errorHandler.handleError(recoverableError, context: context)
+                    if recoveryAction == .refreshToken {
+                        if let refreshToken = self?.retrieveStoredRefreshToken() {
+                            self?.refreshAccessToken(refreshToken: refreshToken) { [weak self] success in
+                                if success {
+                                    // Token refreshed, retry playlist request
+                                    self?.fetchUserPlaylists(completion: completion)
+                                } else {
+                                    // Refresh failed
+                                    self?.handleTokenExpired()
+                                    completion(.failure(SpotifyError.tokenExpired))
+                                }
+                            }
+                        } else {
+                            self?.handleTokenExpired()
+                            completion(.failure(SpotifyError.tokenExpired))
+                        }
+                    } else {
+                        self?.handleTokenExpired()
+                        completion(.failure(SpotifyError.tokenExpired))
+                    }
                     return
                 case 403:
                     print("❌ Forbidden - insufficient permissions")
