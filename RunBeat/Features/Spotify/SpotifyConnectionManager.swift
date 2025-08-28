@@ -151,21 +151,62 @@ class SpotifyConnectionManager: ObservableObject {
     }
     
     func startAppRemoteConnection() {
-        guard case .authenticated(let token) = connectionState else {
-            print("⚠️ [ConnectionManager] Cannot start AppRemote connection - not authenticated")
-            return
+        // Handle starting AppRemote connection based on current state
+        switch connectionState {
+        case .authenticated(let token):
+            // Normal case - authenticated and ready to connect
+            print("🔄 [ConnectionManager] Starting AppRemote connection...")
+            connectionState = .connecting(token: token)
+            
+        case .connectionError(let token, _):
+            // Retry from error state
+            print("🔄 [ConnectionManager] Retrying AppRemote connection from error state...")
+            connectionState = .connecting(token: token)
+            
+        case .connecting:
+            // Already in connecting state - this might be a duplicate call
+            print("ℹ️ [ConnectionManager] AppRemote connection already in progress")
+            
+        case .connected:
+            // Already connected - no need to start again
+            print("ℹ️ [ConnectionManager] AppRemote already connected")
+            
+        default:
+            print("⚠️ [ConnectionManager] Cannot start AppRemote connection - not authenticated (current state: \(connectionState))")
         }
-        print("🔄 [ConnectionManager] Starting AppRemote connection...")
-        connectionState = .connecting(token: token)
     }
     
     func appRemoteConnectionSucceeded() {
-        guard case .connecting(let token) = connectionState else {
-            print("⚠️ [ConnectionManager] AppRemote success but not in connecting state")
-            return
+        // Handle AppRemote connection success based on current state
+        switch connectionState {
+        case .connecting(let token):
+            // Normal case - we were in connecting state
+            print("✅ [ConnectionManager] AppRemote connection succeeded")
+            connectionState = .connected(token: token)
+            
+        case .authenticated(let token):
+            // AppRemote connected while we were still in authenticated state
+            // This can happen if connection is very fast
+            print("✅ [ConnectionManager] AppRemote connection succeeded (fast connection)")
+            connectionState = .connected(token: token)
+            
+        case .connectionError(let token, _):
+            // Recovered from a previous connection error
+            print("✅ [ConnectionManager] AppRemote connection succeeded (recovered from error)")
+            connectionState = .connected(token: token)
+            
+        case .connected:
+            // Already connected - this might be a duplicate event
+            print("ℹ️ [ConnectionManager] AppRemote connection event received but already connected")
+            
+        default:
+            // Unexpected state - log warning but try to handle gracefully
+            print("⚠️ [ConnectionManager] AppRemote success but in unexpected state: \(connectionState)")
+            if let token = connectionState.accessToken {
+                print("ℹ️ [ConnectionManager] Updating to connected state with available token")
+                connectionState = .connected(token: token)
+            }
         }
-        print("✅ [ConnectionManager] AppRemote connection succeeded")
-        connectionState = .connected(token: token)
     }
     
     func appRemoteConnectionFailed(error: Error) {

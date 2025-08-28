@@ -125,6 +125,69 @@ class SpotifyViewModel: ObservableObject {
     
     private func setupSpotifyServiceDelegate() {
         spotifyService.delegate = self
+        setupDataCoordinatorObserver()
+    }
+    
+    private func setupDataCoordinatorObserver() {
+        // Observe coordinated track data changes
+        spotifyService.dataCoordinatorPublisher.$currentTrack
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] trackInfo in
+                self?.handleCoordinatedTrackUpdate(trackInfo)
+            }
+            .store(in: &cancellables)
+            
+        // Observe error handler state for user-friendly error messages
+        spotifyService.errorHandlerPublisher.$currentError
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] error in
+                self?.handleErrorUpdate(error)
+            }
+            .store(in: &cancellables)
+            
+        spotifyService.errorHandlerPublisher.$recoveryMessage
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] message in
+                self?.handleRecoveryMessage(message)
+            }
+            .store(in: &cancellables)
+            
+        print("📊 [SpotifyViewModel] Set up data coordinator and error handler observers")
+    }
+    
+    private func handleCoordinatedTrackUpdate(_ trackInfo: SpotifyTrackInfo) {
+        print("📊 [SpotifyViewModel] Received coordinated track update:")
+        print("  - Track: '\(trackInfo.name)'")
+        print("  - Artist: '\(trackInfo.artist)'")
+        print("  - Playing: \(trackInfo.isPlaying)")
+        print("  - Source: \(trackInfo.source.rawValue)")
+        
+        // Update UI state from coordinated data
+        currentTrack = trackInfo.name
+        currentArtist = trackInfo.artist
+        currentAlbumArtwork = trackInfo.artworkURL
+        isPlaying = trackInfo.isPlaying
+        
+        // Clear loading state when we get fresh data
+        if !trackInfo.name.isEmpty {
+            isFetchingTrackData = false
+        }
+        
+        print("📊 [SpotifyViewModel] Updated UI from coordinated data (source: \(trackInfo.source.rawValue))")
+    }
+    
+    private func handleErrorUpdate(_ error: SpotifyRecoverableError?) {
+        if let error = error {
+            print("🚨 [SpotifyViewModel] Error update: \(error.errorDescription ?? "Unknown")")
+            // Could update UI to show error state
+        }
+    }
+    
+    private func handleRecoveryMessage(_ message: String) {
+        if !message.isEmpty {
+            print("🔧 [SpotifyViewModel] Recovery message: \(message)")
+            // Could show this message to the user in UI
+        }
     }
     
     // MARK: - Public API for UI
@@ -544,23 +607,48 @@ extension SpotifyViewModel: SpotifyServiceDelegate {
             fetchPlaylists()
         }
         
-        // If training is active but we weren't connected before, start music now
+        // If training is active but we weren't connected before, start music now (but avoid double-starting)
         if VO2MaxTrainingManager.shared.trainingState == .active {
-            print("🎵 Training is active - starting music now that Spotify is connected")
+            print("🎵 Training is active - checking if music needs to be started")
             
-            // Start appropriate playlist based on current phase
-            switch VO2MaxTrainingManager.shared.currentPhase {
-            case .highIntensity:
-                playHighIntensityPlaylist()
-            case .rest:
-                playRestPlaylist()
-            case .notStarted, .completed:
-                playHighIntensityPlaylist() // Default to high intensity
-            }
-            
-            // Start track polling if not already active
-            if !spotifyService.isTrackPollingActive {
-                startTrackPolling()
+            // Don't restart playlist if we just automatically opened Spotify for device activation
+            if spotifyService.wasAutomaticSpotifyActivationRecent {
+                print("🎵 Skipping playlist restart - returning from automatic Spotify activation")
+                
+                // Just ensure track polling is active
+                if !spotifyService.isTrackPollingActive {
+                    print("🎵 Starting track polling for existing music")
+                    startTrackPolling()
+                }
+            } else {
+                // Only start playlist if music is not currently playing or track polling is not active
+                // This handles cases where user manually went to Spotify
+                if !isPlaying || !spotifyService.isTrackPollingActive {
+                    print("🎵 Starting music for active training (not currently playing)")
+                    
+                    // Start appropriate playlist based on current phase
+                    switch VO2MaxTrainingManager.shared.currentPhase {
+                    case .highIntensity:
+                        playHighIntensityPlaylist()
+                    case .rest:
+                        playRestPlaylist()
+                    case .notStarted, .completed:
+                        playHighIntensityPlaylist() // Default to high intensity
+                    }
+                    
+                    // Start track polling if not already active
+                    if !spotifyService.isTrackPollingActive {
+                        startTrackPolling()
+                    }
+                } else {
+                    print("🎵 Training music already playing - not restarting playlist")
+                    
+                    // Just ensure track polling is active for existing music
+                    if !spotifyService.isTrackPollingActive {
+                        print("🎵 Starting track polling for existing music")
+                        startTrackPolling()
+                    }
+                }
             }
         }
     }

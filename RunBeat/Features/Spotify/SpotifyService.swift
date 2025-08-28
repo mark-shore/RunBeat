@@ -24,12 +24,23 @@ class SpotifyService: NSObject {
     // Unified connection management
     private let connectionManager = SpotifyConnectionManager()
     
+    // Unified data source coordination
+    private let dataCoordinator = SpotifyDataCoordinator()
+    
+    // Structured error handling and recovery
+    private let errorHandler = SpotifyErrorHandler()
+    
     // Legacy properties for backward compatibility
     var isAuthenticated: Bool { connectionManager.connectionState.isAuthenticated }
     var accessToken: String? { connectionManager.connectionState.accessToken }
     var isAppRemoteConnected: Bool { connectionManager.connectionState.isAppRemoteConnected }
     private var appRemote: SPTAppRemote?
     private var sessionManager: SPTSessionManager?
+    
+    // Connection management
+    private var isAppRemoteConnectionInProgress = false
+    private var appRemoteSubscriptionID: Any?
+    private var isAutomaticSpotifyActivationInProgress = false
     
     // Device activation state
     private var isDeviceActivating = false
@@ -47,6 +58,18 @@ class SpotifyService: NSObject {
     // Keychain storage
     private let keychainWrapper = KeychainWrapper.shared
     private let tokenKeychainKey = "spotify_access_token"
+    
+    // Coordinated track data access
+    var currentTrack: SpotifyTrackInfo { dataCoordinator.currentTrack }
+    var hasValidTrackData: Bool { dataCoordinator.hasValidData }
+    var trackDataSource: String { dataCoordinator.dataSourceInUse.rawValue }
+    var dataCoordinatorPublisher: SpotifyDataCoordinator { dataCoordinator }
+    
+    // Error handling access
+    var errorHandlerPublisher: SpotifyErrorHandler { errorHandler }
+    
+    // Device activation state access
+    var wasAutomaticSpotifyActivationRecent: Bool { isAutomaticSpotifyActivationInProgress }
     
     // Data source prioritization
     private enum TrackDataSource {
@@ -94,12 +117,20 @@ class SpotifyService: NSObject {
         // Handle state-specific logic
         switch state {
         case .authenticated(let token):
-            // When we have a token, try to connect AppRemote
+            // When we have a token, prepare AppRemote but don't auto-connect during restoration
             if let appRemote = appRemote {
                 appRemote.connectionParameters.accessToken = token
                 appRemote.delegate = self
-                connectionManager.startAppRemoteConnection()
-                appRemote.connect()
+                
+                if !isAppRemoteConnectionInProgress && !appRemote.isConnected {
+                    print("🔄 [SpotifyService] Starting AppRemote connection with token")
+                    isAppRemoteConnectionInProgress = true
+                    connectionManager.startAppRemoteConnection()
+                    appRemote.connect()
+                } else if appRemote.isConnected {
+                    print("✅ [SpotifyService] AppRemote already connected, updating connection state")
+                    connectionManager.appRemoteConnectionSucceeded()
+                }
             }
             
         case .connected:
@@ -248,6 +279,17 @@ class SpotifyService: NSObject {
     private func handleAppWillEnterForeground() {
         print("📱 App returning to foreground - checking Spotify connection...")
         
+        // Delay clearing automatic activation flag to allow connection state changes to see it
+        if isAutomaticSpotifyActivationInProgress {
+            print("🔄 [DeviceActivation] Scheduling automatic activation flag clearance in 3 seconds")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                if self.isAutomaticSpotifyActivationInProgress {
+                    print("🔄 [DeviceActivation] Clearing automatic activation flag after delay")
+                    self.isAutomaticSpotifyActivationInProgress = false
+                }
+            }
+        }
+        
         if accessToken != nil && !isAppRemoteConnected {
             print("🔄 Attempting to reconnect AppRemote after returning to foreground...")
             attemptAppRemoteReconnection()
@@ -379,6 +421,15 @@ class SpotifyService: NSObject {
             return
         }
         
+        // Check if connection is already in progress
+        if isAppRemoteConnectionInProgress {
+            print("⏳ AppRemote connection already in progress, waiting...")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                completion(appRemote.isConnected || self.deviceActivationCompleted)
+            }
+            return
+        }
+        
         // Prevent multiple simultaneous activation attempts
         if isDeviceActivating {
             print("⏳ Device activation already in progress, waiting...")
@@ -411,12 +462,21 @@ class SpotifyService: NSObject {
         }
         
         // Use authorizeAndPlayURI to wake up device
+        print("🔄 [DeviceActivation] Using authorizeAndPlayURI to activate device - setting automatic activation flag")
+        isAutomaticSpotifyActivationInProgress = true
         appRemote.authorizeAndPlayURI(playURI)
         appRemote.delegate = self
         
-        // Connect for control
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            appRemote.connect()
+        // Only connect if not already connected or connecting
+        if !appRemote.isConnected && !isAppRemoteConnectionInProgress {
+            isAppRemoteConnectionInProgress = true
+            // Connect for control
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                if !appRemote.isConnected {
+                    print("🔄 [DeviceActivation] Connecting AppRemote after authorization")
+                    appRemote.connect()
+                }
+            }
         }
         
         // Check activation result
@@ -700,6 +760,124 @@ class SpotifyService: NSObject {
         } else {
             print("🔄 AppRemote not available, using Web API for track info")
             fetchCurrentTrackViaWebAPI()
+        }
+    }
+    
+    /// Enhanced retry mechanism using structured error recovery
+    private func fetchCurrentTrackWithRecovery(operation: String, isTrainingActive: Bool = false, completion: @escaping (Result<Void, SpotifyRecoverableError>) -> Void) {
+        let context = ErrorContext(
+            operation: operation,
+            attemptNumber: (errorHandler.debugInfo.contains(operation) ? 1 : 0) + 1,
+            lastSuccessTime: nil, // Could track this in the future
+            connectionState: connectionManager.connectionState,
+            isTrainingActive: isTrainingActive
+        )
+        
+        performTrackFetchWithContext(context: context, completion: completion)
+    }
+    
+    private func performTrackFetchWithContext(context: ErrorContext, completion: @escaping (Result<Void, SpotifyRecoverableError>) -> Void) {
+        guard let accessToken = accessToken else {
+            let error = SpotifyRecoverableError.tokenExpired
+            handleRecoverableError(error, context: context, completion: completion)
+            return
+        }
+        
+        let currentlyPlayingURL = URL(string: "https://api.spotify.com/v1/me/player/currently-playing")!
+        var request = URLRequest(url: currentlyPlayingURL)
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpMethod = "GET"
+        request.timeoutInterval = 10.0 // Reasonable timeout
+        
+        print("🔄 [Enhanced] \(context.operation) attempt \(context.attemptNumber)")
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
+            // Handle network errors
+            if let error = error {
+                let recoverableError = SpotifyErrorHandler.convertLegacyError(error, operation: context.operation)
+                self.handleRecoverableError(recoverableError, context: context, completion: completion)
+                return
+            }
+            
+            // Handle HTTP response errors
+            if let httpResponse = response as? HTTPURLResponse {
+                if let recoverableError = self.handleHTTPResponse(httpResponse, data: data, context: context) {
+                    self.handleRecoverableError(recoverableError, context: context, completion: completion)
+                    return
+                }
+            }
+            
+            // Handle successful response
+            if let data = data, !data.isEmpty {
+                let responseTimestamp = Date()
+                self.parseCurrentlyPlayingResponseWithDebug(data, requestTimestamp: Date(), responseTimestamp: responseTimestamp)
+                self.errorHandler.recordSuccess(for: context.operation)
+                completion(.success(()))
+            } else {
+                let error = SpotifyRecoverableError.noData(operation: context.operation)
+                self.handleRecoverableError(error, context: context, completion: completion)
+            }
+        }.resume()
+    }
+    
+    private func handleHTTPResponse(_ response: HTTPURLResponse, data: Data?, context: ErrorContext) -> SpotifyRecoverableError? {
+        switch response.statusCode {
+        case 200...299:
+            return nil // Success
+        case 401:
+            return .tokenExpired
+        case 403:
+            return .insufficientPermissions
+        case 429:
+            // Extract retry-after header if available
+            let retryAfter = response.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init)
+            return .rateLimited(retryAfter: retryAfter)
+        case 500...599:
+            return .serviceUnavailable
+        default:
+            let message = data.flatMap { String(data: $0, encoding: .utf8) }
+            return .apiError(code: response.statusCode, message: message)
+        }
+    }
+    
+    private func handleRecoverableError(_ error: SpotifyRecoverableError, context: ErrorContext, completion: @escaping (Result<Void, SpotifyRecoverableError>) -> Void) {
+        let recoveryAction = errorHandler.handleError(error, context: context)
+        
+        switch recoveryAction {
+        case .retryAfterDelay, .retryWithExponentialBackoff:
+            errorHandler.executeRecovery(recoveryAction, for: context.operation) { [weak self] in
+                // Retry with incremented attempt number
+                let newContext = ErrorContext(
+                    operation: context.operation,
+                    attemptNumber: context.attemptNumber + 1,
+                    lastSuccessTime: context.lastSuccessTime,
+                    connectionState: context.connectionState,
+                    isTrainingActive: context.isTrainingActive
+                )
+                self?.performTrackFetchWithContext(context: newContext, completion: completion)
+            }
+            
+        case .refreshToken:
+            // Trigger token refresh (would need to implement)
+            print("🔄 [Recovery] Token refresh needed - triggering re-authentication")
+            completion(.failure(error))
+            
+        case .degradeToWebAPIOnly:
+            print("🔄 [Recovery] Degrading to Web API only mode")
+            // Could set a flag to disable AppRemote attempts
+            completion(.failure(error))
+            
+        case .showUserErrorMessage, .showUserAuthPrompt:
+            completion(.failure(error))
+            
+        case .noAction:
+            completion(.failure(error))
+            
+        default:
+            completion(.failure(error))
         }
     }
     
@@ -1097,14 +1275,28 @@ class SpotifyService: NSObject {
     private func attemptAppRemoteReconnection() {
         guard let appRemote = appRemote else { return }
         
+        // Prevent duplicate reconnection attempts
+        if isAppRemoteConnectionInProgress {
+            print("⏳ AppRemote reconnection already in progress")
+            return
+        }
+        
+        if appRemote.isConnected {
+            print("✅ AppRemote already connected, no need to reconnect")
+            return
+        }
+        
+        print("🔄 [Reconnection] Attempting AppRemote reconnection...")
+        isAppRemoteConnectionInProgress = true
         appRemote.delegate = self
         appRemote.connect()
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
             if appRemote.isConnected {
                 print("✅ Successfully reconnected AppRemote")
             } else {
                 print("ℹ️ AppRemote reconnection failed - Web API fallback available")
+                self.isAppRemoteConnectionInProgress = false
             }
         }
     }
@@ -1194,27 +1386,37 @@ class SpotifyService: NSObject {
     
     // MARK: - Data Source Prioritization
     
-    private func handleWebAPITrackData(isPlaying: Bool, trackName: String, artistName: String, artworkURL: String) {
+    private func handleWebAPITrackData(isPlaying: Bool, trackName: String, artistName: String, artworkURL: String, duration: TimeInterval = 0, position: TimeInterval = 0, uri: String = "") {
+        // Always update data coordinator with Web API data - it will handle prioritization
+        dataCoordinator.updateFromWebAPI(
+            name: trackName,
+            artist: artistName,
+            uri: uri,
+            artworkURL: artworkURL,
+            duration: duration,
+            position: position,
+            isPlaying: isPlaying
+        )
+        
         let currentTime = Date()
         let timeSinceAppRemote = currentTime.timeIntervalSince(lastAppRemoteUpdate)
         
-        // Only use Web API data if:
+        // Only use Web API data for legacy notification if:
         // 1. No AppRemote data has been received, OR
         // 2. AppRemote data is older than 30 seconds (connection likely lost)
         let shouldUseWebAPIData = currentDataSource == .none || timeSinceAppRemote > 30.0
         
         if shouldUseWebAPIData {
-            print("✅ [DATA SOURCE] Using Web API data (AppRemote unavailable or stale)")
+            print("✅ [DATA SOURCE] Using Web API data for legacy notifications (AppRemote unavailable or stale)")
             print("  - Data source priority: Web API (fallback)")
             print("  - Time since AppRemote: \(String(format: "%.1f", timeSinceAppRemote))s")
             
             currentDataSource = .webAPI
             notifyPlayerStateChange(isPlaying: isPlaying, trackName: trackName, artistName: artistName, artworkURL: artworkURL)
         } else {
-            print("🚫 [DATA SOURCE] Ignoring Web API data - AppRemote data is more recent")
-            print("  - Data source priority: AppRemote (preferred)")
+            print("📊 [DATA SOURCE] Web API data sent to coordinator but not used for legacy notifications")
+            print("  - Data coordinator will prioritize AppRemote data")
             print("  - Time since AppRemote: \(String(format: "%.1f", timeSinceAppRemote))s")
-            print("  - Discarding Web API track: '\(trackName)'")
         }
     }
     
@@ -1432,6 +1634,8 @@ extension SpotifyService {
         let contentLinkURL = "https://spotify.link/content_linking?~campaign=\(bundleId)&$canonical_url=\(canonicalURL)"
         
         if let url = URL(string: contentLinkURL) {
+            print("🔄 [URLScheme] Opening Spotify via URL scheme - setting automatic activation flag")
+            isAutomaticSpotifyActivationInProgress = true
             UIApplication.shared.open(url) { success in
                 if success {
                     print("Successfully opened \(playlistName) via content linking")
@@ -1555,17 +1759,24 @@ extension SpotifyService: SPTSessionManagerDelegate {
 extension SpotifyService: SPTAppRemoteDelegate {
     func appRemoteDidEstablishConnection(_ appRemote: SPTAppRemote) {
         print("🎵 AppRemote: Connected successfully! Device is now active.")
+        isAppRemoteConnectionInProgress = false // Reset connection flag
         connectionManager.appRemoteConnectionSucceeded()
         appRemote.playerAPI?.delegate = self
         
-        // Subscribe to player state for real-time track info
-        appRemote.playerAPI?.subscribe(toPlayerState: { (result, error) in
-            if let error = error {
-                print("Error subscribing to player state: \(error)")
-            } else {
-                print("✅ Successfully subscribed to player state updates")
-            }
-        })
+        // Only subscribe once - prevent duplicate subscriptions
+        if appRemoteSubscriptionID == nil {
+            appRemote.playerAPI?.subscribe(toPlayerState: { [weak self] (result, error) in
+                if let error = error {
+                    print("Error subscribing to player state: \(error)")
+                } else {
+                    print("✅ Successfully subscribed to player state updates")
+                    // Store subscription ID to prevent duplicates
+                    self?.appRemoteSubscriptionID = result
+                }
+            })
+        } else {
+            print("📊 [AppRemote] Already subscribed to player state, skipping duplicate subscription")
+        }
         
         // Also get current player state immediately
         appRemote.playerAPI?.getPlayerState { (playerState, error) in
@@ -1593,19 +1804,80 @@ extension SpotifyService: SPTAppRemoteDelegate {
     
     func appRemote(_ appRemote: SPTAppRemote, didFailConnectionAttemptWithError error: Error?) {
         print("AppRemote: Failed connection attempt with error: \(error?.localizedDescription ?? "Unknown error")")
+        isAppRemoteConnectionInProgress = false // Reset connection flag
+        
+        // Use enhanced error handling for AppRemote connection failures
+        let recoverableError = SpotifyRecoverableError.appRemoteConnectionFailed(underlying: error)
+        let context = ErrorContext(
+            operation: "AppRemote Connection",
+            attemptNumber: 1,
+            lastSuccessTime: nil,
+            connectionState: connectionManager.connectionState,
+            isTrainingActive: false // Could be determined dynamically
+        )
+        
+        let recoveryAction = errorHandler.handleError(recoverableError, context: context)
+        handleAppRemoteRecovery(recoveryAction, error: error)
+        
         let connectionError = error ?? SpotifyConnectionError.appRemoteConnectionTimeout
         connectionManager.appRemoteConnectionFailed(error: connectionError)
     }
     
     func appRemote(_ appRemote: SPTAppRemote, didDisconnectWithError error: Error?) {
         print("AppRemote: Disconnected with error: \(error?.localizedDescription ?? "No error")")
-        // Reset data source tracking when AppRemote disconnects
+        isAppRemoteConnectionInProgress = false // Reset connection flag
+        appRemoteSubscriptionID = nil // Clear subscription ID for next connection
+        
+        // Use enhanced error handling for AppRemote disconnection
+        if let error = error {
+            let recoverableError = SpotifyRecoverableError.appRemoteDisconnected(underlying: error)
+            let context = ErrorContext(
+                operation: "AppRemote Connection",
+                attemptNumber: 1,
+                lastSuccessTime: nil,
+                connectionState: connectionManager.connectionState,
+                isTrainingActive: false // Could be determined dynamically
+            )
+            
+            let recoveryAction = errorHandler.handleError(recoverableError, context: context)
+            handleAppRemoteRecovery(recoveryAction, error: error)
+        }
+        
+        // Clear AppRemote data from coordinator
+        dataCoordinator.clearDataSource(.appRemote)
+        
+        // Reset legacy data source tracking when AppRemote disconnects
         print("🔄 [DATA SOURCE] AppRemote disconnected - allowing Web API fallback")
         currentDataSource = .none
         lastAppRemoteUpdate = Date.distantPast
         
         connectionManager.appRemoteDisconnected(error: error)
     }
+    
+    /// Handles recovery actions specific to AppRemote errors
+    private func handleAppRemoteRecovery(_ action: ErrorRecoveryAction, error: Error?) {
+        switch action {
+        case .reconnectAppRemote:
+            print("🔄 [Recovery] Attempting AppRemote reconnection...")
+            errorHandler.executeRecovery(action, for: "AppRemote Connection") { [weak self] in
+                self?.attemptAppRemoteReconnection()
+            }
+            
+        case .degradeToWebAPIOnly:
+            print("🔄 [Recovery] Switching to Web API only mode")
+            // Could set a flag to prevent future AppRemote attempts during this session
+            
+        case .retryAfterDelay, .retryWithExponentialBackoff:
+            errorHandler.executeRecovery(action, for: "AppRemote Connection") { [weak self] in
+                print("🔄 [Recovery] Retrying AppRemote connection after delay")
+                self?.attemptAppRemoteReconnection()
+            }
+            
+        default:
+            print("🔄 [Recovery] No automatic recovery for AppRemote error: \(action)")
+        }
+    }
+    
 }
 
 // MARK: - SPTAppRemotePlayerStateDelegate
@@ -1635,11 +1907,22 @@ extension SpotifyService: SPTAppRemotePlayerStateDelegate {
         print("  - Artwork URL: \(artworkURL)")
         
         // AppRemote data is always prioritized as the authoritative source
-        // Update data source tracking
+        // Update data coordinator with AppRemote data
+        dataCoordinator.updateFromAppRemote(
+            name: trackName,
+            artist: artistName,
+            uri: trackURI,
+            artworkURL: artworkURL,
+            duration: Double(duration) / 1000.0, // Convert from ms to seconds
+            position: Double(playbackPosition) / 1000.0, // Convert from ms to seconds
+            isPlaying: isPlaying
+        )
+        
+        // Update legacy data source tracking
         currentDataSource = .appRemote
         lastAppRemoteUpdate = Date()
         
-        print("✅ [DATA SOURCE] AppRemote data received - setting as authoritative source")
+        print("✅ [DATA SOURCE] AppRemote data received - updating data coordinator")
         print("  - Data source priority: AppRemote (highest)")
         
         notifyPlayerStateChange(isPlaying: isPlaying, trackName: trackName, artistName: artistName, artworkURL: artworkURL)
