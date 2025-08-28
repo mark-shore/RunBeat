@@ -1,120 +1,94 @@
-# Spotify Integration Setup Guide
+# Spotify Setup Guide
 
-This guide will help you set up the Spotify integration for the VO2 Max training feature.
+Get your RunBeat app connected to Spotify for seamless music control during VO2 Max training sessions.
 
-## Prerequisites
+## What You'll Need
 
-1. A Spotify account
-2. A Spotify Developer account (free)
+- **Spotify Premium account** (required for music control)
+- **10 minutes** to set up your developer credentials
+- **Your favorite workout playlists** (or we'll help you create them)
 
-## Step 1: Create a Spotify App
+## Quick Setup Steps
 
-1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
-2. Click "Create App"
-3. Fill in the app details:
-   - **App name**: RunBeat
-   - **App description**: Heart rate zone training app with Spotify integration
-   - **Website**: (optional)
-   - **Redirect URIs**: `runbeat://spotify-login-callback`
-   - **API/SDKs**: Select "iOS SDK"
-4. Click "Save"
+### 1. Create Your Spotify Developer App
 
-## Step 2: Get Your Client ID
+1. Visit [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
+2. Click **"Create App"**
+3. Fill out the form:
+   - **App name**: `RunBeat`
+   - **App description**: `Heart rate training with music`
+   - **Redirect URI**: `runbeat://spotify-login-callback`
+   - **API/SDKs**: Check both "iOS SDK" and "Web Playback SDK"
+4. Click **"Save"**
 
-1. After creating the app, you'll see your Client ID
-2. Copy this Client ID - you'll need it for the next step
+### 2. Get Your App Credentials
 
-## Step 3: Configure Environment Variables
+1. Copy your **Client ID** (visible on your app dashboard)
+2. Click **"Show client secret"** and copy your **Client Secret**
+3. Keep these handy for the next step
 
-### Option A: Using .env file (Development)
+### 3. Add Credentials to RunBeat
 
-1. Edit the `.env` file in the project root
-2. Replace the placeholder values with your actual credentials:
+1. In your RunBeat project, copy `Config.sample.plist` to `Config.plist`
+2. Replace the placeholder values with your real credentials:
 
-```bash
-# Spotify Configuration
-SPOTIFY_CLIENT_ID=your_actual_client_id_here
-
-# High Intensity Playlist (4-minute intervals)
-SPOTIFY_HIGH_INTENSITY_PLAYLIST_ID=your_high_intensity_playlist_id_here
-
-# Rest Playlist (3-minute intervals)
-SPOTIFY_REST_PLAYLIST_ID=your_rest_playlist_id_here
+```xml
+<key>spotifyClientID</key>
+<string>your_client_id_here</string>
+<key>spotifyClientSecret</key>
+<string>your_client_secret_here</string>
 ```
 
-### Option B: Using Config.plist (Production)
+## 4. Using RunBeat with Spotify
 
-1. Copy `RunBeat/Config.sample.plist` to `RunBeat/Config.plist`
-2. Replace the placeholder values in `Config.plist` with your actual credentials
+### First Time Setup
+1. **Launch RunBeat** and navigate to **VO₂ Max Training**
+2. **Connect Spotify**: Tap the Connect button and log in with your Premium account
+3. **Choose Your Music**: Select playlists for high-intensity and rest intervals
+   - **High-intensity**: Pick energetic playlists (rock, electronic, hip-hop)
+   - **Rest intervals**: Choose calmer music (ambient, acoustic, downtempo)
+4. **You're ready!** Your playlist choices are saved for future workouts
 
-## Step 4: Create Spotify Playlists
+### How Training Works
+RunBeat automatically manages your music during VO₂ Max intervals:
 
-### High-Intensity Playlist
-1. Create a new playlist in Spotify for high-intensity workouts
-2. Add energetic, fast-paced songs (140-180 BPM recommended)
-3. Get the playlist ID from the URL: `spotify:playlist:PLAYLIST_ID`
+**🔥 4 minutes high-intensity** → Your energetic playlist plays  
+**😌 3 minutes rest** → Your calm playlist plays  
+**Repeat 4 times** for a complete 28-minute workout
 
-### Rest Playlist
-1. Create a new playlist in Spotify for rest/recovery
-2. Add calming, slower songs (60-100 BPM recommended)
-3. Get the playlist ID from the URL: `spotify:playlist:PLAYLIST_ID`
-
-## Step 5: Get Playlist IDs
-
-1. Open your playlist in Spotify
-2. Click "Share" → "Copy link to playlist"
-3. The playlist ID is the string after the last `/` in the URL
-4. Example: `https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M` → `37i9dQZF1DXcBWIGoYBM5M`
-
-## Step 6: Test the Integration
-
-1. Build and run the app
-2. Tap "VO₂ Max Training"
-3. Tap "Connect Spotify"
-4. Authorize the app in Spotify
-5. Start a training session
-
-## How It Works
-
-The VO2 Max training feature follows this pattern:
-- **4 minutes**: High-intensity interval (plays high-intensity playlist)
-- **3 minutes**: Rest interval (plays rest playlist)
-- **Repeats 4 times** for a total of 28 minutes
-
-The app automatically:
-- Switches between playlists based on the current phase
-- Shows a visual progress indicator
-- Displays the current track information
-- Provides play/pause/stop controls
-
-## Security Notes
-
-- The `.env` and `Config.plist` files are excluded from git to keep your credentials secure
-- Never commit your actual Client ID or playlist IDs to the repository
-- Use different playlists for development and production if needed
+### What You'll Experience
+✅ **Seamless music switching** between workout phases  
+✅ **Background playback** continues when you put your phone away  
+✅ **Persistent login** - authenticate once, train anytime  
+✅ **Your music, your way** - use any playlists you want
 
 ## Troubleshooting
 
-### "Spotify connection failed"
-- Make sure your Client ID is correct
-- Verify the redirect URI matches exactly: `runbeat://spotify-login-callback`
-- Check that you've authorized the app in Spotify
+**Connection issues?**  
+- Double-check your Client ID and Client Secret in `Config.plist`
+- Make sure you have Spotify Premium (free accounts won't work)
+- Verify the redirect URI is exactly: `runbeat://spotify-login-callback`
 
-### "Playlist not found"
-- Verify your playlist IDs are correct
-- Make sure the playlists are public or you're the owner
-- Check that the playlists contain songs
+**Can't select playlists?**  
+- Ensure you're logged into Spotify first
+- Make sure you have playlists in your Spotify account
+- Try disconnecting and reconnecting if needed
 
-### "No music playing"
-- Ensure Spotify is installed and logged in
-- Check that you have an active Spotify Premium subscription (required for SDK)
-- Verify the playlist IDs are valid
+**No music during workouts?**  
+- Install the Spotify app on your device
+- Check that your selected playlists have songs
+- Verify your Premium subscription is active
 
-## Features
+## Tips for Great Workouts
 
-✅ **Automatic Playlist Switching** - High-intensity and rest playlists  
-✅ **Visual Progress Indicator** - Circular progress bar with color coding  
-✅ **Timer Display** - Large, easy-to-read countdown timer  
-✅ **Spotify Integration** - Real-time track information and controls  
-✅ **Pause/Resume/Stop** - Full control over training sessions  
-✅ **Secure Configuration** - Environment-based credential management
+🎵 **Playlist Ideas**:
+- **High-intensity**: Electronic, rock, hip-hop with driving beats
+- **Rest periods**: Ambient, acoustic, or downtempo music
+
+🔄 **Change anytime**: Swap playlists from the VO₂ Max Training screen
+
+📱 **Background ready**: Music continues when you put your phone away and focus on training
+
+---
+
+*Ready to train? Your heart rate zones and Spotify playlists will work together to power your best workouts yet.*

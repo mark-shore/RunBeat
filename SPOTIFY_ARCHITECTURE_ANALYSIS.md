@@ -1,12 +1,12 @@
-# Spotify Integration Architecture Analysis
+# Spotify Integration Architecture Documentation
 
 ## Overview
 
-This document provides a comprehensive analysis of the current Spotify integration architecture in the RunBeat iOS app, identifying pain points and proposing improvements.
+This document describes the current Spotify integration architecture in the RunBeat iOS app after the Phase 1-4 refactor completed in 2025. The integration now features persistent authentication, unified state management, coordinated data sources, and structured error handling.
 
 ## Current Architecture Overview
 
-The Spotify integration follows a **layered MVVM architecture** with the following components:
+The Spotify integration follows a **layered MVVM architecture** with specialized components:
 
 ```
 UI Layer
@@ -16,502 +16,280 @@ UI Layer
 
 ViewModel Layer
 ├── SpotifyViewModel.swift (Singleton - Main UI State)
-└── SpotifyManager.swift (Compatibility Wrapper)
+└── SpotifyManager.swift (Legacy Compatibility)
 
 Service Layer
 ├── SpotifyService.swift (Core Business Logic)
-├── SpotifyPlaylist.swift (Data Models)
-└── ConfigurationManager.swift (Config)
+├── SpotifyConnectionManager.swift (State Machine)
+├── SpotifyDataCoordinator.swift (Data Source Management)
+├── SpotifyErrorHandler.swift (Error Recovery)
+├── SpotifyPlaylist.swift (Data Models & Selection Persistence)
+└── KeychainWrapper.swift (Secure Token Storage)
 
 External Dependencies
 ├── SpotifyiOS SDK (AppRemote)
-└── Spotify Web API (REST)
+└── Spotify Web API (REST - Playlists & Playback)
 ```
 
-## File Structure and Responsibilities
+## Core Components
 
-### Core Components
-
-#### 1. SpotifyService.swift (1,528 lines)
-**Role**: Core business logic and API integration
-**Key Responsibilities**:
-- OAuth authentication flow management
-- AppRemote connection management
-- Web API calls for playback control and data fetching
+### SpotifyService.swift
+**Role**: Core business logic and orchestration
+**Key Features**:
+- OAuth authentication with keychain persistence
+- AppRemote and Web API integration
 - Device activation and playlist playback
-- Track polling for real-time updates
-- Error handling and token management
+- Automatic activation tracking to prevent duplicate playlist starts
 
-**Notable Features**:
-- Complex retry mechanisms for track fetching
-- Background/foreground state management
-- Fallback strategies (AppRemote → Web API → URL schemes)
+### SpotifyConnectionManager.swift
+**Role**: Unified connection state management
+**Features**:
+- Single source of truth for connection state
+- State machine with proper transitions: `disconnected` → `authenticating` → `authenticated` → `connecting` → `connected`
+- Error state handling with token preservation
+- Eliminates multiple boolean connection flags
 
-#### 2. SpotifyViewModel.swift (577 lines)
-**Role**: UI state management and coordination
-**Key Responsibilities**:
-- @Published properties for SwiftUI binding
-- Playlist selection persistence
-- Connection status management
-- UI state synchronization
-- Service delegation
+### SpotifyDataCoordinator.swift
+**Role**: Intelligent data source coordination
+**Features**:
+- Priority-based data consolidation (AppRemote > Web API > Optimistic)
+- Deduplication logic to prevent redundant UI updates
+- Thread-safe data processing with dedicated queue
+- Standardized `SpotifyTrackInfo` model across all sources
 
-**State Properties**:
-- `isConnected`: OAuth authentication status
-- `currentTrack/Artist/Artwork`: Currently playing track info
-- `isPlaying`: Playback state
-- `availablePlaylists`: User's playlists
-- `playlistSelection`: Selected training playlists
+### SpotifyErrorHandler.swift
+**Role**: Structured error recovery system
+**Features**:
+- Context-aware error recovery with `SpotifyRecoverableError` enum
+- Exponential backoff retry strategies
+- User-friendly error messages and recovery guidance
+- Training-aware error handling (more aggressive during workouts)
 
-#### 3. SpotifyManager.swift (110 lines)
-**Role**: Compatibility wrapper for legacy code
-**Purpose**: Maintains backward compatibility while transitioning to MVVM
-**Status**: Deprecated, delegates all calls to SpotifyViewModel
+### KeychainWrapper.swift
+**Role**: Secure token persistence
+**Features**:
+- Encrypted token storage in iOS keychain
+- Automatic token restoration on app launch
+- Eliminates repeated OAuth flows
 
-#### 4. SpotifyPlaylist.swift (112 lines)
-**Role**: Data models and JSON parsing
-**Contains**:
-- `SpotifyPlaylist` struct with display properties
-- API response models for Web API parsing
-- `PlaylistSelection` for persisted user choices
+### SpotifyPlaylist.swift
+**Role**: Playlist data models and selection management
+**Features**:
+- `SpotifyPlaylist` struct with display properties and metadata
+- `PlaylistSelection` model for persistent user choices
+- API response parsing for Web API playlist endpoints
+- UserDefaults integration for selection persistence
 
-## Authentication Flow Analysis
+### PlaylistSelectionView.swift
+**Role**: User playlist selection interface
+**Features**:
+- Grid-based playlist display with artwork and metadata
+- Separate selection flows for high-intensity and rest playlists
+- Real-time selection persistence and validation
+- Design system integration with AppColors and AppTypography
 
-### Current Implementation
+## Authentication Flow
 
 ```mermaid
 sequenceDiagram
     participant UI as UI Layer
     participant VM as SpotifyViewModel
     participant SVC as SpotifyService
-    participant SPOT as Spotify OAuth
+    participant CM as ConnectionManager
+    participant KC as Keychain
 
     UI->>VM: connect()
     VM->>SVC: connect()
-    SVC->>SPOT: initiateSession()
-    SPOT-->>SVC: handleCallback(url)
-    SVC->>SVC: validateAuthenticationAndConnect()
-    Note over SVC: Makes test API call to /v1/me
-    SVC->>VM: spotifyServiceDidConnect()
-    VM->>UI: Update @Published isConnected = true
+    SVC->>KC: retrieveStoredToken()
+    alt Token exists and valid
+        KC-->>SVC: token
+        SVC->>CM: authenticationSucceeded(token)
+        CM->>VM: connectionStateChanged(.authenticated)
+    else No token or invalid
+        SVC->>SVC: initiateOAuthFlow()
+        Note over SVC: User completes OAuth
+        SVC->>KC: storeToken(newToken)
+        SVC->>CM: authenticationSucceeded(token)
+    end
+    CM->>VM: connectionStateChanged(.connected)
+    VM->>UI: Update @Published state
 ```
 
-### Token Management
+## Data Flow Architecture
 
-**Storage**: Tokens stored in memory only (not persisted)
-- `accessToken: String?` in SpotifyService
-- `isAuthenticated: Bool` flag
-
-**Validation**: Active validation on every auth success
-- Test API call to `/v1/me` endpoint
-- Only marks connected after successful validation
-
-**Refresh**: Handled automatically by SpotifyiOS SDK
-- `sessionManager:didRenew:` delegate method updates tokens
-- No manual refresh implementation
-
-### Pain Points in Authentication
-
-1. **No Token Persistence**: Users must re-authenticate every app restart
-2. **Overvalidation**: Every auth success triggers a validation API call
-3. **Connection State Confusion**: `isAuthenticated` vs `isConnected` vs `isAppRemoteConnected`
-
-## Connection Management Analysis
-
-### Dual API Strategy
-
-The integration uses **two separate Spotify APIs** with different capabilities:
-
-#### AppRemote (SpotifyiOS SDK)
-- **Capabilities**: Real-time playback control, player state updates
-- **Limitations**: Requires Spotify app installed, foreground-only in some scenarios
-- **Use Cases**: Play/pause, skip, real-time track updates
-
-#### Web API (REST)
-- **Capabilities**: Full catalog access, cross-platform, background operation
-- **Limitations**: Rate limited, eventual consistency, less real-time
-- **Use Cases**: Playlist fetching, device management, background playback
-
-### Connection State Management
-
-**Multiple Connection States**:
-```swift
-// In SpotifyService
-private(set) var isAuthenticated = false        // OAuth token valid
-private(set) var isAppRemoteConnected = false   // AppRemote connected
-private(set) var accessToken: String?           // Token available
-
-// In SpotifyViewModel  
-@Published var isConnected = false              // UI connection state
-@Published var connectionStatus: ConnectionStatus // Detailed status
+```mermaid
+graph TD
+    AR[AppRemote] --> DC[SpotifyDataCoordinator]
+    WA[Web API] --> DC
+    OP[Optimistic Updates] --> DC
+    DC --> |Priority: AppRemote=3, WebAPI=2, Optimistic=1| UI[SpotifyViewModel]
+    DC --> |Deduplication| UI
+    UI --> |@Published| V[Views]
 ```
 
-### Reconnection Logic
+## Error Handling Strategy
 
-**AppRemote Reconnection**:
-```swift
-private func handleAppWillEnterForeground() {
-    if accessToken != nil && !isAppRemoteConnected {
-        attemptAppRemoteReconnection()
-    }
-}
-```
-
-**Pain Point**: AppRemote disconnection triggers full re-authentication instead of simple reconnection.
-
-## Data Sources and Flow Analysis
-
-### Data Source Hierarchy
-
-1. **AppRemote** (Preferred for real-time data)
-   - Player state updates
-   - Track information with image identifiers
-   - Playback position
-
-2. **Web API** (Fallback and comprehensive data)
-   - Currently playing endpoint (`/v1/me/player/currently-playing`)
-   - Detailed track metadata with artwork URLs
-   - Playlist information
-
-3. **Predicted Data** (During startup)
-   - Immediate UI feedback
-   - Replaced by real data when available
-
-### Data Inconsistency Issues
-
-The service implements **complex data validation** to detect inconsistencies:
+The error handling system provides intelligent recovery:
 
 ```swift
-// Compare AppRemote vs Web API data
-if let lastWebAPITrack = lastFetchedTrackName {
-    if lastWebAPITrack != trackName {
-        print("⚠️ [DATA COMPARISON] MISMATCH DETECTED!")
-        // Trigger comparison Web API fetch
-        fetchCurrentTrackViaWebAPI(isValidationFetch: true)
-    }
-}
-```
-
-### Track Polling System
-
-**Multi-stage fetch mechanism**:
-1. **Fast Retry Phase**: 500ms intervals, up to 20 attempts
-2. **Regular Polling**: 10-second intervals during training
-3. **Validation Fetches**: On-demand consistency checks
-
-```swift
-func startTrackPolling() {
-    // Two-stage fetch for workout start
-    fetchFreshTrackDataForWorkout()
-    
-    // Set up timer for periodic updates
-    trackPollingTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { _ in
-        self.fetchCurrentTrackViaWebAPI()
-    }
-}
-```
-
-## State Management Architecture
-
-### UI State (SpotifyViewModel)
-
-**Published Properties**:
-- Connection state (`isConnected`, `connectionStatus`)
-- Playback state (`isPlaying`, `currentTrack`, `currentArtist`, `currentAlbumArtwork`)
-- Playlist state (`availablePlaylists`, `playlistSelection`, `playlistFetchStatus`)
-- Loading state (`isFetchingTrackData`)
-
-### Persistent State
-
-**UserDefaults Storage**:
-```swift
-// Playlist selection
-"SpotifyPlaylistSelection" -> PlaylistSelection struct
-"CachedSelectedPlaylists" -> [SpotifyPlaylist] array
-```
-
-**Configuration (ConfigurationManager)**:
-```swift
-// From Config.plist or .env
-spotifyClientID
-spotifyClientSecret  
-spotifyHighIntensityPlaylistID (legacy)
-spotifyRestPlaylistID (legacy)
-```
-
-### Cross-Component Communication
-
-**Delegate Pattern**: SpotifyService → SpotifyViewModel
-```swift
-protocol SpotifyServiceDelegate: AnyObject {
-    func spotifyServiceDidConnect()
-    func spotifyServiceDidDisconnect(error: Error?)
-    func spotifyServicePlayerStateDidChange(isPlaying: Bool, trackName: String, artistName: String, artworkURL: String)
-}
-```
-
-**Integration with Training System**:
-```swift
-// VO2MaxTrainingManager observes SpotifyViewModel
-if VO2MaxTrainingManager.shared.isTraining && !VO2MaxTrainingManager.shared.isPaused {
-    // Start appropriate playlist based on current phase
-    switch VO2MaxTrainingManager.shared.currentPhase {
-    case .highIntensity:
-        self.playHighIntensityPlaylist()
-    case .rest:
-        self.playRestPlaylist()
-    }
-}
-```
-
-## Error Handling Analysis
-
-### Error Types
-
-**Custom Error Enum**:
-```swift
-enum SpotifyError: LocalizedError {
-    case notAuthenticated
-    case noData
-    case apiError(Int)
-    case networkError(String)
+enum SpotifyRecoverableError {
+    case appRemoteDisconnected(underlying: Error?)
     case tokenExpired
-    case insufficientPermissions
-    case rateLimited
-    case decodingError(String)
+    case rateLimited(retryAfter: TimeInterval?)
+    case networkTimeout
+    // ... other error types
+}
+
+enum ErrorRecoveryAction {
+    case reconnectAppRemote
+    case refreshToken
+    case retryAfterDelay(TimeInterval)
+    case retryWithExponentialBackoff
+    case showUserAuthPrompt
+    // ... other recovery actions
 }
 ```
 
-### Error Recovery Strategies
+## Playlist Selection Architecture
 
-1. **Token Expiration**: Clear state and require re-authentication
-2. **Network Errors**: Retry with exponential backoff
-3. **Rate Limiting**: Delay and retry
-4. **AppRemote Disconnection**: Attempt reconnection vs full re-auth
+**User-Selectable Playlist System**:
+The app implements a comprehensive playlist selection system that replaces hardcoded playlist IDs with user choice:
 
-### Pain Points in Error Handling
-
-1. **Aggressive Re-authentication**: Minor AppRemote disconnections trigger full OAuth flow
-2. **Inconsistent Error Handling**: Different paths handle similar errors differently
-3. **Limited Error Context**: Users don't get clear guidance on error resolution
-
-## Key Pain Points Identified
-
-### 1. AppRemote Disconnection Causes Full Re-Auth
-**Problem**: AppRemote disconnection (common when app backgrounds) triggers full OAuth re-authentication instead of simple reconnection.
-
-**Impact**: 
-- Poor user experience
-- Unnecessary OAuth flows
-- Loss of session state
-
-**Evidence**: Lines 1313-1317 in SpotifyService.swift
+### Data Models
 ```swift
-func appRemote(_ appRemote: SPTAppRemote, didDisconnectWithError error: Error?) {
-    print("AppRemote: Disconnected with error: \(error?.localizedDescription ?? "No error")")
-    isAppRemoteConnected = false
-    delegate?.spotifyServiceDidDisconnect(error: error)  // Triggers full disconnect
+struct SpotifyPlaylist: Identifiable, Codable, Hashable {
+    let id: String
+    let name: String
+    let description: String?
+    let trackCount: Int
+    let imageURL: String?
+    let isPublic: Bool
+    let owner: String
+}
+
+struct PlaylistSelection: Codable {
+    var highIntensityPlaylistID: String?
+    var restPlaylistID: String?
+    
+    var isComplete: Bool {
+        return highIntensityPlaylistID != nil && restPlaylistID != nil
+    }
 }
 ```
 
-### 2. Multiple Competing Data Sources
-**Problem**: AppRemote and Web API provide different data formats and timing, creating validation complexity.
+### Selection Flow
+1. **Playlist Fetching**: Web API call to `/v1/me/playlists` retrieves user's playlists
+2. **Grid Interface**: PlaylistSelectionView displays playlists with artwork and metadata
+3. **Two-Stage Selection**: High-intensity playlist → Rest playlist with auto-advance
+4. **Persistent Storage**: Selections saved to UserDefaults with JSON encoding
+5. **Training Integration**: VO2MaxTrainingView validates selections before allowing training
 
-**Impact**:
-- Complex validation logic (300+ lines)
-- Data inconsistency detection
-- Performance overhead
+### State Management
+- `availablePlaylists: [SpotifyPlaylist]` - Fetched user playlists
+- `playlistSelection: PlaylistSelection` - Current user selections  
+- `playlistFetchStatus: PlaylistFetchStatus` - Loading/error states
+- Backward compatibility with Config.plist playlist IDs
 
-**Evidence**: Extensive data comparison logic in `playerStateDidChange` and `parseCurrentlyPlayingResponseWithDebug`
+## Training Integration
 
-### 3. Inconsistent Connection State Management
-**Problem**: Multiple boolean flags for connection state without clear single source of truth.
+**Seamless Training Flow**:
+1. User selects playlists via in-app interface (persistent across sessions)
+2. User starts training → Selected playlist begins automatically
+3. App opens Spotify briefly for device activation
+4. **Automatic activation tracking prevents duplicate playlist starts**
+5. **Playlist switching** occurs seamlessly between high-intensity and rest intervals
+6. User can manually browse Spotify without disrupting training music
+7. Error recovery maintains music playback during network issues
 
-**States**:
-- `isAuthenticated` (has valid token)
-- `isAppRemoteConnected` (AppRemote connected)
-- `isConnected` (UI connection state)
-- `connectionStatus` (detailed status enum)
-
-### 4. Authentication Happening Multiple Times
-**Problem**: No token persistence leads to repeated authentication flows.
-
-**Impact**:
-- Poor user experience
-- Unnecessary API calls
-- Potential rate limiting
-
-## Current File Coupling Issues
-
-### High Coupling Areas
-
-1. **SpotifyViewModel ↔ VO2MaxTrainingManager**: Direct cross-references for music coordination
-2. **SpotifyService ↔ UIApplication**: Direct app state checking for background handling
-3. **Multiple Data Models**: Playlist data scattered across SpotifyPlaylist, PlaylistSelection, and cached arrays
-
-### Architectural Concerns
-
-1. **Singleton Dependencies**: SpotifyViewModel.shared creates tight coupling
-2. **Mixed Responsibilities**: SpotifyService handles both business logic and UI concerns
-3. **Complex State Synchronization**: Manual @Published property binding in SpotifyManager
-
-## Proposed Architectural Improvements
-
-### 1. Authentication Layer Redesign
-
-**Persistent Authentication**:
+**Playlist Switching Logic**:
 ```swift
-class SpotifyAuthenticationManager {
-    private let keychain: KeychainService
-    private let sessionManager: SPTSessionManager
-    
-    func persistToken(_ token: String) {
-        keychain.store(token, key: "spotify_access_token")
-    }
-    
-    func restoreSession() -> Bool {
-        guard let token = keychain.retrieve(key: "spotify_access_token"),
-              tokenIsValid(token) else { return false }
-        
-        // Set up session without full OAuth flow
-        return true
-    }
+switch VO2MaxTrainingManager.shared.currentPhase {
+case .highIntensity:
+    let playlistID = playlistSelection.highIntensityPlaylistID
+    spotifyService.playHighIntensityPlaylist(playlistID: playlistID)
+case .rest:
+    let playlistID = playlistSelection.restPlaylistID
+    spotifyService.playRestPlaylist(playlistID: playlistID)
 }
 ```
 
-**Benefits**:
-- Single authentication per install
-- Faster app startup
-- Better user experience
+## Key Improvements Implemented
 
-### 2. Connection State Management
+### ✅ Phase 1: Authentication Persistence
+- **Keychain token storage** - No repeated OAuth flows
+- **Token validation on launch** - Automatic session restoration
+- **Separated authentication from connection** - More robust state management
 
-**Single Source of Truth**:
-```swift
-class SpotifyConnectionManager {
-    @Published var state: ConnectionState = .disconnected
-    
-    enum ConnectionState {
-        case disconnected
-        case authenticating
-        case authenticated(token: String)
-        case connecting
-        case connected(AppRemoteConnectionInfo)
-        case error(SpotifyError)
-    }
-    
-    func handleAppRemoteDisconnection() {
-        // Only attempt reconnection, don't invalidate auth
-        if case .connected = state {
-            state = .authenticated(currentToken)
-            attemptReconnection()
-        }
-    }
-}
-```
+### ✅ Phase 2: Connection State Consolidation  
+- **Unified SpotifyConnectionState enum** - Single source of truth
+- **State machine validation** - Proper state transitions
+- **Eliminated multiple boolean flags** - Cleaner connection logic
 
-### 3. Unified Data Source Strategy
+### ✅ Phase 3: Data Source Simplification
+- **SpotifyDataCoordinator** - Intelligent data prioritization
+- **Removed complex validation** - Replaced with deduplication
+- **Standardized data models** - Consistent SpotifyTrackInfo struct
 
-**Data Source Coordinator**:
-```swift
-class SpotifyDataCoordinator {
-    private let appRemote: AppRemoteService
-    private let webAPI: WebAPIService
-    
-    func getCurrentTrack() -> AnyPublisher<TrackInfo, Never> {
-        // Prefer AppRemote, fallback to Web API
-        appRemote.currentTrack
-            .catch { _ in webAPI.currentTrack }
-            .eraseToAnyPublisher()
-    }
-}
-```
+### ✅ Phase 4: Error Handling Enhancement
+- **Structured error recovery** - Context-aware error handling
+- **Exponential backoff retries** - Intelligent retry strategies  
+- **User-friendly messages** - Clear error guidance
 
-### 4. Improved Error Handling
+## Performance Optimizations
 
-**Structured Error Recovery**:
-```swift
-class SpotifyErrorHandler {
-    func handle(_ error: SpotifyError, context: ErrorContext) -> ErrorRecovery {
-        switch error {
-        case .appRemoteDisconnected:
-            return .reconnectAppRemote
-        case .tokenExpired:
-            return .refreshToken
-        case .networkError:
-            return .retryAfterDelay
-        }
-    }
-}
-```
+- **Deduplication**: Prevents processing identical track/playing state updates
+- **Connection management**: Single AppRemote connection with proper cleanup
+- **Thread-safe processing**: Dedicated queues for data coordination
+- **Smart polling**: Contextual track polling based on training state
 
-### 5. Dependency Injection Architecture
+## Current Status: Production Ready
 
-**Remove Singleton Dependencies**:
-```swift
-// Instead of SpotifyViewModel.shared
-class VO2TrainingCoordinator {
-    private let spotifyService: SpotifyServiceProtocol
-    
-    init(spotifyService: SpotifyServiceProtocol) {
-        self.spotifyService = spotifyService
-    }
-}
-```
+**Resolved Issues**:
+- ✅ Persistent authentication (no repeated OAuth)
+- ✅ Single connection state source of truth  
+- ✅ Intelligent data source coordination
+- ✅ Structured error recovery with retry strategies
+- ✅ Training music flow without restarts
+- ✅ Clean duplicate connection prevention
 
-## Implementation Roadmap
+**Architecture Benefits**:
+- **User Experience**: Seamless authentication and music control
+- **Maintainability**: Clear separation of concerns and single responsibilities
+- **Reliability**: Robust error handling and state management
+- **Performance**: Optimized data processing and connection management
 
-### Phase 1: Authentication Persistence
-1. Implement token persistence with Keychain
-2. Add token validation on app launch
-3. Separate AppRemote connection from authentication
+## Implementation Roadmap Status
 
-### Phase 2: Connection State Consolidation
-1. Create unified connection state enum
-2. Implement connection state machine
-3. Update UI to use single connection state
+- ✅ **Phase 1: Authentication Persistence** - Complete
+- ✅ **Phase 2: Connection State Consolidation** - Complete  
+- ✅ **Phase 3: Data Source Simplification** - Complete
+- ✅ **Phase 4: Error Handling Enhancement** - Complete
+- ⏸️ **Phase 5: Dependency Injection** - Deferred
 
-### Phase 3: Data Source Simplification
-1. Implement data source coordinator
-2. Remove complex validation logic
-3. Standardize data models
+**Phase 5 Status**: Dependency injection (removing singleton patterns, protocol-based dependencies) has been deferred as the current architecture provides excellent functionality and maintainability. The singleton pattern works well for this app's scale and use case.
 
-### Phase 4: Error Handling Enhancement
-1. Implement structured error recovery
-2. Add user-friendly error messages
-3. Implement retry strategies
+## Testing Strategy
 
-### Phase 5: Dependency Injection
-1. Remove singleton patterns
-2. Implement protocol-based dependencies
-3. Add dependency injection container
+Current architecture supports:
+- **Unit testing**: Clear component separation and focused responsibilities
+- **Integration testing**: Well-defined interfaces between components  
+- **State testing**: Predictable state machine behavior
+- **Error testing**: Structured error scenarios and recovery paths
 
-## Testing Considerations
+### Playlist Selection Testing
+- **API Integration**: Test playlist fetching with various account states
+- **Persistence**: Verify selection storage across app restarts
+- **UI States**: Loading, error, empty, and populated playlist scenarios
+- **Training Integration**: Validate playlist switching during VO2 intervals
+- **Backward Compatibility**: Ensure Config.plist fallback continues working
 
-### Current Testability Issues
-- Singleton dependencies make unit testing difficult
-- Network dependencies not mocked
-- Complex state makes test setup challenging
+### Recommended Test Cases
+- Account with 0 playlists (empty state handling)
+- Account with 1-5 playlists (normal selection flow)
+- Account with 50+ playlists (performance and scrolling)
+- Network errors during playlist fetching
+- Invalid playlist IDs or deleted playlists
+- Selection persistence after app restart
+- Training validation with missing playlist selections
 
-### Proposed Testing Strategy
-- Protocol-based dependency injection
-- Mock implementations for external services
-- State machine testing for connection flows
-- Integration tests for authentication flow
-
-## Conclusion
-
-The current Spotify integration is functional but suffers from architectural complexity that impacts maintainability and user experience. The key issues are:
-
-1. **No persistent authentication** leading to repeated OAuth flows
-2. **AppRemote disconnections triggering full re-auth** instead of simple reconnection
-3. **Multiple competing data sources** requiring complex validation
-4. **Inconsistent connection state management** across multiple boolean flags
-
-The proposed improvements focus on:
-- **Persistent authentication** with Keychain storage
-- **Unified connection state management** with clear state machine
-- **Single source of truth** for connection status
-- **Structured error recovery** with specific handling strategies
-
-These changes would significantly improve user experience while reducing code complexity and improving maintainability.
+The Spotify integration is now architecturally sound, user-friendly, and ready for long-term maintenance.

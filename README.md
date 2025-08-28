@@ -61,6 +61,7 @@ RunBeat/
 │   │   └── SpeechAnnouncer.swift  # Voice announcements
 │   ├── Models/                    # Data models
 │   └── Utils/                     # Utility classes
+│       └── KeychainWrapper.swift  # Secure token storage for Spotify
 ├── Features/                      # Feature-specific modules
 │   ├── HeartRate/                 # Heart rate monitoring and training
 │   │   ├── HeartRateManager.swift        # CoreBluetooth heart rate monitoring
@@ -68,9 +69,12 @@ RunBeat/
 │   │   ├── HeartRateTrainingManager.swift # Training session management
 │   │   └── HeartRateZoneCalculator.swift # Zone calculation logic
 │   ├── Spotify/                   # Spotify integration
-│   │   ├── SpotifyService.swift          # Spotify API and playback logic
+│   │   ├── SpotifyService.swift          # Core orchestration and business logic
+│   │   ├── SpotifyConnectionManager.swift # Unified connection state management
+│   │   ├── SpotifyDataCoordinator.swift  # Data source coordination
+│   │   ├── SpotifyErrorHandler.swift     # Structured error recovery
 │   │   ├── SpotifyViewModel.swift        # Spotify UI state management
-│   │   └── SpotifyManager.swift          # Compatibility wrapper
+│   │   └── SpotifyManager.swift          # Legacy compatibility wrapper
 │   ├── VO2Training/               # VO2 max interval training
 │   │   ├── VO2MaxTrainingManager.swift   # Training session logic
 │   │   ├── VO2MaxTrainingView.swift      # Training UI
@@ -137,16 +141,42 @@ RunBeat/
 
 ### Spotify Module
 
-#### SpotifyService
-- Handles Spotify OAuth authentication
-- Manages API calls and device activation
-- Controls playback and playlist switching
-- Implements fallback between App Remote and Web API
+The Spotify integration uses a modular architecture with specialized components:
 
-#### VO2 Training Playlist Management
-- Automatic playlist switching during intervals
+#### SpotifyService
+- Core orchestration and business logic coordination
+- OAuth authentication with persistent keychain storage
+- Device activation and automatic playlist management
+- Coordinates between connection manager, data coordinator, and error handler
+
+#### SpotifyConnectionManager
+- Unified connection state management with single source of truth
+- State machine: `disconnected` → `authenticating` → `authenticated` → `connecting` → `connected`
+- Eliminates multiple boolean connection flags
+- Handles state transitions and error recovery
+
+#### SpotifyDataCoordinator
+- Intelligent data source prioritization (AppRemote > Web API > Optimistic)
+- Deduplication logic prevents redundant UI updates
+- Thread-safe data processing with standardized `SpotifyTrackInfo` model
+- Consolidates track information from multiple sources
+
+#### SpotifyErrorHandler
+- Structured error recovery with context-aware strategies
+- Exponential backoff retry logic for network issues
+- Training-aware error handling (more aggressive during workouts)
+- User-friendly error messages and recovery guidance
+
+#### Authentication & Persistence
+- **Keychain Integration**: Tokens persist across app restarts - no repeated OAuth flows
+- **Automatic Restoration**: Validates and restores sessions on app launch
+- **Smart Activation**: Prevents duplicate playlist starts during device activation
+
+#### VO2 Training Integration
+- Seamless playlist switching during intervals without music interruption
 - User-selectable playlists for high intensity and rest periods
-- Background playlist changes synchronized with training phases
+- Automatic activation tracking prevents duplicate starts during Spotify wakeup
+- Background-safe playlist changes synchronized with training phases
 
 ### VO2 Training Module
 
@@ -164,9 +194,11 @@ RunBeat/
 - Maintains connection during phone sleep
 
 ### Spotify Integration
-- **Foreground**: App Remote preferred with Web API fallback
-- **Background**: Web API only (wrapped in background tasks)
-- Idempotent playlist switching (one switch per interval)
+- **Unified Data Sources**: SpotifyDataCoordinator intelligently prioritizes AppRemote, Web API, and optimistic updates
+- **Persistent Authentication**: Keychain storage eliminates repeated OAuth flows
+- **Smart State Management**: Connection state machine handles complex scenarios gracefully
+- **Background Support**: Structured error recovery maintains functionality across app states
+- **Training-Optimized**: Automatic activation tracking prevents music interruption during workouts
 
 ### Audio Management
 - Audio session configured for mixing with other apps
@@ -235,11 +267,17 @@ RunBeat/
 
 ### Common Issues
 
-1. **Spotify Playlists Not Switching**
-   - Ensure heart rate session is active during VO2 training
-   - Verify Spotify access token is valid
-   - Check playlist IDs are correctly configured
-   - Look for device activation errors in logs
+1. **Spotify Connection Issues**
+   - Check connection state in SpotifyConnectionManager (should show `connected`)
+   - Verify keychain token persistence is working (no repeated OAuth prompts)
+   - Look for error recovery actions in SpotifyErrorHandler logs
+   - Ensure proper state transitions: disconnected → authenticating → authenticated → connected
+
+2. **Spotify Playlists Not Switching**
+   - Verify VO2 training session is active
+   - Check SpotifyDataCoordinator for data source conflicts
+   - Ensure automatic activation tracking isn't preventing playlist starts
+   - Look for duplicate connection prevention in logs
 
 2. **Heart Rate Not Updating**
    - Verify Bluetooth permissions in Settings

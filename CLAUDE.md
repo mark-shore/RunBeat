@@ -36,6 +36,7 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - `HeartRateManager`: CoreBluetooth heart rate monitoring - working perfectly
 - Background execution logic for continuous monitoring
 - Audio announcement timing and cooldown system
+- **Spotify architecture**: Recently refactored (Phase 1-4) with robust connection management, error recovery, and persistent authentication
 
 ### Core Modules
 
@@ -46,9 +47,13 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - `HeartRateViewModel.swift`: UI state and settings persistence
 
 #### Spotify Module (`Features/Spotify/`)
-- `SpotifyService.swift`: OAuth, API calls, and playbook control
-- `SpotifyViewModel.swift`: UI state management for authentication
-- Handles both foreground (App Remote) and background (Web API) playback
+- `SpotifyService.swift`: Core orchestration and business logic
+- `SpotifyConnectionManager.swift`: Unified connection state management
+- `SpotifyDataCoordinator.swift`: Intelligent data source prioritization
+- `SpotifyErrorHandler.swift`: Structured error recovery with retry strategies
+- `SpotifyViewModel.swift`: UI state management with persistent authentication
+- `KeychainWrapper.swift`: Secure token storage (eliminates repeated OAuth)
+- Features: Seamless training integration, automatic activation tracking, background-safe operation
 
 #### VO2 Training Module (`Features/VO2Training/`)
 - `VO2MaxTrainingManager.swift`: 4x4 interval training coordination
@@ -79,9 +84,10 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - UserDefaults for settings persistence (preserve existing keys)
 
 ### Current Priority Issues
-1. **Playlist Selection UI**: VO2 training requires user-selectable playlists
+1. **Apple Music Integration**: Consider adding as alternative to Spotify
 2. **Live HR Display**: Add current BPM to training screens
-3. **Training Mode Clarity**: Improve mode names and descriptions
+3. **User Onboarding**: Guide new users through HR zone setup
+4. **UI Polish**: Improve training mode descriptions and visual clarity
 
 ## Testing Requirements
 
@@ -110,13 +116,15 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 
 ## Known Issues
 
-### Current Problems
-- Playlist selection UI missing for VO2 training (blocks feature)
-- Live BPM not displayed during training sessions
+### Current Areas for Improvement
+- Live BPM not displayed during training screens
+- User onboarding could be more guided for new users
+- Apple Music integration not available (Spotify-only currently)
 
 ### Development Rules
 - Never modify `HeartRateManager`'s core Bluetooth logic
 - Preserve all background execution functionality
 - Keep audio announcement timing unchanged
+- **Don't modify Spotify architecture** - recently refactored and stable
 - Test on physical device for realistic behavior
-- Don't break Spotify authentication flow
+- Use design system components consistently
