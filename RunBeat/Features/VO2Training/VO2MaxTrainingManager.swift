@@ -11,8 +11,8 @@ import Combine
 class VO2MaxTrainingManager: ObservableObject {
     static let shared = VO2MaxTrainingManager()
     
-    @Published var isTraining = false
-    @Published var isPaused = false
+    // Simplified 3-state model: Setup → Active → Complete
+    @Published var trainingState: TrainingState = .setup
     @Published var currentPhase: TrainingPhase = .notStarted
     @Published var timeRemaining: TimeInterval = 0
     @Published var currentInterval = 0
@@ -27,9 +27,14 @@ class VO2MaxTrainingManager: ObservableObject {
     }
 
     private var intervalState: IntervalState?
-    private var pausedAt: Date?
     private var lastIssuedCommandInterval: Int?
     private var timeProvider: TimeProvider = SystemTimeProvider()
+    
+    enum TrainingState {
+        case setup      // Ready to start - show playlists and start button
+        case active     // Training in progress - show timer and stop button only
+        case complete   // Finished - show summary and restart button
+    }
     
     enum TrainingPhase {
         case notStarted
@@ -52,13 +57,20 @@ class VO2MaxTrainingManager: ObservableObject {
         self.timeProvider = timeProvider
     }
     
+    // MARK: - Computed Properties
+    
+    /// Legacy compatibility - maps to trainingState
+    var isTraining: Bool {
+        return trainingState == .active
+    }
+    
     func startTraining() {
-        print("Starting VO2 Max training...")
-        print("Spotify connected: \(spotifyViewModel.isConnected)")
+        print("🏃 Starting VO2 Max training...")
+        print("🎵 Spotify connected: \(spotifyViewModel.isConnected)")
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.isTraining = true
+            self.trainingState = .active
             self.currentInterval = 1
             self.currentPhase = .highIntensity
             self.timeRemaining = self.highIntensityDuration
@@ -70,67 +82,80 @@ class VO2MaxTrainingManager: ObservableObject {
         lastIssuedCommandInterval = nil
         startTimer()
         
-        // Activate device and start music in parallel (non-blocking)
-        // Always attempt activation; this will authorize if needed and start playback.
-        spotifyViewModel.activateDeviceForTraining { [weak self] success in
-            if success {
-                print("✅ Training music started during first interval")
-            } else {
-                print("ℹ️ Using fallback music control during first interval")
-                DispatchQueue.main.async {
-                    self?.spotifyViewModel.playHighIntensityPlaylist()
+        // Check Spotify connection before starting music
+        if spotifyViewModel.isConnected {
+            print("🎵 Spotify connected - starting music for training")
+            
+            // Get current track info immediately for responsive UI
+            spotifyViewModel.refreshCurrentTrack()
+            
+            // Start track polling for real-time updates during training
+            spotifyViewModel.startTrackPolling()
+            
+            // Activate device and start music
+            spotifyViewModel.activateDeviceForTraining { [weak self] success in
+                if success {
+                    print("✅ Training music started during first interval")
+                } else {
+                    print("ℹ️ Using fallback music control during first interval")
+                    DispatchQueue.main.async {
+                        self?.spotifyViewModel.playHighIntensityPlaylist()
+                    }
+                }
+                
+                // Refresh track info again after music starts to capture any changes
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    self?.spotifyViewModel.refreshCurrentTrack()
                 }
             }
-        }
-    }
-    
-    func pauseTraining() {
-        timer?.invalidate()
-        timer = nil
-        DispatchQueue.main.async { [weak self] in
-            self?.isPaused = true
-        }
-        pausedAt = timeProvider.now()
-        spotifyViewModel.pause()
-    }
-    
-    func resumeTraining() {
-        DispatchQueue.main.async { [weak self] in
-            self?.isPaused = false
-        }
-        if let pausedAt = pausedAt, var state = intervalState {
-            let delta = timeProvider.now().timeIntervalSince(pausedAt)
-            state.start = state.start.addingTimeInterval(delta)
-            intervalState = state
-            self.pausedAt = nil
-        }
-        startTimer()
-        // Robust resume: if AppRemote/Web API resume fails due to device not active,
-        // explicitly start the expected playlist for the current phase.
-        if currentPhase == .highIntensity {
-            spotifyViewModel.playHighIntensityPlaylist()
-        } else if currentPhase == .rest {
-            spotifyViewModel.playRestPlaylist()
         } else {
-            // Fallback to basic resume if phase is unexpected
-            spotifyViewModel.resume()
+            print("⚠️ Spotify not connected - training will start without music")
+            print("⚠️ Music will start automatically once Spotify connects")
         }
     }
     
+    /// Stops the training session and returns to setup state
     func stopTraining() {
+        print("⏹️ Stopping VO2 Max training...")
+        
         timer?.invalidate()
         timer = nil
+        
         DispatchQueue.main.async { [weak self] in
-            self?.isTraining = false
-            self?.isPaused = false
-            self?.currentPhase = .notStarted
-            self?.timeRemaining = 0
-            self?.currentInterval = 0
+            guard let self = self else { return }
+            self.trainingState = .setup
+            self.currentPhase = .notStarted
+            self.timeRemaining = 0
+            self.currentInterval = 0
         }
+        
+        // Stop music and track polling
         spotifyViewModel.pause()
         
-        // Reset device activation state so next training session can start fresh
+        // Get final track state before stopping polling (for display consistency)
+        spotifyViewModel.refreshCurrentTrack()
+        
+        spotifyViewModel.stopTrackPolling()
+        
+        // Reset device activation state for next training session
         spotifyViewModel.resetDeviceActivationState()
+    }
+    
+    /// Resets the training session to setup state (for completed training)
+    func resetToSetup() {
+        print("🔄 Resetting training to setup state...")
+        
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.trainingState = .setup
+            self.currentPhase = .notStarted
+            self.timeRemaining = 0
+            self.currentInterval = 0
+        }
+        
+        // Clean up any remaining state
+        lastIssuedCommandInterval = nil
+        intervalState = nil
     }
     
     private func startNextInterval() {
@@ -183,7 +208,7 @@ class VO2MaxTrainingManager: ObservableObject {
     }
 
     private func updateTimerUsingWallClock(now: Date) {
-        guard isTraining, !isPaused, let state = intervalState else { return }
+        guard trainingState == .active, let state = intervalState else { return }
         let elapsed = max(0, now.timeIntervalSince(state.start))
         let remaining = max(0, state.duration - elapsed)
         
@@ -193,7 +218,9 @@ class VO2MaxTrainingManager: ObservableObject {
             self?.timeRemaining = floor(remaining)
         }
         
-        print("⏱️ VO2 tick - phase: \(currentPhase) interval: \(currentInterval) elapsed: \(Int(elapsed))s remaining: \(Int(remaining))s")
+        if currentInterval <= totalIntervals {
+            print("⏱️ VO2 tick - phase: \(currentPhase) interval: \(currentInterval) elapsed: \(Int(elapsed))s remaining: \(Int(remaining))s")
+        }
 
         if remaining <= 0 {
             DispatchQueue.main.async { [weak self] in
@@ -223,15 +250,23 @@ class VO2MaxTrainingManager: ObservableObject {
     }
     
     private func completeTraining() {
+        print("🎉 VO2 Max training completed!")
+        
         timer?.invalidate()
         timer = nil
-        DispatchQueue.main.async { [weak self] in
-            self?.isTraining = false
-            self?.currentPhase = .completed
-        }
-        spotifyViewModel.pause()
         
-        // Reset device activation state so next training session can start fresh
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.trainingState = .complete
+            self.currentPhase = .completed
+            self.timeRemaining = 0
+        }
+        
+        // Stop music and track polling
+        spotifyViewModel.pause()
+        spotifyViewModel.stopTrackPolling()
+        
+        // Reset device activation state for next training session
         spotifyViewModel.resetDeviceActivationState()
     }
     

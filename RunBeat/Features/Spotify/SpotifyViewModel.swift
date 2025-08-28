@@ -15,8 +15,11 @@ class SpotifyViewModel: ObservableObject {
     // MARK: - Published UI State
     @Published var isConnected = false          // OAuth authentication status (for UI)
     @Published var currentTrack: String = ""    // Currently playing track name
+    @Published var currentArtist: String = ""   // Currently playing artist name
+    @Published var currentAlbumArtwork: String = "" // Currently playing album artwork URL
     @Published var isPlaying = false           // Playback state
     @Published var connectionStatus: ConnectionStatus = .disconnected
+    @Published var isFetchingTrackData = false  // Loading state for track fetching
     
     // Playlist management state
     @Published var availablePlaylists: [SpotifyPlaylist] = []
@@ -127,6 +130,7 @@ class SpotifyViewModel: ObservableObject {
     // MARK: - Public API for UI
     
     func connect() {
+        print("🎵 [SpotifyViewModel] Starting connection process...")
         connectionStatus = .connecting
         spotifyService.connect()
     }
@@ -337,7 +341,32 @@ class SpotifyViewModel: ObservableObject {
     func resetDeviceActivationState() {
         spotifyService.resetDeviceActivationState()
         currentTrack = ""
+        currentArtist = ""
+        currentAlbumArtwork = ""
         isPlaying = false
+    }
+    
+    func refreshCurrentTrack() {
+        spotifyService.refreshCurrentTrack()
+    }
+    
+    func startTrackPolling() {
+        // Set loading state when starting workout polling
+        isFetchingTrackData = true
+        spotifyService.startTrackPolling()
+        
+        // Clear loading state after fast retry period (10 seconds max)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
+            if self.isFetchingTrackData {
+                print("⚠️ Clearing loading state after fast retry timeout")
+                self.isFetchingTrackData = false
+            }
+        }
+    }
+    
+    func stopTrackPolling() {
+        isFetchingTrackData = false
+        spotifyService.stopTrackPolling()
     }
     
     // MARK: - Private Helpers
@@ -345,8 +374,11 @@ class SpotifyViewModel: ObservableObject {
     private func resetUIState() {
         isConnected = false
         currentTrack = ""
+        currentArtist = ""
+        currentAlbumArtwork = ""
         isPlaying = false
         connectionStatus = .disconnected
+        isFetchingTrackData = false
     }
     
     // MARK: - Computed Properties for UI
@@ -469,35 +501,107 @@ class SpotifyViewModel: ObservableObject {
 
 // MARK: - SpotifyServiceDelegate
 extension SpotifyViewModel: SpotifyServiceDelegate {
-    func spotifyServiceDidConnect() {
+    func spotifyServiceConnectionStateDidChange(_ state: SpotifyConnectionState) {
         DispatchQueue.main.async {
-            self.isConnected = true
-            self.connectionStatus = .connected
+            // Update legacy properties for backward compatibility
+            self.isConnected = state.isAuthenticated
+            self.connectionStatus = self.mapConnectionState(state)
             
-            // Auto-fetch playlists if user has any saved selections
-            if (self.playlistSelection.highIntensityPlaylistID != nil || 
-                self.playlistSelection.restPlaylistID != nil) && 
-               self.playlistFetchStatus == .notStarted {
-                self.fetchPlaylists()
+            print("🎵 [SpotifyViewModel] Connection state changed: \(state.statusMessage)")
+            
+            // Handle specific state transitions
+            switch state {
+            case .connected:
+                self.handleFullyConnected()
+            case .disconnected, .authenticationFailed:
+                self.handleDisconnected()
+            default:
+                break
             }
         }
+    }
+    
+    private func mapConnectionState(_ state: SpotifyConnectionState) -> ConnectionStatus {
+        switch state {
+        case .disconnected:
+            return .disconnected
+        case .authenticating, .connecting:
+            return .connecting
+        case .authenticated, .connected:
+            return .connected
+        case .authenticationFailed(let error), .connectionError(_, let error):
+            return .error(error.localizedDescription)
+        }
+    }
+    
+    private func handleFullyConnected() {
+        print("🎵 [SpotifyViewModel] Fully connected - checking for active training")
+        
+        // Auto-fetch playlists if user has any saved selections
+        if (playlistSelection.highIntensityPlaylistID != nil || 
+            playlistSelection.restPlaylistID != nil) && 
+           playlistFetchStatus == .notStarted {
+            fetchPlaylists()
+        }
+        
+        // If training is active but we weren't connected before, start music now
+        if VO2MaxTrainingManager.shared.trainingState == .active {
+            print("🎵 Training is active - starting music now that Spotify is connected")
+            
+            // Start appropriate playlist based on current phase
+            switch VO2MaxTrainingManager.shared.currentPhase {
+            case .highIntensity:
+                playHighIntensityPlaylist()
+            case .rest:
+                playRestPlaylist()
+            case .notStarted, .completed:
+                playHighIntensityPlaylist() // Default to high intensity
+            }
+            
+            // Start track polling if not already active
+            if !spotifyService.isTrackPollingActive {
+                startTrackPolling()
+            }
+        }
+    }
+    
+    private func handleDisconnected() {
+        print("🎵 [SpotifyViewModel] Disconnected")
+        // Any cleanup specific to disconnection
+    }
+    
+    // Legacy delegate methods for backward compatibility
+    func spotifyServiceDidConnect() {
+        // This will be called by the connection state change handler
     }
     
     func spotifyServiceDidDisconnect(error: Error?) {
-        DispatchQueue.main.async {
-            self.isConnected = false
-            if let error = error {
-                self.connectionStatus = .error(error.localizedDescription)
-            } else {
-                self.connectionStatus = .disconnected
-            }
-        }
+        // This will be called by the connection state change handler
     }
     
-    func spotifyServicePlayerStateDidChange(isPlaying: Bool, trackName: String) {
+    func spotifyServicePlayerStateDidChange(isPlaying: Bool, trackName: String, artistName: String, artworkURL: String) {
+        print("🎵 [SpotifyViewModel] Received player state change:")
+        print("  - Track: '\(trackName)'")
+        print("  - Artist: '\(artistName)'") 
+        print("  - Artwork: '\(artworkURL)'")
+        print("  - Playing: \(isPlaying)")
+        
         DispatchQueue.main.async {
             self.isPlaying = isPlaying
             self.currentTrack = trackName
+            self.currentArtist = artistName
+            self.currentAlbumArtwork = artworkURL
+            
+            // Clear loading state when we get fresh data
+            if !trackName.isEmpty {
+                self.isFetchingTrackData = false
+            }
+            
+            print("🎵 [SpotifyViewModel] Updated @Published properties:")
+            print("  - currentTrack: '\(self.currentTrack)'")
+            print("  - currentArtist: '\(self.currentArtist)'")
+            print("  - isPlaying: \(self.isPlaying)")
+            print("  - isFetchingTrackData: \(self.isFetchingTrackData)")
         }
     }
 }
