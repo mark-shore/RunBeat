@@ -288,7 +288,7 @@ VO2MaxTrainingManager ─┘
 ### Planned Improvements
 1. **Backend Service**: Add backend to handle Spotify OAuth and token management 
 2. **Live Heart Rate Display**: Add current BPM to active training cards
-3. **Training History**: Add workout history and statistics tracking with Firebase integration
+3. **Training History**: Add workout history and statistics tracking with Supabase integration
 4. **Audio Settings**: Make announcement settings more accessible
 5. **Onboarding Flow**: Guide new users through HR zone setup
 
