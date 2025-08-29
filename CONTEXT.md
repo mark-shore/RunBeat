@@ -5,29 +5,37 @@ Audio-first iOS heart rate training app. Users start workout, put phone away, ge
 
 ## Current Project State
 ✅ **Stable & Production Ready**:
-- Heart rate monitoring with CoreBluetooth
+- Heart rate monitoring with CoreBluetooth and shared services architecture
+- **Dual training mode system** with mutual exclusion (Free Training + VO2 Max Training)
+- **Shared services** eliminate code duplication: HeartRateService + ZoneAnnouncementCoordinator
 - Background execution for phone-away training  
-- Audio announcements during training
-- **Spotify integration** - fully refactored and stable with persistent auth, unified state management, error recovery, and reliable background execution
+- Audio announcements during training with per-mode controls
+- **Spotify integration** - fully refactored with centralized token refresh, reconnection observers, and training-aware foreground handling
 
 ## Current Priorities
-1. **Apple Music Integration** - Consider adding as alternative to Spotify
-2. **Live HR Display** - Show current BPM on training screens
-3. **UI Polish** - Training mode descriptions and visual improvements
-4. **User Onboarding** - Guide new users through setup
+1. **Backend Service** - Add backend to handle Spotify OAuth and eliminate client-side token management friction
+2. **Apple Music Integration** - Consider adding as alternative to Spotify
+3. **Live HR Display** - Show current BPM on training screens
+4. **UI Polish** - Training mode descriptions and visual improvements
+5. **User Onboarding** - Guide new users through setup
 
 ## Don't Touch (Working Perfectly)
 - `HeartRateManager.swift` - CoreBluetooth heart rate monitoring
+- **Shared services architecture** - HeartRateService and ZoneAnnouncementCoordinator working reliably
+- **Dual training mode coordination** - AppState mutual exclusion system
 - Background execution logic for continuous monitoring
 - Audio announcement timing and cooldown system
-- **Spotify architecture** - fully stable with background execution reliability
+- **Spotify architecture** - centralized token refresh, reconnection observers, training-aware handling
 
 ## Spotify Integration Status
-✅ **Production-Ready Architecture** (Phase 1-4 refactor complete):
+✅ **Production-Ready Architecture** with Recent Token Management Improvements:
 - `SpotifyConnectionManager` - unified state management with background-aware error handling
 - `SpotifyDataCoordinator` - intelligent data source prioritization  
 - `SpotifyErrorHandler` - structured error recovery with background execution support
 - `KeychainWrapper` - persistent authentication (no repeated OAuth)
+- **Centralized Token Refresh** - `makeAuthenticatedAPICall()` handles automatic token refresh on 401s
+- **Reconnection Observers** - VO2 training automatically resumes music when Spotify reconnects
+- **Training-Aware Foreground Handling** - prevents playlist restart during active sessions
 - Training integration works seamlessly in foreground and background
 - Background playlist switching reliable during phone-away workouts
 
@@ -46,13 +54,19 @@ Audio-first iOS heart rate training app. Users start workout, put phone away, ge
 - Combine for reactive state management
 
 ## Architecture Notes
-- **Heart Rate**: Pure CoreBluetooth with background execution
-- **Spotify**: Modular design with connection/data/error components
-- **Training**: Coordinates HR monitoring with music control
+- **Shared Services Pattern**: HeartRateService + ZoneAnnouncementCoordinator eliminate duplication between training modes
+- **Dual Training Architecture**: AppState coordinates mutual exclusion between Free Training and VO2 Max Training
+- **Heart Rate**: Pure CoreBluetooth with shared processing service and background execution
+- **Spotify**: Modular design with centralized token refresh and automatic reconnection
+- **Training**: Two independent modes using shared services for consistent HR processing
 - **UI**: Design system with `AppColors`, `AppTypography`, `AppButton`, etc.
 
 ## Development Tips
+- **Shared Services**: Use HeartRateService and ZoneAnnouncementCoordinator for consistent HR processing
+- **Training Modes**: Only one can be active at a time - check AppState.activeTrainingMode
+- **Spotify API Calls**: Use `makeAuthenticatedAPICall()` for automatic token refresh on new endpoints
 - Use design system components consistently
 - Test on physical device for background modes
 - Check Console app for background execution logs
 - Spotify testing requires installed app and premium account
+- Test dual training mode mutual exclusion scenarios

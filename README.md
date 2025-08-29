@@ -58,10 +58,14 @@ RunBeat/
 ├── Core/                          # Core application services and utilities
 │   ├── Services/                  # Core business services
 │   │   ├── AudioService.swift     # Audio session management
-│   │   └── SpeechAnnouncer.swift  # Voice announcements
+│   │   ├── SpeechAnnouncer.swift  # Voice announcements
+│   │   ├── HeartRateService.swift # Shared HR processing and zone calculation
+│   │   └── ZoneAnnouncementCoordinator.swift # Per-training-mode announcement management
 │   ├── Models/                    # Data models
 │   └── Utils/                     # Utility classes
-│       └── KeychainWrapper.swift  # Secure token storage for Spotify
+│       ├── KeychainWrapper.swift  # Secure token storage for Spotify
+│       ├── ConfigurationManager.swift # App configuration management
+│       └── TimeProvider.swift     # Time abstraction for testing
 ├── Features/                      # Feature-specific modules
 │   ├── HeartRate/                 # Heart rate monitoring and training
 │   │   ├── HeartRateManager.swift        # CoreBluetooth heart rate monitoring
@@ -89,12 +93,13 @@ RunBeat/
 │       └── ContentView.swift     # Main app view
 ├── Resources/                    # App resources
 │   └── Audio/                    # Audio files for zone announcements
+│       ├── zone0.mp3
 │       ├── zone1.mp3
 │       ├── zone2.mp3
 │       ├── zone3.mp3
 │       ├── zone4.mp3
 │       └── zone5.mp3
-├── AppState.swift                # App coordinator and state management
+├── AppState.swift                # Dual training mode coordinator with mutual exclusion
 ├── RunBeatApp.swift              # App entry point
 ├── Info.plist                    # App configuration
 ├── Config.plist                  # Feature configuration
@@ -103,6 +108,20 @@ RunBeat/
 ## Key Components
 
 ### Core Services
+
+#### HeartRateService (Shared Processing)
+- **Shared across all training modes** - eliminates duplication
+- Real-time zone calculation and BPM processing
+- Manages heart rate settings and zone configuration
+- Thread-safe zone state management
+- Central hub for all heart rate data processing
+
+#### ZoneAnnouncementCoordinator (Per-Training Management)
+- **Per-training-mode announcement logic** with independent settings
+- Manages cooldown periods and announcement frequency for each mode
+- NotificationCenter-based announcement routing to AppState
+- Prevents announcement conflicts between training modes
+- Configurable per-mode announcement controls
 
 #### AudioService
 - Manages audio session configuration for announcements
@@ -113,7 +132,7 @@ RunBeat/
 #### SpeechAnnouncer
 - Provides voice announcements for heart rate zones
 - Manages speech synthesis and timing
-- Implements cooldown periods between announcements
+- Receives announcements via NotificationCenter from coordinators
 
 ### Heart Rate Module
 
@@ -129,11 +148,12 @@ RunBeat/
 - Provides validation for heart rate calculations
 - Supports both automatic (Karvonen) and manual zone configuration
 
-#### FreeTrainingManager  
+#### FreeTrainingManager (Replaces Legacy HeartRateTrainingManager)
+- **Uses shared services architecture** - HeartRateService and ZoneAnnouncementCoordinator
 - Simple background HR monitoring with zone announcements
-- Uses shared HeartRateService and ZoneAnnouncementCoordinator
-- Independent announcement controls
+- Independent announcement controls separate from VO2 training
 - Lightweight training mode for general HR monitoring
+- Delegates to shared services instead of duplicating logic
 
 #### HeartRateZoneCalculator
 - Pure, stateless heart rate zone calculations
@@ -182,14 +202,48 @@ The Spotify integration uses a modular architecture with specialized components:
 ### VO2 Training Module
 
 #### VO2MaxTrainingManager
-- Manages 4x4 minute interval training sessions
+- **Uses shared services architecture** - HeartRateService and ZoneAnnouncementCoordinator
+- Manages 4x4 minute interval training sessions with independent announcement controls
 - Handles interval timing and phase transitions
 - Coordinates with Spotify for playlist switching
+- Spotify reconnection observers for automatic music recovery during training
 - Manages training state with visual and audio feedback
+
+## Architecture: Shared Services + Dual Training Modes
+
+### Shared Services Architecture
+**Problem Solved**: Eliminates code duplication between Free Training and VO2 Max Training modes.
+
+**Design Pattern**: 
+```
+FreeTrainingManager ──┐
+                      ├── HeartRateService (shared processing)
+                      └── ZoneAnnouncementCoordinator (per-mode settings)
+VO2MaxTrainingManager ─┘
+```
+
+**Benefits**:
+- **Single source of truth** for HR zone calculations
+- **Independent announcement controls** per training mode
+- **Consistent zone logic** across all training types
+- **Easier testing and maintenance** with centralized processing
+
+### Dual Training Mode System
+**Coordinated by AppState**: Ensures only one training mode active at a time
+
+**Training Modes**:
+- `.none` - No active training
+- `.free` - Simple background HR monitoring with announcements  
+- `.vo2Max` - Structured 4x4 interval training with Spotify integration
+
+**Mutual Exclusion**: AppState prevents simultaneous training sessions
+**Shared Resources**: Both modes use HeartRateService and ZoneAnnouncementCoordinator
+**Independent Settings**: Each mode maintains separate announcement preferences
 
 ## Background Execution Strategy
 
 ### Heart Rate Monitoring
+- **Shared HeartRateService** processes all BPM data regardless of training mode
 - Uses CoreBluetooth background mode for continuous monitoring
 - Wall-clock based timing advanced by HR events
 - Maintains connection during phone sleep
@@ -228,13 +282,13 @@ The Spotify integration uses a modular architecture with specialized components:
 ## Known Issues & Planned Improvements
 
 ### Current Issues
-1. **Playlist Selection**: Users need to manually select playlists for VO2 training before first use
+1. **Spotify Token Management**: Client-only OAuth creates UX friction - backend service planned to resolve
 2. **Heart Rate Display**: Live BPM not visible on main training screens
 
 ### Planned Improvements
-1. **Playlist Selection UI**: Implement in-app playlist picker for VO2 training
+1. **Backend Service**: Add backend to handle Spotify OAuth and token management 
 2. **Live Heart Rate Display**: Add current BPM to active training cards
-3. **Training History**: Add workout history and statistics tracking
+3. **Training History**: Add workout history and statistics tracking with Firebase integration
 4. **Audio Settings**: Make announcement settings more accessible
 5. **Onboarding Flow**: Guide new users through HR zone setup
 
@@ -260,15 +314,29 @@ The Spotify integration uses a modular architecture with specialized components:
 - Use `@MainActor` for ViewModel updates
 
 ### State Management
+- **AppState coordinates dual training modes** with mutual exclusion (only one active at a time)
+- **Shared services pattern** eliminates duplication between training modes
+- **NotificationCenter routing** for announcements from coordinators to AppState to SpeechAnnouncer
 - ViewModels manage UI state with `@Published` properties
 - Services handle business logic and external integrations
-- AppState coordinates between different modules
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Spotify Connection Issues**
+1. **Training Mode Conflicts**
+   - Only one training mode can be active at a time (enforced by AppState)
+   - If training won't start, check that previous session was properly stopped
+   - Look for "Cannot start X training - another mode is active" messages
+   - Verify AppState.activeTrainingMode shows `.none` before starting new session
+
+2. **Shared Services Issues**
+   - HR processing issues affect both Free and VO2 training modes
+   - Check HeartRateService logs for zone calculation problems
+   - Verify ZoneAnnouncementCoordinator delegate setup for announcement routing
+   - Ensure NotificationCenter announcements are reaching AppState
+
+3. **Spotify Connection Issues**
    - Check connection state in SpotifyConnectionManager (should show `connected`)
    - Verify keychain token persistence is working (no repeated OAuth prompts)
    - Look for error recovery actions in SpotifyErrorHandler logs
@@ -314,10 +382,21 @@ The Spotify integration uses a modular architecture with specialized components:
 - Spotify App Remote requires installed Spotify app
 
 ### Test Scenarios
-1. Start zone training → background app → verify announcements continue
-2. Start VO2 training → verify playlist switches at intervals
-3. Connect HR monitor → verify real-time updates
-4. Test audio announcements over music playback
+1. **Dual Training Mode Testing**:
+   - Start Free training → try to start VO2 training → should be prevented
+   - Stop Free training → start VO2 training → should work normally
+   - Force-quit app during training → verify proper cleanup on restart
+
+2. **Shared Services Testing**:
+   - Start Free training → verify HR processing and announcements
+   - Stop and start VO2 training → verify same HR data but independent announcements
+   - Change HR zones → verify both training modes use updated zones
+
+3. **Background Execution Testing**:
+   - Start zone training → background app → verify announcements continue
+   - Start VO2 training → verify playlist switches at intervals
+   - Connect HR monitor → verify real-time updates
+   - Test audio announcements over music playback
 
 ## Building and Deployment
 
