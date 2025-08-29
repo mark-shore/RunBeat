@@ -129,21 +129,43 @@ Copy `.env.example` to `.env` and update with your actual credentials:
 
 ```
 backend/
-├── main.py                 # FastAPI application entry point
-├── requirements.txt        # Python dependencies
-├── railway.toml           # Railway deployment config
-├── .env.example           # Environment variables template
-└── app/
-    ├── api/v1/routes/     # API route handlers
-    │   ├── health.py      # Health check endpoints
-    │   ├── devices.py     # Device management
-    │   └── spotify.py     # Spotify integration
-    ├── core/              # Core configuration
-    │   ├── config.py      # Settings and environment management
-    │   └── logging_config.py # Structured logging setup
-    ├── models/            # Pydantic data models
-    ├── services/          # Business logic services
-    └── utils/             # Utility functions
+├── main.py                   # FastAPI application entry point
+├── requirements.txt          # Python dependencies
+├── runtime.txt               # Python version specification
+├── railway.toml              # Railway deployment config
+├── Procfile                  # Process definition for Railway
+├── deploy.sh                 # Railway deployment script
+├── README.md                 # Backend-specific documentation
+├── RAILWAY_DEPLOYMENT.md     # Deployment guide
+├── test_endpoints.py         # API endpoint tests
+├── test_ios_integration.py   # iOS integration tests
+├── test_refresh_system.py    # Token refresh tests
+├── test_timing_updates.py    # Timing system tests
+├── .gitignore                # Python/backend specific ignore rules
+└── app/                      # Backend application code
+    ├── __init__.py
+    ├── api/                  # REST API endpoints
+    │   ├── __init__.py
+    │   └── v1/
+    │       ├── __init__.py
+    │       └── routes/
+    │           ├── __init__.py
+    │           ├── admin.py          # Admin endpoints
+    │           ├── devices.py        # Device management
+    │           ├── health.py         # Health check endpoints
+    │           └── spotify.py        # Spotify token management
+    ├── core/                 # Configuration and logging
+    │   ├── __init__.py
+    │   ├── config.py                 # App configuration
+    │   └── logging_config.py         # Logging setup
+    ├── models/               # Data models
+    │   └── __init__.py
+    ├── services/             # Business logic services
+    │   ├── __init__.py
+    │   ├── firebase_client.py        # Firebase integration
+    │   └── token_refresh_service.py  # Token refresh logic
+    └── utils/                # Utility functions
+        └── __init__.py
 ```
 
 ## iOS Integration

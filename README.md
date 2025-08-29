@@ -108,15 +108,45 @@ RunBeat/
 ├── Info.plist                    # App configuration
 ├── Config.plist                  # Feature configuration
 ├── Assets.xcassets/              # App assets
+├── .gitignore                    # iOS/Swift project ignore rules
 └── backend/                      # FastAPI backend service
     ├── app/                      # Backend application code
-    │   ├── api/v1/routes/        # REST API endpoints
+    │   ├── __init__.py
+    │   ├── api/                  # REST API endpoints
+    │   │   ├── __init__.py
+    │   │   └── v1/
+    │   │       ├── __init__.py
+    │   │       └── routes/
+    │   │           ├── __init__.py
+    │   │           ├── admin.py          # Admin endpoints
+    │   │           ├── devices.py        # Device management
+    │   │           ├── health.py         # Health check endpoints
+    │   │           └── spotify.py        # Spotify token management
     │   ├── core/                 # Configuration and logging
-    │   ├── services/             # Token refresh and Firebase services
-    │   └── models/               # Data models
+    │   │   ├── __init__.py
+    │   │   ├── config.py                 # App configuration
+    │   │   └── logging_config.py         # Logging setup
+    │   ├── models/               # Data models
+    │   │   └── __init__.py
+    │   ├── services/             # Business logic services
+    │   │   ├── __init__.py
+    │   │   ├── firebase_client.py        # Firebase integration
+    │   │   └── token_refresh_service.py  # Token refresh logic
+    │   └── utils/                # Utility functions
+    │       └── __init__.py
     ├── main.py                   # FastAPI application entry point
     ├── requirements.txt          # Python dependencies
-    └── deploy.sh                 # Railway deployment script
+    ├── runtime.txt               # Python version specification
+    ├── railway.toml              # Railway deployment config
+    ├── Procfile                  # Process definition for Railway
+    ├── deploy.sh                 # Railway deployment script
+    ├── README.md                 # Backend-specific documentation
+    ├── RAILWAY_DEPLOYMENT.md     # Deployment guide
+    ├── test_endpoints.py         # API endpoint tests
+    ├── test_ios_integration.py   # iOS integration tests
+    ├── test_refresh_system.py    # Token refresh tests
+    ├── test_timing_updates.py    # Timing system tests
+    └── .gitignore                # Python/backend specific ignore rules
 
 ## Key Components
 
