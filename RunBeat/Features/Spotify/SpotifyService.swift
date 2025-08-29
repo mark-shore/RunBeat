@@ -184,7 +184,7 @@ class SpotifyService: NSObject {
     
     /// Stores both access token and refresh token from SPTSession
     private func storeAuthenticationTokens(session: SPTSession) {
-        // Store access token
+        // Store access token (keeping keychain as offline fallback)
         let accessSuccess = keychainWrapper.store(session.accessToken, forKey: tokenKeychainKey)
         
         // Store refresh token if available
@@ -192,6 +192,21 @@ class SpotifyService: NSObject {
         let refreshToken = session.refreshToken
         if !refreshToken.isEmpty {
             refreshSuccess = keychainWrapper.store(refreshToken, forKey: refreshTokenKeychainKey)
+            
+            // Send tokens to backend immediately after OAuth success
+            Task {
+                do {
+                    try await BackendService.shared.storeSpotifyTokens(
+                        accessToken: session.accessToken,
+                        refreshToken: refreshToken,
+                        expiresIn: Int(session.expirationDate.timeIntervalSinceNow)
+                    )
+                    print("✅ [SpotifyService] Tokens sent to backend successfully")
+                } catch {
+                    print("⚠️ [SpotifyService] Failed to send tokens to backend: \(error.localizedDescription)")
+                    // Continue with keychain fallback - don't fail authentication
+                }
+            }
             print("✅ [SpotifyService] Stored refresh token in keychain: \(refreshSuccess)")
         } else {
             print("⚠️ [SpotifyService] No refresh token available in session")
@@ -238,8 +253,17 @@ class SpotifyService: NSObject {
     private func attemptTokenRestoration() {
         print("🔍 [SpotifyService] Attempting to restore persisted authentication...")
         
-        guard let storedToken = retrieveStoredToken() else {
-            print("ℹ️ [SpotifyService] No stored token found - fresh authentication required")
+        // Check what's in keychain
+        let storedAccessToken = keychainWrapper.retrieve(forKey: tokenKeychainKey)
+        let storedRefreshToken = keychainWrapper.retrieve(forKey: refreshTokenKeychainKey)
+        
+        print("🔍 [SpotifyService] Keychain state:")
+        print("   - Has access token: \(storedAccessToken != nil)")
+        print("   - Has refresh token: \(storedRefreshToken != nil)")
+        print("   - Connection state: \(connectionManager.connectionState)")
+        
+        guard let storedToken = storedAccessToken else {
+            print("ℹ️ [SpotifyService] No stored access token found - fresh authentication required")
             return
         }
         
@@ -320,7 +344,7 @@ class SpotifyService: NSObject {
         }
     }
     
-    /// Refreshes the access token using the stored refresh token
+    /// Refreshes the access token using the backend service
     private func refreshAccessToken(refreshToken: String, completion: @escaping (Bool) -> Void) {
         // Prevent concurrent refresh attempts
         guard !isTokenRefreshInProgress else {
@@ -331,9 +355,48 @@ class SpotifyService: NSObject {
             return
         }
         
-        print("🔄 [SpotifyService] Attempting to refresh access token...")
+        print("🔄 [SpotifyService] Attempting to get fresh token from backend...")
         isTokenRefreshInProgress = true
         
+        Task {
+            do {
+                // Get fresh token from backend (backend handles refresh automatically)
+                let tokenResponse = try await BackendService.shared.getFreshSpotifyToken()
+                
+                // Update local keychain with fresh token (fallback storage)
+                let success = keychainWrapper.store(tokenResponse.accessToken, forKey: tokenKeychainKey)
+                
+                if let newRefreshToken = tokenResponse.refreshToken {
+                    keychainWrapper.store(newRefreshToken, forKey: refreshTokenKeychainKey)
+                }
+                
+                // Update connection manager with new token
+                DispatchQueue.main.async { [weak self] in
+                    self?.isTokenRefreshInProgress = false
+                    self?.connectionManager.authenticationSucceeded(token: tokenResponse.accessToken)
+                    print("✅ [SpotifyService] Successfully refreshed access token via backend")
+                    completion(true)
+                }
+                
+            } catch {
+                print("❌ [SpotifyService] Backend token refresh failed: \(error.localizedDescription)")
+                
+                // Fallback to local token refresh if backend is unavailable
+                if let backendError = error as? BackendError, backendError.isNetworkUnavailable {
+                    print("🔄 [SpotifyService] Backend unavailable, attempting local token refresh fallback...")
+                    self.refreshAccessTokenLocal(refreshToken: refreshToken, completion: completion)
+                } else {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.isTokenRefreshInProgress = false
+                        completion(false)
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Local token refresh fallback when backend is unavailable
+    private func refreshAccessTokenLocal(refreshToken: String, completion: @escaping (Bool) -> Void) {
         let tokenURL = URL(string: "https://accounts.spotify.com/api/token")!
         var request = URLRequest(url: tokenURL)
         request.httpMethod = "POST"
@@ -436,14 +499,6 @@ class SpotifyService: NSObject {
     
     private func handleAppWillEnterForeground() {
         print("📱 App returning to foreground - checking Spotify connection...")
-        
-        // Check if we're in the middle of training to avoid disrupting playlist flow
-        let isTrainingActive = isTrainingSessionActive()
-        if isTrainingActive {
-            print("🏃 Training session active - avoiding automatic playlist restart on foreground")
-            // During training, only refresh track data and ensure polling continues
-            // Don't trigger playlist changes that could interrupt the training flow
-        }
         
         // Delay clearing automatic activation flag to allow connection state changes to see it
         if isAutomaticSpotifyActivationInProgress {
@@ -634,40 +689,60 @@ class SpotifyService: NSObject {
         isRetry: Bool,
         completion: @escaping (Data?, URLResponse?, Error?) -> Void
     ) {
-        guard let accessToken = accessToken else {
-            completion(nil, nil, SpotifyError.notAuthenticated)
-            return
-        }
-        
-        // Add authorization header
-        var authenticatedRequest = request
-        authenticatedRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        
-        URLSession.shared.dataTask(with: authenticatedRequest) { [weak self] data, response, error in
-            // Check for 401 (token expired)
-            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 401 {
-                if !isRetry, let refreshToken = self?.retrieveStoredRefreshToken() {
-                    print("🔄 Token expired (401) - attempting refresh and retry")
-                    self?.refreshAccessToken(refreshToken: refreshToken) { success in
-                        if success {
-                            // Retry the original request with new token
-                            self?.makeAuthenticatedAPICallWithRetry(request: request, isRetry: true, completion: completion)
-                        } else {
-                            // Refresh failed - disconnect
-                            self?.handleTokenExpired()
-                            completion(nil, response, SpotifyError.tokenExpired)
+        // Get fresh token from backend if available, otherwise use local token
+        Task {
+            var tokenToUse: String?
+            
+            // Try to get fresh token from backend first
+            do {
+                let tokenResponse = try await BackendService.shared.getFreshSpotifyToken()
+                tokenToUse = tokenResponse.accessToken
+                print("🔄 [SpotifyService] Using fresh token from backend for API call")
+                
+                // Update local storage as fallback
+                keychainWrapper.store(tokenResponse.accessToken, forKey: tokenKeychainKey)
+                
+            } catch {
+                // Fallback to local token
+                tokenToUse = accessToken
+                print("🔄 [SpotifyService] Backend unavailable, using local token for API call")
+            }
+            
+            guard let finalToken = tokenToUse else {
+                completion(nil, nil, SpotifyError.notAuthenticated)
+                return
+            }
+            
+            // Add authorization header
+            var authenticatedRequest = request
+            authenticatedRequest.setValue("Bearer \(finalToken)", forHTTPHeaderField: "Authorization")
+            
+            URLSession.shared.dataTask(with: authenticatedRequest) { [weak self] data, response, error in
+                // Check for 401 (token expired)
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 401 {
+                    if !isRetry, let refreshToken = self?.retrieveStoredRefreshToken() {
+                        print("🔄 Token expired (401) - attempting refresh and retry")
+                        self?.refreshAccessToken(refreshToken: refreshToken) { success in
+                            if success {
+                                // Retry the original request with new token
+                                self?.makeAuthenticatedAPICallWithRetry(request: request, isRetry: true, completion: completion)
+                            } else {
+                                // Refresh failed - disconnect
+                                self?.handleTokenExpired()
+                                completion(nil, response, SpotifyError.tokenExpired)
+                            }
                         }
+                    } else {
+                        // Already retried or no refresh token - fail
+                        self?.handleTokenExpired()
+                        completion(nil, response, SpotifyError.tokenExpired)
                     }
                 } else {
-                    // Already retried or no refresh token - fail
-                    self?.handleTokenExpired()
-                    completion(nil, response, SpotifyError.tokenExpired)
+                    // Not a 401 - return result as-is
+                    completion(data, response, error)
                 }
-            } else {
-                // Not a 401 - return result as-is
-                completion(data, response, error)
-            }
-        }.resume()
+            }.resume()
+        }
     }
     
     private func performDeviceActivation(playlistID: String?, completion: @escaping (Bool) -> Void) {
@@ -1763,6 +1838,7 @@ class SpotifyService: NSObject {
         
         delegate?.spotifyServicePlayerStateDidChange(isPlaying: isPlaying, trackName: trackName, artistName: artistName, artworkURL: artworkURL)
     }
+    
 }
 
 // MARK: - Web API Implementation

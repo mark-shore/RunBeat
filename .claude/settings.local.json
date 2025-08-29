@@ -6,7 +6,16 @@
       "Bash(swift:*)",
       "Bash(grep:*)",
       "Read(/Users/markshore/Desktop/**)",
-      "Read(/Users/markshore/Desktop/**)"
+      "Read(/Users/markshore/Desktop/**)",
+      "Read(/Users/markshore/Desktop/**)",
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+      "Bash(python:*)",
+      "Bash(source:*)",
+      "Bash(pip install:*)",
+      "Bash(uvicorn:*)",
+      "Bash(railway --version)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

@@ -88,6 +88,7 @@ class SpotifyViewModel: ObservableObject {
     // MARK: - Initialization
     
     private init(configurationManager: ConfigurationManager = ConfigurationManager.shared) {
+        print("🎵 [SpotifyViewModel] Initializing SpotifyViewModel...")
         self.configurationManager = configurationManager
         
         // Initialize SpotifyService with configuration
@@ -96,8 +97,13 @@ class SpotifyViewModel: ObservableObject {
             clientSecret: configurationManager.spotifyClientSecret
         )
         
+        print("🎵 [SpotifyViewModel] Initial state - isConnected: \(isConnected), connectionStatus: \(connectionStatus)")
+        
         setupSpotifyServiceDelegate()
         loadPersistedPlaylistSelection()
+        
+        // Debug: Check keychain state
+        print("🔍 [SpotifyViewModel] Checking keychain and connection state...")
         
         // Check if we're already connected and should fetch playlists
         checkForExistingConnection()
@@ -106,6 +112,13 @@ class SpotifyViewModel: ObservableObject {
     private func checkForExistingConnection() {
         // Give a moment for the service to initialize, then check connection
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            print("🎵 [SpotifyViewModel] checkForExistingConnection - isConnected: \(self.isConnected)")
+            print("🎵 [SpotifyViewModel] connectionStatus: \(self.connectionStatus)")
+            print("🎵 [SpotifyViewModel] SpotifyService isAuthenticated: \(self.spotifyService.isAuthenticated)")
+            print("🎵 [SpotifyViewModel] Has high intensity playlist: \(self.playlistSelection.highIntensityPlaylistID != nil)")
+            print("🎵 [SpotifyViewModel] Has rest playlist: \(self.playlistSelection.restPlaylistID != nil)")
+            print("🎵 [SpotifyViewModel] Playlist fetch status: \(self.playlistFetchStatus)")
+            
             if self.isConnected && 
                (self.playlistSelection.highIntensityPlaylistID != nil || 
                 self.playlistSelection.restPlaylistID != nil) && 
@@ -567,10 +580,17 @@ extension SpotifyViewModel: SpotifyServiceDelegate {
     func spotifyServiceConnectionStateDidChange(_ state: SpotifyConnectionState) {
         DispatchQueue.main.async {
             // Update legacy properties for backward compatibility
+            let previousConnected = self.isConnected
             self.isConnected = state.isAuthenticated
             self.connectionStatus = self.mapConnectionState(state)
             
             print("🎵 [SpotifyViewModel] Connection state changed: \(state.statusMessage)")
+            print("   - Previous isConnected: \(previousConnected)")
+            print("   - New isConnected: \(self.isConnected)")
+            print("   - New connectionStatus: \(self.connectionStatus)")
+            print("   - State isAuthenticated: \(state.isAuthenticated)")
+            print("   - canConnect: \(self.canConnect)")
+            print("   - UI should show connect button: \(!self.isConnected && self.canConnect)")
             
             // Handle specific state transitions
             switch state {
@@ -621,33 +641,14 @@ extension SpotifyViewModel: SpotifyServiceDelegate {
                     startTrackPolling()
                 }
             } else {
-                // Only start playlist if music is not currently playing or track polling is not active
-                // This handles cases where user manually went to Spotify
-                if !isPlaying || !spotifyService.isTrackPollingActive {
-                    print("🎵 Starting music for active training (not currently playing)")
-                    
-                    // Start appropriate playlist based on current phase
-                    switch VO2MaxTrainingManager.shared.currentPhase {
-                    case .highIntensity:
-                        playHighIntensityPlaylist()
-                    case .rest:
-                        playRestPlaylist()
-                    case .notStarted, .completed:
-                        playHighIntensityPlaylist() // Default to high intensity
-                    }
-                    
-                    // Start track polling if not already active
-                    if !spotifyService.isTrackPollingActive {
-                        startTrackPolling()
-                    }
-                } else {
-                    print("🎵 Training music already playing - not restarting playlist")
-                    
-                    // Just ensure track polling is active for existing music
-                    if !spotifyService.isTrackPollingActive {
-                        print("🎵 Starting track polling for existing music")
-                        startTrackPolling()
-                    }
+                // Don't automatically restart playlists on reconnection
+                // Playlists should only change during explicit training phase transitions
+                print("🎵 Connection restored during training - ensuring track polling only")
+                
+                // Just ensure track polling is active for existing music
+                if !spotifyService.isTrackPollingActive {
+                    print("🎵 Starting track polling for existing music")
+                    startTrackPolling()
                 }
             }
         }

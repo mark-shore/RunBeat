@@ -1,0 +1,44 @@
+# FastAPI and ASGI server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# HTTP client
+requests==2.31.0
+httpx==0.25.2
+
+# Spotify integration
+spotipy==2.23.0
+
+# Task scheduling
+APScheduler==3.10.4
+
+# Firebase Admin SDK
+firebase-admin==6.4.0
+
+# Environment management
+python-decouple==3.8
+python-dotenv==1.0.0
+
+# Security and auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Database (optional - for user management)
+sqlalchemy==2.0.23
+alembic==1.12.1
+
+# Validation and data models
+pydantic==2.5.0
+email-validator==2.1.0
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+
+# Logging
+structlog==23.2.0
+
+# CORS
+fastapi-cors==0.0.6

@@ -1,4 +1,3 @@
-
 # macOS
 .DS_Store
 
@@ -26,6 +25,13 @@ xcuserdata/
 # Pods/
 # Carthage/Build/
 
-# Environment variables and app config (do not commit secrets)
-RunBeat/.env
-RunBeat/Config.plist
+# Backend environment variables (do not commit secrets)
+backend/.env
+
+# iOS app config (do not commit secrets)
+Config.plist
+
+# Development environment folders
+.claude/
+.cursor/
+.vscode/

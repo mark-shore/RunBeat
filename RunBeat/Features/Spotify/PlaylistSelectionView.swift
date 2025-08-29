@@ -75,6 +75,9 @@ struct PlaylistSelectionView: View {
         .onAppear {
             print("🎵 PlaylistSelectionView appeared")
             print("   - Connected: \(spotifyViewModel.isConnected)")
+            print("   - Connection Status: \(spotifyViewModel.connectionStatus)")
+            print("   - Can Connect: \(spotifyViewModel.canConnect)")
+            print("   - Should show connect button: \(!spotifyViewModel.isConnected)")
             print("   - Fetch status: \(spotifyViewModel.playlistFetchStatus)")
             print("   - Available playlists: \(spotifyViewModel.availablePlaylists.count)")
             

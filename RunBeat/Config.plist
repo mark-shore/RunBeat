@@ -10,5 +10,7 @@
 	<string>4OVrwFYrBP03lXStlTkbDK</string>
 	<key>SPOTIFY_REST_PLAYLIST_ID</key>
 	<string>5TZiprVS1hx8i8DmnF1U9i</string>
+	<key>BackendBaseURL</key>
+	<string>https://runbeat-production.up.railway.app</string>
 </dict>
 </plist>

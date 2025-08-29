@@ -10,15 +10,12 @@ import Foundation
 import Firebase
 import FirebaseAuth
 import FirebaseFirestore
-import FirebaseFunctions
-import FirebaseMessaging
 import Combine
 
 class FirebaseService: ObservableObject {
     static let shared = FirebaseService()
     
     private let db = Firestore.firestore()
-    private let functions = Functions.functions()
     
     @Published var isAuthenticated = false
     @Published var currentUserId: String?
@@ -28,7 +25,6 @@ class FirebaseService: ObservableObject {
     
     private init() {
         setupAuthStateListener()
-        configureFunctions()
     }
     
     deinit {
@@ -104,39 +100,9 @@ class FirebaseService: ObservableObject {
         }
     }
     
-    private func configureFunctions() {
-        // Configure Firebase Functions for development
-        #if DEBUG
-        functions.useEmulator(withHost: "localhost", port: 5001)
-        #endif
-    }
     
     // MARK: - Spotify Token Management
-    
-    func refreshSpotifyToken() async -> String? {
-        guard let userId = currentUserId else {
-            print("❌ [Firebase] No authenticated user for token refresh")
-            return nil
-        }
-        
-        do {
-            let result = try await functions.httpsCallable("refreshSpotifyToken").call([
-                "userId": userId
-            ])
-            
-            if let data = result.data as? [String: Any],
-               let accessToken = data["accessToken"] as? String {
-                print("✅ [Firebase] Spotify token refreshed successfully")
-                return accessToken
-            } else {
-                print("❌ [Firebase] Invalid token refresh response")
-                return nil
-            }
-        } catch {
-            print("❌ [Firebase] Token refresh failed: \(error.localizedDescription)")
-            return nil
-        }
-    }
+    // Note: Token refresh now handled by custom FastAPI backend
     
     func storeSpotifyTokens(accessToken: String, refreshToken: String) async {
         guard let userId = currentUserId else {
@@ -288,22 +254,7 @@ class FirebaseService: ObservableObject {
     }
     
     // MARK: - Push Notifications
-    
-    func updateFCMToken(_ token: String) async {
-        guard let userId = currentUserId else { return }
-        
-        let userRef = db.collection("users").document(userId)
-        
-        do {
-            try await userRef.updateData([
-                "fcmToken": token,
-                "fcmTokenUpdatedAt": FieldValue.serverTimestamp()
-            ])
-            print("✅ [Firebase] FCM token updated")
-        } catch {
-            print("❌ [Firebase] Failed to update FCM token: \(error.localizedDescription)")
-        }
-    }
+    // Note: Push notifications removed for now
 }
 
 // MARK: - Data Models

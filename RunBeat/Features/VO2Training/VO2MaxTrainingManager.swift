@@ -399,28 +399,11 @@ class VO2MaxTrainingManager: ObservableObject {
         }
         
         if isConnected {
-            print("🎵 Spotify reconnected during VO2 training - attempting to resume music")
+            print("🎵 Spotify connection restored during VO2 training")
             
-            // Small delay to ensure connection is fully established
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-                guard let self = self else { return }
-                
-                // Start track polling to ensure real-time updates
-                self.spotifyViewModel.startTrackPolling()
-                
-                // Resume appropriate playlist based on current phase
-                switch self.currentPhase {
-                case .highIntensity:
-                    print("🎵 Resuming high intensity playlist after reconnection")
-                    self.spotifyViewModel.playHighIntensityPlaylist()
-                case .rest:
-                    print("🎵 Resuming rest playlist after reconnection")
-                    self.spotifyViewModel.playRestPlaylist()
-                default:
-                    print("🎵 Starting high intensity playlist as default after reconnection")
-                    self.spotifyViewModel.playHighIntensityPlaylist()
-                }
-            }
+            // Only ensure track polling is active - don't restart playlists
+            // Playlists will only change on explicit training phase transitions
+            spotifyViewModel.startTrackPolling()
         } else {
             print("⚠️ Spotify disconnected during VO2 training - music control paused")
         }
