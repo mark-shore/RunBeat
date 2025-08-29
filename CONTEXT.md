@@ -11,11 +11,13 @@ Audio-first iOS heart rate training app. Users start workout, put phone away, ge
 - Background execution for phone-away training  
 - Audio announcements during training with per-mode controls
 - **Spotify integration** - fully refactored with centralized token refresh, reconnection observers, and training-aware foreground handling
+- **Backend service** - FastAPI backend with Railway deployment for centralized token management
+- **Playlist restart fix** - eliminated automatic music interruptions when switching between apps
 
 ## Current Priorities
-1. **Backend Service** - Add backend to handle Spotify OAuth and eliminate client-side token management friction
-2. **Apple Music Integration** - Consider adding as alternative to Spotify
-3. **Live HR Display** - Show current BPM on training screens
+1. **Apple Music Integration** - Consider adding as alternative to Spotify
+2. **Live HR Display** - Show current BPM on training screens
+3. **Training Analytics** - Add workout history and performance tracking
 4. **UI Polish** - Training mode descriptions and visual improvements
 5. **User Onboarding** - Guide new users through setup
 
@@ -26,16 +28,27 @@ Audio-first iOS heart rate training app. Users start workout, put phone away, ge
 - Background execution logic for continuous monitoring
 - Audio announcement timing and cooldown system
 - **Spotify architecture** - centralized token refresh, reconnection observers, training-aware handling
+- **Backend service** - FastAPI backend with intelligent token caching and Railway deployment
+- **Playlist restart elimination** - App switching no longer interrupts music playback
+
+## Backend Integration Status
+✅ **Production-Ready Backend Service**:
+- `BackendService.swift` - iOS client with intelligent token caching based on app lifecycle
+- `DeviceIDManager.swift` - consistent device identification for multi-device token management  
+- FastAPI backend with Firebase token storage and automatic refresh scheduling
+- Railway deployment with admin endpoints for monitoring and management
+- Token caching: 1 backend call on startup/foreground, 0 calls during active sessions
+- Offline fallback with keychain storage when backend unavailable
 
 ## Spotify Integration Status
-✅ **Production-Ready Architecture** with Recent Token Management Improvements:
+✅ **Production-Ready Architecture** with Recent Improvements:
 - `SpotifyConnectionManager` - unified state management with background-aware error handling
 - `SpotifyDataCoordinator` - intelligent data source prioritization  
 - `SpotifyErrorHandler` - structured error recovery with background execution support
 - `KeychainWrapper` - persistent authentication (no repeated OAuth)
 - **Centralized Token Refresh** - `makeAuthenticatedAPICall()` handles automatic token refresh on 401s
-- **Reconnection Observers** - VO2 training automatically resumes music when Spotify reconnects
-- **Training-Aware Foreground Handling** - prevents playlist restart during active sessions
+- **Playlist Restart Elimination** - App switching no longer interrupts music playback
+- **Backend Token Integration** - Seamless backend/local token coordination with automatic fallback
 - Training integration works seamlessly in foreground and background
 - Background playlist switching reliable during phone-away workouts
 
@@ -64,9 +77,12 @@ Audio-first iOS heart rate training app. Users start workout, put phone away, ge
 ## Development Tips
 - **Shared Services**: Use HeartRateService and ZoneAnnouncementCoordinator for consistent HR processing
 - **Training Modes**: Only one can be active at a time - check AppState.activeTrainingMode
+- **Backend Integration**: Use `BackendService.shared.getFreshSpotifyToken()` for centralized token management
 - **Spotify API Calls**: Use `makeAuthenticatedAPICall()` for automatic token refresh on new endpoints
+- **Token Caching**: Backend tokens cached intelligently based on app lifecycle - check cache status
 - Use design system components consistently
 - Test on physical device for background modes
-- Check Console app for background execution logs
+- Check Console app for backend token requests and caching behavior
 - Spotify testing requires installed app and premium account
 - Test dual training mode mutual exclusion scenarios
+- Test app switching scenarios to verify no playlist interruptions

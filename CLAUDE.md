@@ -50,6 +50,8 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - `ZoneAnnouncementCoordinator.swift`: Per-training-mode announcement management
 - `SpeechAnnouncer.swift`: Audio announcement execution
 - `AudioService.swift`: Audio session and volume management
+- `BackendService.swift`: FastAPI backend integration with intelligent token caching
+- `DeviceIDManager.swift`: Consistent device identification for backend communication
 
 #### Free Training Module (`Features/FreeTraining/`)
 - `FreeTrainingManager.swift`: Simple background HR monitoring with announcements (replaces legacy HeartRateTrainingManager)
@@ -98,11 +100,11 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - UserDefaults for settings persistence (preserve existing keys)
 
 ### Current Priority Issues
-1. **Backend Service**: Add backend to handle Spotify OAuth and token management (planned)
-2. **Apple Music Integration**: Consider adding as alternative to Spotify
-3. **Live HR Display**: Add current BPM to training screens
-4. **User Onboarding**: Guide new users through HR zone setup
-5. **UI Polish**: Improve training mode descriptions and visual clarity
+1. **Apple Music Integration**: Consider adding as alternative to Spotify
+2. **Live HR Display**: Add current BPM to training screens
+3. **User Onboarding**: Guide new users through HR zone setup
+4. **UI Polish**: Improve training mode descriptions and visual clarity
+5. **Training Analytics**: Add workout history and performance tracking
 
 ## Testing Requirements
 
@@ -119,6 +121,8 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - Background playlist switching during phone-away training sessions
 - **Token Expiration Testing**: Leave app closed for 2+ hours → start VO2 training → verify graceful token refresh
 - **Reconnection Testing**: Start training → force Spotify disconnect → verify music resumes when reconnected
+- **App Switching Testing**: Start training → switch to Spotify briefly → return to RunBeat → verify music continues uninterrupted
+- **Backend Integration Testing**: Monitor backend token caching and refresh cycles
 
 ## Configuration
 
@@ -138,12 +142,14 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - ✅ **Token Expiration During Training**: Fixed with centralized token refresh and graceful error handling
 - ✅ **Foreground Playlist Restart**: Fixed with training-aware foreground handling
 - ✅ **Music Recovery After Reconnection**: Fixed with automatic Spotify reconnection observers
+- ✅ **Playlist Restart Interruptions**: Fixed automatic playlist restarts when switching between apps
+- ✅ **Backend Service Integration**: Implemented FastAPI backend with intelligent token caching and Railway deployment
 
 ### Current Areas for Improvement
-- **Spotify Token Management**: Client-only OAuth creates UX friction - backend service planned to resolve
 - Live BPM not displayed during training screens
 - User onboarding could be more guided for new users
 - Apple Music integration not available (Spotify-only currently)
+- Training analytics and workout history tracking
 
 ### Development Rules
 - Never modify `HeartRateManager`'s core Bluetooth logic
@@ -179,4 +185,27 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 
 **API Calls Updated**: Track polling, playlist control, and playlist fetching now use centralized token management.
 
-**Future Improvement**: Backend service planned to eliminate client-side token management complexity entirely.
+### Backend Service Integration (2025)
+
+**Problem Solved**: Client-only OAuth created UX friction and redundant API calls during active sessions.
+
+**Solutions Implemented**:
+1. **FastAPI Backend** (`backend/`) with Railway deployment
+   - Centralized Spotify token storage in Firebase
+   - Automatic token refresh scheduling
+   - Admin endpoints for monitoring and management
+   - Device-based token organization
+
+2. **Intelligent iOS Token Caching** (`BackendService.swift`)
+   - App lifecycle-aware caching (30-minute cache during active sessions)
+   - 1 backend call on startup/foreground, 0 calls during active use
+   - Automatic cache invalidation on app suspension
+   - Offline fallback with keychain storage
+
+3. **Playlist Restart Elimination** (`SpotifyViewModel.swift`, `VO2MaxTrainingManager.swift`)
+   - Removed automatic playlist restarts on app switching
+   - Fixed connection state handlers to only ensure track polling
+   - Music continues uninterrupted when switching between apps
+   - Maintained legitimate playlist changes during training phase transitions
+
+**Technical Implementation**: Backend handles token refresh automatically while users sleep/suspend app, iOS requests fresh tokens only when needed, eliminating redundant API calls and playlist interruptions.

@@ -235,6 +235,12 @@ case .rest:
 - **Exponential backoff retries** - Intelligent retry strategies  
 - **User-friendly messages** - Clear error guidance
 
+### ✅ Phase 5: Backend Integration & Playlist Restart Elimination
+- **FastAPI Backend Service** - Centralized token management with Firebase storage
+- **Intelligent Token Caching** - App lifecycle-aware caching reduces redundant API calls
+- **Playlist Restart Fix** - Eliminated automatic music interruptions when switching between apps
+- **Railway Deployment** - Production backend with monitoring and admin endpoints
+
 ## Performance Optimizations
 
 - **Deduplication**: Prevents processing identical track/playing state updates
@@ -252,13 +258,16 @@ case .rest:
 - ✅ Training music flow without restarts
 - ✅ Clean duplicate connection prevention
 - ✅ Background execution reliability (playlist switching during phone-away training)
+- ✅ **Playlist restart interruptions** - App switching no longer disrupts music playback
+- ✅ **Backend token management** - Centralized token storage and refresh with intelligent iOS caching
 
 **Architecture Benefits**:
-- **User Experience**: Seamless authentication and music control in foreground and background
+- **User Experience**: Seamless authentication and music control with no app-switching interruptions
 - **Maintainability**: Clear separation of concerns and single responsibilities
 - **Reliability**: Robust error handling and state management across all execution contexts
-- **Performance**: Optimized data processing and connection management
+- **Performance**: Optimized data processing, connection management, and intelligent token caching
 - **Background Training**: Reliable playlist switching during phone-away workouts
+- **Scalability**: Backend service supports multi-device token management and monitoring
 
 ## Implementation Roadmap Status
 
@@ -266,11 +275,19 @@ case .rest:
 - ✅ **Phase 2: Connection State Consolidation** - Complete  
 - ✅ **Phase 3: Data Source Simplification** - Complete
 - ✅ **Phase 4: Error Handling Enhancement** - Complete (includes background execution regression fix)
-- ⏸️ **Phase 5: Dependency Injection** - Deferred
+- ✅ **Phase 5: Backend Integration & Playlist Restart Elimination** - Complete
+- ⏸️ **Phase 6: Dependency Injection** - Deferred
 
-**Phase 4 Completion Notes**: The error handling enhancement phase successfully resolved a background execution regression that was introduced during the architectural refactor. The implementation now includes background-aware error recovery, authentication state preservation during background AppRemote failures, and robust background task management for playlist switching.
+**Phase 5 Completion Notes**: Successfully implemented FastAPI backend service with Railway deployment for centralized token management. Added intelligent iOS token caching based on app lifecycle. Most importantly, eliminated automatic playlist restart interruptions when users switch between apps - music now continues uninterrupted when returning from Spotify.
 
-**Phase 5 Status**: Dependency injection (removing singleton patterns, protocol-based dependencies) has been deferred as the current architecture provides excellent functionality and maintainability. The singleton pattern works well for this app's scale and use case.
+**Key Phase 5 Achievements**:
+- Backend handles token refresh automatically during app suspension
+- iOS requests fresh tokens only when needed (startup/foreground return)
+- Fixed `SpotifyViewModel.handleFullyConnected()` and `VO2MaxTrainingManager.handleSpotifyConnectionChange()` to prevent unnecessary playlist restarts
+- Maintained legitimate playlist changes during training phase transitions
+- Added comprehensive backend monitoring and admin endpoints
+
+**Phase 6 Status**: Dependency injection (removing singleton patterns, protocol-based dependencies) has been deferred as the current architecture provides excellent functionality and maintainability. The singleton pattern works well for this app's scale and use case.
 
 ## Testing Strategy
 
@@ -302,4 +319,11 @@ Current architecture supports:
 - **Error Recovery**: Test background timeout handling and graceful Web API fallback
 - **State Machine Integrity**: Validate connection state transitions during background execution
 
-The Spotify integration is now architecturally sound, user-friendly, background-execution reliable, and ready for long-term maintenance.
+### App Switching and Backend Integration Testing
+- **Playlist Continuity**: Start training → switch to Spotify → return to RunBeat → verify music continues uninterrupted
+- **Token Caching**: Monitor backend token requests during app lifecycle (startup/foreground/active/background)
+- **Backend Fallback**: Test offline behavior when backend unavailable (keychain fallback)
+- **Multi-Device**: Verify backend handles multiple devices with same user account
+- **Token Refresh**: Test automatic backend token refresh while app suspended
+
+The Spotify integration is now architecturally sound, user-friendly, interruption-free, backend-integrated, and ready for long-term maintenance.

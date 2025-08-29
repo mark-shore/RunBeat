@@ -60,7 +60,10 @@ RunBeat/
 │   │   ├── AudioService.swift     # Audio session management
 │   │   ├── SpeechAnnouncer.swift  # Voice announcements
 │   │   ├── HeartRateService.swift # Shared HR processing and zone calculation
-│   │   └── ZoneAnnouncementCoordinator.swift # Per-training-mode announcement management
+│   │   ├── ZoneAnnouncementCoordinator.swift # Per-training-mode announcement management
+│   │   ├── BackendService.swift   # FastAPI backend integration with intelligent caching
+│   │   ├── DeviceIDManager.swift  # Device identification for backend communication
+│   │   └── FirebaseService.swift  # Firebase integration (legacy)
 │   ├── Models/                    # Data models
 │   └── Utils/                     # Utility classes
 │       ├── KeychainWrapper.swift  # Secure token storage for Spotify
@@ -99,11 +102,21 @@ RunBeat/
 │       ├── zone3.mp3
 │       ├── zone4.mp3
 │       └── zone5.mp3
+├── AppDelegate.swift             # UIKit app delegate for backend services
 ├── AppState.swift                # Dual training mode coordinator with mutual exclusion
-├── RunBeatApp.swift              # App entry point
+├── RunBeatApp.swift              # SwiftUI app entry point
 ├── Info.plist                    # App configuration
 ├── Config.plist                  # Feature configuration
-└── Assets.xcassets/              # App assets
+├── Assets.xcassets/              # App assets
+└── backend/                      # FastAPI backend service
+    ├── app/                      # Backend application code
+    │   ├── api/v1/routes/        # REST API endpoints
+    │   ├── core/                 # Configuration and logging
+    │   ├── services/             # Token refresh and Firebase services
+    │   └── models/               # Data models
+    ├── main.py                   # FastAPI application entry point
+    ├── requirements.txt          # Python dependencies
+    └── deploy.sh                 # Railway deployment script
 
 ## Key Components
 
@@ -239,6 +252,22 @@ VO2MaxTrainingManager ─┘
 **Mutual Exclusion**: AppState prevents simultaneous training sessions
 **Shared Resources**: Both modes use HeartRateService and ZoneAnnouncementCoordinator
 **Independent Settings**: Each mode maintains separate announcement preferences
+
+## Backend Integration
+
+#### FastAPI Backend Service
+- **Centralized Token Management**: Backend handles Spotify OAuth and refresh cycles
+- **Firebase Integration**: Token storage with automatic cleanup of expired tokens
+- **Railway Deployment**: Production-ready backend with monitoring and admin endpoints
+- **Device Organization**: Multi-device token management with unique device identification
+- **Intelligent Caching**: iOS app caches tokens based on app lifecycle to minimize API calls
+
+#### Token Management Flow
+1. **iOS Authentication**: User completes OAuth, tokens sent to backend immediately
+2. **Backend Storage**: Tokens stored in Firebase with expiration tracking
+3. **Automatic Refresh**: Backend scheduler refreshes tokens before expiration
+4. **iOS Caching**: App requests fresh tokens only on startup/foreground, caches during active use
+5. **Offline Fallback**: Keychain storage provides offline token access when backend unavailable
 
 ## Background Execution Strategy
 
