@@ -42,14 +42,16 @@ class AppState: ObservableObject {
     }
     
     private func routeHeartRateData(_ bpm: Int) {
-        switch activeTrainingMode {
-        case .free:
-            freeTrainingManager.processHeartRate(bpm)
-        case .vo2Max:
-            vo2TrainingManager.processHeartRate(bpm)
-            vo2TrainingManager.tick(now: Date())
-        case .none:
-            break // No training active
+        Task { @MainActor in
+            switch activeTrainingMode {
+            case .free:
+                freeTrainingManager.processHeartRate(bpm)
+            case .vo2Max:
+                vo2TrainingManager.processHeartRate(bpm)
+                vo2TrainingManager.tick(now: Date())
+            case .none:
+                break // No training active
+            }
         }
     }
     
@@ -84,16 +86,22 @@ class AppState: ObservableObject {
         }
         
         activeTrainingMode = .free
-        freeTrainingManager.start()
+        Task { @MainActor in
+            freeTrainingManager.start()
+        }
         hrManager.startMonitoring()
-        updateZoneSettings()
+        Task { @MainActor in
+            updateZoneSettings()
+        }
         print("🏃 Free training mode started")
     }
     
     func stopFreeTraining() {
         guard activeTrainingMode == .free else { return }
         
-        freeTrainingManager.stop()
+        Task { @MainActor in
+            freeTrainingManager.stop()
+        }
         hrManager.stopMonitoring()
         audioService.deactivateAudioSession()
         activeTrainingMode = .none
@@ -108,15 +116,19 @@ class AppState: ObservableObject {
         
         activeTrainingMode = .vo2Max
         hrManager.startMonitoring()
-        updateZoneSettings()
-        vo2TrainingManager.startTraining()
+        Task { @MainActor in
+            updateZoneSettings()
+            vo2TrainingManager.startTraining()
+        }
         print("🏃 VO2 Max training mode started")
     }
     
     func stopVO2Training() {
         guard activeTrainingMode == .vo2Max else { return }
         
-        vo2TrainingManager.stopTraining()
+        Task { @MainActor in
+            vo2TrainingManager.stopTraining()
+        }
         hrManager.stopMonitoring()
         audioService.deactivateAudioSession()
         activeTrainingMode = .none
@@ -141,7 +153,9 @@ class AppState: ObservableObject {
         )
         .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
         .sink { [weak self] _, _, _ in
-            self?.updateZoneSettings()
+            Task { @MainActor [weak self] in
+                self?.updateZoneSettings()
+            }
         }
         .store(in: &cancellables)
         
@@ -153,7 +167,9 @@ class AppState: ObservableObject {
         )
         .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
         .sink { [weak self] _, _, _ in
-            self?.updateZoneSettings()
+            Task { @MainActor [weak self] in
+                self?.updateZoneSettings()
+            }
         }
         .store(in: &cancellables)
     }
@@ -171,6 +187,7 @@ class AppState: ObservableObject {
         print("🔊 Zone \(zone) announced")
     }
     
+    @MainActor
     private func updateZoneSettings() {
         let settings = heartRateViewModel.getCurrentZoneSettings()
         

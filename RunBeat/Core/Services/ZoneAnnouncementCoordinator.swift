@@ -94,9 +94,21 @@ class ZoneAnnouncementCoordinator {
     
     private func handleCooldownExpired() {
         print("⏰ Announcement cooldown expired")
-        // For now, we'll keep it simple and not announce on cooldown expiry
-        // This matches the existing HeartRateTrainingManager behavior where
-        // cooldown expiry would only announce if delegate approves
+        
+        // Check if current zone is different from last announced zone
+        Task { @MainActor in
+            guard let currentZone = HeartRateService.shared.getCurrentZone() else {
+                print("⏰ No current zone available after cooldown")
+                return
+            }
+            
+            if currentZone != lastAnnouncedZone {
+                print("⏰ Current zone (\(currentZone)) differs from last announced (\(lastAnnouncedZone ?? -1)), announcing now")
+                requestZoneAnnouncement(currentZone)
+            } else {
+                print("⏰ Current zone (\(currentZone)) same as last announced, no announcement needed")
+            }
+        }
     }
     
     deinit {

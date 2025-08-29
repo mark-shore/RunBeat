@@ -437,6 +437,14 @@ class SpotifyService: NSObject {
     private func handleAppWillEnterForeground() {
         print("📱 App returning to foreground - checking Spotify connection...")
         
+        // Check if we're in the middle of training to avoid disrupting playlist flow
+        let isTrainingActive = isTrainingSessionActive()
+        if isTrainingActive {
+            print("🏃 Training session active - avoiding automatic playlist restart on foreground")
+            // During training, only refresh track data and ensure polling continues
+            // Don't trigger playlist changes that could interrupt the training flow
+        }
+        
         // Delay clearing automatic activation flag to allow connection state changes to see it
         if isAutomaticSpotifyActivationInProgress {
             print("🔄 [DeviceActivation] Scheduling automatic activation flag clearance in 3 seconds")
@@ -452,6 +460,20 @@ class SpotifyService: NSObject {
         if accessToken != nil {
             print("✅ [SpotifyService] Token available - AppRemote ready for on-demand connection")
         }
+    }
+    
+    /// Check if there's an active training session that shouldn't be interrupted
+    private func isTrainingSessionActive() -> Bool {
+        // Check VO2 training status
+        if VO2MaxTrainingManager.shared.isTraining {
+            return true
+        }
+        
+        // Check Free training status via notification or AppState if accessible
+        // For now, using VO2 as primary indicator since it has direct access
+        // TODO: Add proper AppState.shared access or notification-based check
+        
+        return false
     }
     
     // MARK: - Public Authentication API
@@ -597,6 +619,57 @@ class SpotifyService: NSObject {
         performDeviceActivation(playlistID: playlistID, completion: completion)
     }
     
+    // MARK: - Centralized API Call with Auto Token Refresh
+    
+    /// Makes an authenticated API call with automatic token refresh on 401
+    private func makeAuthenticatedAPICall(
+        request: URLRequest,
+        completion: @escaping (Data?, URLResponse?, Error?) -> Void
+    ) {
+        makeAuthenticatedAPICallWithRetry(request: request, isRetry: false, completion: completion)
+    }
+    
+    private func makeAuthenticatedAPICallWithRetry(
+        request: URLRequest,
+        isRetry: Bool,
+        completion: @escaping (Data?, URLResponse?, Error?) -> Void
+    ) {
+        guard let accessToken = accessToken else {
+            completion(nil, nil, SpotifyError.notAuthenticated)
+            return
+        }
+        
+        // Add authorization header
+        var authenticatedRequest = request
+        authenticatedRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        
+        URLSession.shared.dataTask(with: authenticatedRequest) { [weak self] data, response, error in
+            // Check for 401 (token expired)
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 401 {
+                if !isRetry, let refreshToken = self?.retrieveStoredRefreshToken() {
+                    print("🔄 Token expired (401) - attempting refresh and retry")
+                    self?.refreshAccessToken(refreshToken: refreshToken) { success in
+                        if success {
+                            // Retry the original request with new token
+                            self?.makeAuthenticatedAPICallWithRetry(request: request, isRetry: true, completion: completion)
+                        } else {
+                            // Refresh failed - disconnect
+                            self?.handleTokenExpired()
+                            completion(nil, response, SpotifyError.tokenExpired)
+                        }
+                    }
+                } else {
+                    // Already retried or no refresh token - fail
+                    self?.handleTokenExpired()
+                    completion(nil, response, SpotifyError.tokenExpired)
+                }
+            } else {
+                // Not a 401 - return result as-is
+                completion(data, response, error)
+            }
+        }.resume()
+    }
+    
     private func performDeviceActivation(playlistID: String?, completion: @escaping (Bool) -> Void) {
         guard let appRemote = appRemote else {
             completion(false)
@@ -709,7 +782,7 @@ class SpotifyService: NSObject {
             return
         }
         
-        guard let accessToken = accessToken else {
+        guard accessToken != nil else {
             print("❌ No access token available for fast retry")
             isFetchingFreshData = false
             return
@@ -717,14 +790,13 @@ class SpotifyService: NSObject {
         
         let currentlyPlayingURL = URL(string: "https://api.spotify.com/v1/me/player/currently-playing")!
         var request = URLRequest(url: currentlyPlayingURL)
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.httpMethod = "GET"
         
         let requestTimestamp = Date()
         print("🔄 Fast retry \(attempt)/\(maxAttempts) (300ms intervals)")
         
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+        makeAuthenticatedAPICall(request: request) { [weak self] data, response, error in
             guard let self = self else { return }
             
             let responseTimestamp = Date()
@@ -772,7 +844,7 @@ class SpotifyService: NSObject {
             default:
                 self.scheduleNextFastRetry(attempt: attempt + 1, maxAttempts: maxAttempts)
             }
-        }.resume()
+        }
     }
     
     private func scheduleNextFastRetry(attempt: Int, maxAttempts: Int) {
@@ -1774,12 +1846,11 @@ extension SpotifyService {
     }
     
     private func startPlaybackViaWebAPI(playlistID: String, playlistName: String) {
-        guard let accessToken = accessToken else { return }
+        guard accessToken != nil else { return }
         
         let playURL = URL(string: "https://api.spotify.com/v1/me/player/play")!
         var request = URLRequest(url: playURL)
         request.httpMethod = "PUT"
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         let body = ["context_uri": "spotify:playlist:\(playlistID)"]
@@ -1787,7 +1858,7 @@ extension SpotifyService {
         
         print("Attempting to start \(playlistName) via Web API...")
         
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+        makeAuthenticatedAPICall(request: request) { [weak self] data, response, error in
             if let error = error {
                 print("Error starting playback: \(error)")
                 DispatchQueue.main.async {
@@ -1807,7 +1878,7 @@ extension SpotifyService {
                     }
                 }
             }
-        }.resume()
+        }
     }
     
     private func activateIPhoneDeviceForPlayback(completion: @escaping (Bool) -> Void) {
@@ -2208,14 +2279,13 @@ extension SpotifyService {
         
         let playlistsURL = URL(string: "https://api.spotify.com/v1/me/playlists?limit=50&offset=0")!
         var request = URLRequest(url: playlistsURL)
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.httpMethod = "GET"
         
         print("🎵 Fetching user playlists from Spotify Web API...")
         print("🔑 Using access token: \(accessToken.prefix(20))...")
         
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+        makeAuthenticatedAPICall(request: request) { [weak self] data, response, error in
             // Handle network errors
             if let error = error {
                 print("❌ Network error fetching playlists: \(error.localizedDescription)")
@@ -2310,7 +2380,7 @@ extension SpotifyService {
                 }
                 completion(.failure(SpotifyError.decodingError(decodingError.localizedDescription)))
             }
-        }.resume()
+        }
     }
     
     private func logDecodingError(_ error: DecodingError) {

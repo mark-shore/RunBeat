@@ -3,7 +3,10 @@
     "allow": [
       "Bash(xcodebuild:*)",
       "Bash(find:*)",
-      "Bash(swift:*)"
+      "Bash(swift:*)",
+      "Bash(grep:*)",
+      "Read(/Users/markshore/Desktop/**)",
+      "Read(/Users/markshore/Desktop/**)"
     ],
     "deny": [],
     "ask": []

@@ -11,29 +11,31 @@ import Foundation
 class FreeTrainingManager: ObservableObject {
     @Published var isActive = false
     
-    private let hrService = HeartRateService()
     private let announcements = ZoneAnnouncementCoordinator()
     
     init() {
         announcements.delegate = self
     }
     
+    @MainActor
     func start() {
         isActive = true
-        hrService.resetState()
+        HeartRateService.shared.resetState()
         announcements.resetState()
         print("🏃 Free training started")
     }
     
+    @MainActor
     func stop() {
         isActive = false
-        hrService.resetState()
+        HeartRateService.shared.resetState()
         announcements.resetState()
         print("⏹️ Free training stopped")
     }
     
+    @MainActor
     func processHeartRate(_ bpm: Int) {
-        let result = hrService.processHeartRate(bpm)
+        let result = HeartRateService.shared.processHeartRate(bpm)
         
         if let newZone = result.currentZone, result.didChangeZone {
             announcements.handleZoneChange(newZone, from: result.oldZone, for: .free)
@@ -44,11 +46,12 @@ class FreeTrainingManager: ObservableObject {
         announcements.setAnnouncementsEnabled(enabled, for: .free)
     }
     
+    @MainActor
     func updateZoneSettings(restingHR: Int, maxHR: Int, useAutoZones: Bool, 
                           zone1Lower: Int = 60, zone1Upper: Int = 70, 
                           zone2Upper: Int = 80, zone3Upper: Int = 90, 
                           zone4Upper: Int = 100, zone5Upper: Int = 110) {
-        hrService.updateZoneSettings(
+        HeartRateService.shared.updateZoneSettings(
             restingHR: restingHR,
             maxHR: maxHR,
             useAutoZones: useAutoZones,
@@ -61,12 +64,14 @@ class FreeTrainingManager: ObservableObject {
         )
     }
     
+    @MainActor
     func getCurrentZone() -> Int? {
-        return hrService.getCurrentZone()
+        return HeartRateService.shared.getCurrentZone()
     }
     
+    @MainActor
     func getManualZonesFromAuto() -> (Int, Int, Int, Int, Int, Int) {
-        return hrService.getManualZonesFromAuto()
+        return HeartRateService.shared.getManualZonesFromAuto()
     }
 }
 

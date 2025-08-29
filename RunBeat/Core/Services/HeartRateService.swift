@@ -8,7 +8,10 @@
 
 import Foundation
 
-class HeartRateService {
+@MainActor
+class HeartRateService: ObservableObject {
+    static let shared = HeartRateService()
+    
     // Zone settings
     private var restingHR: Int = 60
     private var maxHR: Int = 190
@@ -16,7 +19,9 @@ class HeartRateService {
     private var manualZones: (zone1Lower: Int, zone1Upper: Int, zone2Upper: Int, zone3Upper: Int, zone4Upper: Int, zone5Upper: Int) = (60, 70, 80, 90, 100, 110)
     
     // Current state
-    private var currentZone: Int?
+    @Published private(set) var currentZone: Int?
+    
+    private init() {}
     
     func updateZoneSettings(restingHR: Int, maxHR: Int, useAutoZones: Bool, 
                           zone1Lower: Int = 60, zone1Upper: Int = 70, 

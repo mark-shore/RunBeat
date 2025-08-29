@@ -20,9 +20,9 @@ class VO2MaxTrainingManager: ObservableObject {
     
     private var timer: Timer?
     private var spotifyViewModel: SpotifyViewModel
+    private var spotifyConnectionObserver: AnyCancellable?
     
     // NEW: Shared services for HR processing and announcements
-    private let hrService = HeartRateService()
     private let announcements = ZoneAnnouncementCoordinator()
     private struct IntervalState {
         var phase: TrainingPhase
@@ -54,6 +54,7 @@ class VO2MaxTrainingManager: ObservableObject {
         // Initialize with shared SpotifyViewModel for consistent state
         self.spotifyViewModel = SpotifyViewModel.shared
         self.announcements.delegate = self // NEW: Set up announcement delegation
+        setupSpotifyReconnectionObserver()
     }
     
     // Dependency injection for testing
@@ -61,6 +62,7 @@ class VO2MaxTrainingManager: ObservableObject {
         self.spotifyViewModel = spotifyViewModel
         self.timeProvider = timeProvider
         self.announcements.delegate = self // NEW: Set up announcement delegation
+        setupSpotifyReconnectionObserver()
     }
     
     // MARK: - Computed Properties
@@ -71,12 +73,13 @@ class VO2MaxTrainingManager: ObservableObject {
     }
     
     
+    @MainActor
     func startTraining() {
         print("🏃 Starting VO2 Max training...")
         print("🎵 Spotify connected: \(spotifyViewModel.isConnected)")
         
         // NEW: Reset HR services
-        hrService.resetState()
+        HeartRateService.shared.resetState()
         announcements.resetState()
         
         DispatchQueue.main.async { [weak self] in
@@ -93,30 +96,43 @@ class VO2MaxTrainingManager: ObservableObject {
         lastIssuedCommandInterval = nil
         startTimer()
         
-        // Check Spotify connection before starting music
+        // Check Spotify connection and validate tokens before starting music
         if spotifyViewModel.isConnected {
-            print("🎵 Spotify connected - starting music for training")
+            print("🎵 Spotify connected - validating token before starting training music")
             
-            // Get current track info immediately for responsive UI
+            // Validate token by making a lightweight API call first
             spotifyViewModel.refreshCurrentTrack()
             
-            // Start track polling for real-time updates during training
-            spotifyViewModel.startTrackPolling()
-            
-            // Activate device and start music
-            spotifyViewModel.activateDeviceForTraining { [weak self] success in
-                if success {
-                    print("✅ Training music started during first interval")
-                } else {
-                    print("ℹ️ Using fallback music control during first interval")
-                    DispatchQueue.main.async {
-                        self?.spotifyViewModel.playHighIntensityPlaylist()
-                    }
-                }
+            // Small delay to allow token validation, then proceed with training music
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self = self else { return }
                 
-                // Refresh track info again after music starts to capture any changes
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    self?.spotifyViewModel.refreshCurrentTrack()
+                // Check if still connected after token validation attempt
+                if self.spotifyViewModel.isConnected {
+                    print("✅ Token validated - starting training music")
+                    
+                    // Start track polling for real-time updates during training
+                    self.spotifyViewModel.startTrackPolling()
+                    
+                    // Activate device and start music
+                    self.spotifyViewModel.activateDeviceForTraining { success in
+                        if success {
+                            print("✅ Training music started during first interval")
+                        } else {
+                            print("ℹ️ Using fallback music control during first interval")
+                            DispatchQueue.main.async {
+                                self.spotifyViewModel.playHighIntensityPlaylist()
+                            }
+                        }
+                        
+                        // Refresh track info after music starts
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            self.spotifyViewModel.refreshCurrentTrack()
+                        }
+                    }
+                } else {
+                    print("⚠️ Token validation failed - Spotify likely disconnected for re-authentication")
+                    print("🔄 Training will continue, music will start when Spotify reconnects")
                 }
             }
         } else {
@@ -126,6 +142,7 @@ class VO2MaxTrainingManager: ObservableObject {
     }
     
     /// Stops the training session and returns to setup state
+    @MainActor
     func stopTraining() {
         print("⏹️ Stopping VO2 Max training...")
         
@@ -152,11 +169,15 @@ class VO2MaxTrainingManager: ObservableObject {
         spotifyViewModel.resetDeviceActivationState()
         
         // NEW: Reset services
-        hrService.resetState()
+        HeartRateService.shared.resetState()
         announcements.resetState()
+        
+        // Clean up observers
+        spotifyConnectionObserver?.cancel()
     }
     
     /// Resets the training session to setup state (for completed training)
+    @MainActor
     func resetToSetup() {
         print("🔄 Resetting training to setup state...")
         
@@ -173,8 +194,12 @@ class VO2MaxTrainingManager: ObservableObject {
         intervalState = nil
         
         // NEW: Reset services  
-        hrService.resetState()
+        HeartRateService.shared.resetState()
         announcements.resetState()
+        
+        // Clean up observers
+        spotifyConnectionObserver?.cancel()
+        spotifyConnectionObserver = nil
     }
     
     private func startNextInterval() {
@@ -317,8 +342,9 @@ class VO2MaxTrainingManager: ObservableObject {
     // MARK: - Heart Rate Processing
     
     /// NEW: Heart rate processing using shared service
+    @MainActor
     func processHeartRate(_ bpm: Int) {
-        let result = hrService.processHeartRate(bpm)
+        let result = HeartRateService.shared.processHeartRate(bpm)
         
         if let newZone = result.currentZone, result.didChangeZone {
             announcements.handleZoneChange(newZone, from: result.oldZone, for: .vo2Max)
@@ -331,11 +357,12 @@ class VO2MaxTrainingManager: ObservableObject {
     }
     
     /// NEW: Zone settings management
+    @MainActor
     func updateZoneSettings(restingHR: Int, maxHR: Int, useAutoZones: Bool, 
                           zone1Lower: Int = 60, zone1Upper: Int = 70, 
                           zone2Upper: Int = 80, zone3Upper: Int = 90, 
                           zone4Upper: Int = 100, zone5Upper: Int = 110) {
-        hrService.updateZoneSettings(
+        HeartRateService.shared.updateZoneSettings(
             restingHR: restingHR,
             maxHR: maxHR,
             useAutoZones: useAutoZones,
@@ -349,8 +376,54 @@ class VO2MaxTrainingManager: ObservableObject {
     }
     
     /// NEW: Get current HR zone
+    @MainActor
     func getCurrentZone() -> Int? {
-        return hrService.getCurrentZone()
+        return HeartRateService.shared.getCurrentZone()
+    }
+    
+    // MARK: - Spotify Reconnection Handling
+    
+    private func setupSpotifyReconnectionObserver() {
+        // Observe Spotify connection changes during training
+        spotifyConnectionObserver = spotifyViewModel.$isConnected
+            .dropFirst() // Skip initial value
+            .sink { [weak self] isConnected in
+                self?.handleSpotifyConnectionChange(isConnected: isConnected)
+            }
+    }
+    
+    private func handleSpotifyConnectionChange(isConnected: Bool) {
+        guard trainingState == .active else {
+            // Only handle reconnection during active training
+            return
+        }
+        
+        if isConnected {
+            print("🎵 Spotify reconnected during VO2 training - attempting to resume music")
+            
+            // Small delay to ensure connection is fully established
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                guard let self = self else { return }
+                
+                // Start track polling to ensure real-time updates
+                self.spotifyViewModel.startTrackPolling()
+                
+                // Resume appropriate playlist based on current phase
+                switch self.currentPhase {
+                case .highIntensity:
+                    print("🎵 Resuming high intensity playlist after reconnection")
+                    self.spotifyViewModel.playHighIntensityPlaylist()
+                case .rest:
+                    print("🎵 Resuming rest playlist after reconnection")
+                    self.spotifyViewModel.playRestPlaylist()
+                default:
+                    print("🎵 Starting high intensity playlist as default after reconnection")
+                    self.spotifyViewModel.playHighIntensityPlaylist()
+                }
+            }
+        } else {
+            print("⚠️ Spotify disconnected during VO2 training - music control paused")
+        }
     }
 }
 
