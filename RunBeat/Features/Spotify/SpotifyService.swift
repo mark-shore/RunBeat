@@ -1589,9 +1589,6 @@ class SpotifyService: NSObject {
     }
     
     private func playPlaylist(playlistID: String, playlistName: String) {
-        // Ensure AppRemote connection first (on-demand)
-        ensureAppRemoteConnection()
-        
         // Try AppRemote first
         if let appRemote = appRemote, appRemote.isConnected {
             print("Using AppRemote to play \(playlistName)...")
