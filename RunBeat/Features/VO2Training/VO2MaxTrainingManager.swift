@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import Combine
 
 class VO2MaxTrainingManager: ObservableObject {
     static let shared = VO2MaxTrainingManager()
@@ -20,7 +19,6 @@ class VO2MaxTrainingManager: ObservableObject {
     
     private var timer: Timer?
     private var spotifyViewModel: SpotifyViewModel
-    private var spotifyConnectionObserver: AnyCancellable?
     
     // NEW: Shared services for HR processing and announcements
     private let announcements = ZoneAnnouncementCoordinator()
@@ -54,7 +52,6 @@ class VO2MaxTrainingManager: ObservableObject {
         // Initialize with shared SpotifyViewModel for consistent state
         self.spotifyViewModel = SpotifyViewModel.shared
         self.announcements.delegate = self // NEW: Set up announcement delegation
-        setupSpotifyReconnectionObserver()
     }
     
     // Dependency injection for testing
@@ -62,7 +59,6 @@ class VO2MaxTrainingManager: ObservableObject {
         self.spotifyViewModel = spotifyViewModel
         self.timeProvider = timeProvider
         self.announcements.delegate = self // NEW: Set up announcement delegation
-        setupSpotifyReconnectionObserver()
     }
     
     // MARK: - Computed Properties
@@ -171,9 +167,6 @@ class VO2MaxTrainingManager: ObservableObject {
         // NEW: Reset services
         HeartRateService.shared.resetState()
         announcements.resetState()
-        
-        // Clean up observers
-        spotifyConnectionObserver?.cancel()
     }
     
     /// Resets the training session to setup state (for completed training)
@@ -196,10 +189,6 @@ class VO2MaxTrainingManager: ObservableObject {
         // NEW: Reset services  
         HeartRateService.shared.resetState()
         announcements.resetState()
-        
-        // Clean up observers
-        spotifyConnectionObserver?.cancel()
-        spotifyConnectionObserver = nil
     }
     
     private func startNextInterval() {
@@ -381,33 +370,6 @@ class VO2MaxTrainingManager: ObservableObject {
         return HeartRateService.shared.getCurrentZone()
     }
     
-    // MARK: - Spotify Reconnection Handling
-    
-    private func setupSpotifyReconnectionObserver() {
-        // Observe Spotify connection changes during training
-        spotifyConnectionObserver = spotifyViewModel.$isConnected
-            .dropFirst() // Skip initial value
-            .sink { [weak self] isConnected in
-                self?.handleSpotifyConnectionChange(isConnected: isConnected)
-            }
-    }
-    
-    private func handleSpotifyConnectionChange(isConnected: Bool) {
-        guard trainingState == .active else {
-            // Only handle reconnection during active training
-            return
-        }
-        
-        if isConnected {
-            print("🎵 Spotify connection restored during VO2 training")
-            
-            // Only ensure track polling is active - don't restart playlists
-            // Playlists will only change on explicit training phase transitions
-            spotifyViewModel.startTrackPolling()
-        } else {
-            print("⚠️ Spotify disconnected during VO2 training - music control paused")
-        }
-    }
 }
 
 // NEW: ZoneAnnouncementDelegate implementation
