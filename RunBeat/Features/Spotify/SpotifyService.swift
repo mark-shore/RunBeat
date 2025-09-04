@@ -534,16 +534,8 @@ class SpotifyService: NSObject {
     
     /// Check if there's an active training session that shouldn't be interrupted
     private func isTrainingSessionActive() -> Bool {
-        // Check VO2 training status
-        if VO2MaxTrainingManager.shared.isTraining {
-            return true
-        }
-        
-        // Check Free training status via notification or AppState if accessible
-        // For now, using VO2 as primary indicator since it has direct access
-        // TODO: Add proper AppState.shared access or notification-based check
-        
-        return false
+        // Use intent-based architecture - training intent indicates active session
+        return getCurrentIntent() == .training
     }
     
     // MARK: - Public Authentication API

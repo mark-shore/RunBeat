@@ -7,7 +7,6 @@
 
 import SwiftUI
 import Foundation
-import Combine
 
 struct VO2MaxTrainingView: View {
     // ✅ View only talks to coordination layer - no direct manager access
