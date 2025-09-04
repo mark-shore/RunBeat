@@ -162,12 +162,8 @@ struct VO2MaxTrainingView: View {
                     spotifyViewModel.fetchPlaylists()
                 }
                 
-                // Only refresh current track info if we're in setup or active state
-                // Don't refresh when coming back to complete state (preserves last track display)
-                if trainingManager.trainingState == .setup {
-                    print("🎵 Refreshing current track for setup state")
-                    spotifyViewModel.refreshCurrentTrack()
-                }
+                // Track info will be refreshed when training actually starts
+                // No need to make API calls just for viewing the screen
             }
         }
         .onChange(of: trainingManager.trainingState) { oldValue, newValue in

@@ -74,6 +74,9 @@ class VO2MaxTrainingManager: ObservableObject {
         print("🏃 Starting VO2 Max training...")
         print("🎵 Spotify connected: \(spotifyViewModel.isConnected)")
         
+        // Activate Spotify for training session - stops unnecessary background activity
+        spotifyViewModel.setIntent(.training)
+        
         // NEW: Reset HR services
         HeartRateService.shared.resetState()
         announcements.resetState()
@@ -152,6 +155,9 @@ class VO2MaxTrainingManager: ObservableObject {
             self.timeRemaining = 0
             self.currentInterval = 0
         }
+        
+        // Deactivate Spotify training state - stops unnecessary reconnection attempts  
+        spotifyViewModel.setIntent(.idle)
         
         // Stop track polling (but let music continue playing)
         spotifyViewModel.stopTrackPolling()

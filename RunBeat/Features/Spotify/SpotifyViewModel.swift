@@ -426,6 +426,10 @@ class SpotifyViewModel: ObservableObject {
         spotifyService.refreshCurrentTrack()
     }
     
+    func setIntent(_ intent: SpotifyService.SpotifyIntent) {
+        spotifyService.setIntent(intent)
+    }
+    
     func startTrackPolling() {
         // Set loading state when starting workout polling
         isFetchingTrackData = true

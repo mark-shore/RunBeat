@@ -50,6 +50,21 @@ class SpotifyService: NSObject {
     // Token refresh state
     private var isTokenRefreshInProgress = false
     
+    // Training state tracking for API optimization
+    
+    // Resource-aware recovery management
+    private var activeRecoveryTasks: [ErrorPriority: [String: Task<Void, Never>]] = [
+        .trainingCritical: [:],
+        .trainingEnhancing: [:], 
+        .background: [:]
+    ]
+    
+    private let recoveryLimits: [ErrorPriority: Int] = [
+        .trainingCritical: 2,    // Device activation + playlist operations
+        .trainingEnhancing: 1,   // Track polling, artwork loading
+        .background: 1           // Token refresh, maintenance
+    ]
+    
     // Configuration
     private let clientID: String
     private let clientSecret: String
@@ -819,6 +834,244 @@ class SpotifyService: NSObject {
         isStartingTrainingPlaylist = false
     }
     
+    // MARK: - Intent-Based State Management
+    
+    /// Spotify usage intent - drives all connection and recovery behavior
+    enum SpotifyIntent {
+        case training      // Active training - requires AppRemote connection and aggressive recovery
+        case idle         // Not training - minimal connection, background-only recovery
+        case disconnected // Explicitly disconnected - no recovery attempts
+    }
+    
+    private var currentIntent: SpotifyIntent = .idle
+    private let intentQueue = DispatchQueue(label: "spotify.intent", qos: .userInitiated)
+    
+    /// Synchronously sets Spotify usage intent and updates all dependent systems
+    func setIntent(_ intent: SpotifyIntent) {
+        intentQueue.sync {
+            let oldIntent = currentIntent
+            currentIntent = intent
+            
+            print("🎵 [Intent] Spotify intent: \(oldIntent) → \(intent)")
+            
+            // Synchronously update all systems to prevent race conditions
+            if Thread.isMainThread {
+                updateSystemsForIntentChange(from: oldIntent, to: intent)
+            } else {
+                DispatchQueue.main.sync {
+                    updateSystemsForIntentChange(from: oldIntent, to: intent)
+                }
+            }
+        }
+    }
+    
+    /// Thread-safe intent getter
+    func getCurrentIntent() -> SpotifyIntent {
+        return intentQueue.sync { currentIntent }
+    }
+    
+    private func updateSystemsForIntentChange(from oldIntent: SpotifyIntent, to newIntent: SpotifyIntent) {
+        switch (oldIntent, newIntent) {
+        case (_, .training):
+            activateForTraining()
+            
+        case (.training, .idle):
+            deactivateFromTraining()
+            
+        case (.training, .disconnected):
+            disconnectExplicitly()
+            
+        case (.idle, .disconnected):
+            disconnectExplicitly()
+            
+        case (_, .idle):
+            // Transition to idle from any other state
+            transitionToIdle()
+            
+        case (.disconnected, .disconnected):
+            // No-op: already disconnected
+            print("🎯 [Intent] Already disconnected - no action needed")
+        }
+    }
+    
+    private func activateForTraining() {
+        print("🎯 [Intent] Activating for training - enabling aggressive recovery")
+        print("🎵 [Intent] Training mode activated - AppRemote failures will be aggressively recovered")
+    }
+    
+    private func deactivateFromTraining() {
+        print("🎯 [Intent] Deactivating from training - switching to dormant mode")
+        
+        // Cancel training-related recovery tasks
+        cancelRecoveryTasks(for: .trainingCritical, reason: "Training stopped")
+        cancelRecoveryTasks(for: .trainingEnhancing, reason: "Training stopped")
+        
+        // Don't proactively disconnect - just stop caring about events
+        appRemoteSubscriptionID = nil
+        print("🔌 [Intent] Training deactivated - AppRemote now dormant (connected but ignored)")
+        print("🧹 [Intent] Cleaned up training-related systems")
+    }
+    
+    private func disconnectExplicitly() {
+        print("🎯 [Intent] Explicit disconnection - stopping all recovery")
+        
+        // Cancel all recovery tasks
+        cancelAllRecoveryTasks(reason: "Explicit disconnection")
+        
+        // Only disconnect when explicitly requested (user logout, etc.)
+        appRemoteSubscriptionID = nil
+        appRemote?.disconnect()
+        print("🔌 [Intent] AppRemote explicitly disconnected")
+    }
+    
+    private func transitionToIdle() {
+        print("🎯 [Intent] Transitioning to idle state")
+        print("🎵 [Intent] Idle mode activated - minimal background recovery only")
+    }
+    
+    
+    private func cancelAllRecoveryTasks(reason: String) {
+        print("🛑 [Recovery] Canceling all recovery tasks: \(reason)")
+        for priority in [ErrorPriority.trainingCritical, .trainingEnhancing, .background] {
+            cancelRecoveryTasks(for: priority, reason: reason)
+        }
+    }
+    
+    private func cancelRecoveryTasks(for priority: ErrorPriority, reason: String) {
+        let tasksToCancel = activeRecoveryTasks[priority] ?? [:]
+        
+        for (operation, task) in tasksToCancel {
+            print("🚫 [Recovery] Canceling \(priority) recovery for \(operation): \(reason)")
+            task.cancel()
+        }
+        
+        activeRecoveryTasks[priority] = [:]
+    }
+    
+    /// NEW: Training-state-aware error handling with resource limits
+    func handleErrorWithDecision(_ error: SpotifyRecoverableError, context: ErrorContext) {
+        let decision = errorHandler.shouldRecover(from: error, context: context)
+        
+        print("🔍 [Recovery] \(decision.reasoning)")
+        
+        // Check resource limits before attempting recovery
+        let currentCount = activeRecoveryTasks[decision.priority]?.count ?? 0
+        let maxAllowed = recoveryLimits[decision.priority] ?? 1
+        
+        guard currentCount < maxAllowed else {
+            print("🚫 [Recovery] Resource limit reached for \(decision.priority) (\(currentCount)/\(maxAllowed))")
+            print("🔄 [Recovery] Applying fallback: \(decision.fallbackStrategy)")
+            applyFallbackStrategy(decision.fallbackStrategy, error: error, context: context)
+            return
+        }
+        
+        // Training-state-aware decision making
+        guard decision.shouldRetry && shouldExecuteRecovery(for: decision.priority) else {
+            print("ℹ️ [Recovery] Not retrying \(context.operation) - \(decision.shouldRetry ? "training state mismatch" : "max attempts reached")")
+            applyFallbackStrategy(decision.fallbackStrategy, error: error, context: context)
+            return
+        }
+        
+        // Schedule resource-managed recovery
+        scheduleRecovery(decision, operation: context.operation)
+    }
+    
+    private func shouldExecuteRecovery(for priority: ErrorPriority) -> Bool {
+        let intent = getCurrentIntent()
+        
+        switch (priority, intent) {
+        case (.trainingCritical, .training):
+            return true  // Always recover critical training failures
+            
+        case (.trainingEnhancing, .training):
+            return true  // Recover training enhancements during active training
+            
+        case (.background, .idle):
+            return true  // Background maintenance when idle
+            
+        case (_, .disconnected):
+            return false // Never recover when explicitly disconnected
+            
+        default:
+            // All other combinations should not trigger recovery
+            return false
+        }
+    }
+    
+    private func scheduleRecovery(_ decision: ErrorRecoveryDecision, operation: String) {
+        let taskKey = "\(operation)-\(Date().timeIntervalSince1970)"
+        
+        let recoveryTask = Task {
+            // Wait for suggested delay
+            if decision.suggestedDelay > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(decision.suggestedDelay * 1_000_000_000))
+            }
+            
+            // Double-check training state before executing (could have changed during delay)
+            guard shouldExecuteRecovery(for: decision.priority) else {
+                print("ℹ️ [Recovery] Training state changed during delay - canceling \(operation)")
+                return
+            }
+            
+            // Double-check if we were canceled
+            guard !Task.isCancelled else {
+                print("ℹ️ [Recovery] Task was canceled during delay - \(operation)")
+                return
+            }
+            
+            print("🔄 [Recovery] Executing \(decision.priority) recovery for \(operation)")
+            await executeRecoveryAction(for: operation, priority: decision.priority)
+            
+            // Clean up task reference
+            activeRecoveryTasks[decision.priority]?[taskKey] = nil
+        }
+        
+        // Store task for potential cancellation
+        activeRecoveryTasks[decision.priority]?[taskKey] = recoveryTask
+        print("📋 [Recovery] Scheduled \(decision.priority) recovery for \(operation) (delay: \(decision.suggestedDelay)s)")
+    }
+    
+    private func executeRecoveryAction(for operation: String, priority: ErrorPriority) async {
+        // Route to appropriate recovery method based on operation type
+        switch operation {
+        case "AppRemote Connection":
+            attemptAppRemoteReconnection()
+        case "Track Fetch", "Current Track":
+            refreshCurrentTrack()
+        case "Playlist Fetch":
+            // Could trigger playlist refresh
+            break
+        default:
+            print("⚠️ [Recovery] Unknown recovery operation: \(operation)")
+        }
+    }
+    
+    private func applyFallbackStrategy(_ strategy: FallbackStrategy, error: SpotifyRecoverableError, context: ErrorContext) {
+        switch strategy {
+        case .degradeToWebAPI:
+            print("🔄 [Fallback] Degrading to Web API for \(context.operation)")
+            if context.operation.contains("Track") {
+                fetchCurrentTrackViaWebAPI()
+            }
+            
+        case .continueWithoutData:
+            print("ℹ️ [Fallback] Continuing without data for \(context.operation)")
+            // Already handled by not retrying
+            
+        case .notifyUser:
+            print("📢 [Fallback] Notifying user about \(context.operation) failure")
+            DispatchQueue.main.async { [weak self] in
+                // Show error through ErrorHandler UI state 
+                self?.errorHandler.currentError = error
+                self?.errorHandler.recoveryMessage = error.recoveryMessage
+            }
+            
+        case .silentFailure:
+            print("🔇 [Fallback] Silent failure for \(context.operation)")
+            // Just log and continue
+        }
+    }
+    
     // MARK: - Track Polling
     
     func startTrackPolling() {
@@ -1005,18 +1258,20 @@ class SpotifyService: NSObject {
                 }
             case 401:
                 print("❌ Unauthorized - access token expired, attempting refresh")
-                // Use error recovery system instead of immediately clearing tokens
+                // Use new training-state-aware error recovery system
                 let recoverableError = SpotifyRecoverableError.tokenExpired
                 let context = ErrorContext(
                     operation: "Track Fetch",
                     attemptNumber: attempt,
                     lastSuccessTime: nil,
                     connectionState: self.connectionManager.connectionState,
-                    isTrainingActive: self.isPollingActive
+                    currentIntent: self.getCurrentIntent()
                 )
                 
-                let recoveryAction = self.errorHandler.handleError(recoverableError, context: context)
-                if recoveryAction == .refreshToken {
+                self.handleErrorWithDecision(recoverableError, context: context)
+                
+                // For token expiration, always attempt refresh regardless of training state
+                if true { // Token refresh is always needed
                     if let refreshToken = self.retrieveStoredRefreshToken() {
                         self.refreshAccessToken(refreshToken: refreshToken) { [weak self] success in
                             if success {
@@ -1095,13 +1350,13 @@ class SpotifyService: NSObject {
     }
     
     /// Enhanced retry mechanism using structured error recovery
-    private func fetchCurrentTrackWithRecovery(operation: String, isTrainingActive: Bool = false, completion: @escaping (Result<Void, SpotifyRecoverableError>) -> Void) {
+    private func fetchCurrentTrackWithRecovery(operation: String, completion: @escaping (Result<Void, SpotifyRecoverableError>) -> Void) {
         let context = ErrorContext(
             operation: operation,
             attemptNumber: (errorHandler.debugInfo.contains(operation) ? 1 : 0) + 1,
             lastSuccessTime: nil, // Could track this in the future
             connectionState: connectionManager.connectionState,
-            isTrainingActive: isTrainingActive
+            currentIntent: self.getCurrentIntent() // Use instance variable instead of parameter
         )
         
         performTrackFetchWithContext(context: context, completion: completion)
@@ -1175,7 +1430,12 @@ class SpotifyService: NSObject {
     }
     
     private func handleRecoverableError(_ error: SpotifyRecoverableError, context: ErrorContext, completion: @escaping (Result<Void, SpotifyRecoverableError>) -> Void) {
-        let recoveryAction = errorHandler.handleError(error, context: context)
+        // Use new training-state-aware error recovery system
+        handleErrorWithDecision(error, context: context)
+        
+        // For compatibility, get decision to determine if we should retry
+        let decision = errorHandler.shouldRecover(from: error, context: context)
+        let recoveryAction: ErrorRecoveryAction = decision.shouldRetry ? .retryAfterDelay(decision.suggestedDelay) : .noAction
         
         switch recoveryAction {
         case .retryAfterDelay, .retryWithExponentialBackoff:
@@ -1186,7 +1446,7 @@ class SpotifyService: NSObject {
                     attemptNumber: context.attemptNumber + 1,
                     lastSuccessTime: context.lastSuccessTime,
                     connectionState: context.connectionState,
-                    isTrainingActive: context.isTrainingActive
+                    currentIntent: context.currentIntent
                 )
                 self?.performTrackFetchWithContext(context: newContext, completion: completion)
             }
@@ -1284,18 +1544,20 @@ class SpotifyService: NSObject {
                 self.notifyPlayerStateChange(isPlaying: false, trackName: "", artistName: "", artworkURL: "")
             case 401:
                 print("❌ [WEB API DEBUG] Unauthorized - access token expired, attempting refresh")
-                // Use error recovery system for token refresh
+                // Use new training-state-aware error recovery system
                 let recoverableError = SpotifyRecoverableError.tokenExpired
                 let context = ErrorContext(
                     operation: "Current Track",
                     attemptNumber: 1,
                     lastSuccessTime: nil,
                     connectionState: self.connectionManager.connectionState,
-                    isTrainingActive: self.isPollingActive
+                    currentIntent: self.getCurrentIntent()
                 )
                 
-                let recoveryAction = self.errorHandler.handleError(recoverableError, context: context)
-                if recoveryAction == .refreshToken {
+                self.handleErrorWithDecision(recoverableError, context: context)
+                
+                // For token expiration, always attempt refresh regardless of training state
+                if true { // Token refresh is always needed
                     if let refreshToken = self.retrieveStoredRefreshToken() {
                         self.refreshAccessToken(refreshToken: refreshToken) { [weak self] success in
                             if success {
@@ -2212,18 +2474,18 @@ extension SpotifyService: SPTAppRemoteDelegate {
         print("AppRemote: Failed connection attempt with error: \(error?.localizedDescription ?? "Unknown error")")
         isAppRemoteConnectionInProgress = false // Reset connection flag
         
-        // Use enhanced error handling for AppRemote connection failures
+        // Use new training-state-aware error handling for AppRemote connection failures
         let recoverableError = SpotifyRecoverableError.appRemoteConnectionFailed(underlying: error)
         let context = ErrorContext(
             operation: "AppRemote Connection",
             attemptNumber: 1,
             lastSuccessTime: nil,
             connectionState: connectionManager.connectionState,
-            isTrainingActive: isTrackPollingActive // Use polling status as proxy for training activity
+            currentIntent: self.getCurrentIntent()
         )
         
-        let recoveryAction = errorHandler.handleError(recoverableError, context: context)
-        handleAppRemoteRecovery(recoveryAction, error: error)
+        // This will respect training state and only retry if appropriate
+        handleErrorWithDecision(recoverableError, context: context)
         
         let connectionError = error ?? SpotifyConnectionError.appRemoteConnectionTimeout
         connectionManager.appRemoteConnectionFailed(error: connectionError)
@@ -2242,11 +2504,11 @@ extension SpotifyService: SPTAppRemoteDelegate {
                 attemptNumber: 1,
                 lastSuccessTime: nil,
                 connectionState: connectionManager.connectionState,
-                isTrainingActive: isTrackPollingActive // Use polling status as proxy for training activity
+                currentIntent: self.getCurrentIntent()
             )
             
-            let recoveryAction = errorHandler.handleError(recoverableError, context: context)
-            handleAppRemoteRecovery(recoveryAction, error: error)
+            // Use new training-state-aware error handling 
+            handleErrorWithDecision(recoverableError, context: context)
         }
         
         // Clear AppRemote data from coordinator
@@ -2394,11 +2656,14 @@ extension SpotifyService {
                         attemptNumber: 1,
                         lastSuccessTime: nil,
                         connectionState: self?.connectionManager.connectionState ?? .disconnected,
-                        isTrainingActive: self?.isPollingActive ?? false
+                        currentIntent: self?.getCurrentIntent() ?? .idle
                     )
                     
-                    let recoveryAction = self?.errorHandler.handleError(recoverableError, context: context)
-                    if recoveryAction == .refreshToken {
+                    // Use new training-state-aware error recovery system
+                    self?.handleErrorWithDecision(recoverableError, context: context)
+                    
+                    // For token expiration, always attempt refresh regardless of training state
+                    if true { // Token refresh is always needed
                         if let refreshToken = self?.retrieveStoredRefreshToken() {
                             self?.refreshAccessToken(refreshToken: refreshToken) { [weak self] success in
                                 if success {

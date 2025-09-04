@@ -28,12 +28,36 @@ struct ErrorContext {
     let attemptNumber: Int         // How many times we've tried
     let lastSuccessTime: Date?     // When this operation last succeeded
     let connectionState: SpotifyConnectionState
-    let isTrainingActive: Bool     // Whether user is in active training
+    let currentIntent: SpotifyService.SpotifyIntent  // Current Spotify usage intent
     
     var timeSinceLastSuccess: TimeInterval? {
         guard let lastSuccess = lastSuccessTime else { return nil }
         return Date().timeIntervalSince(lastSuccess)
     }
+}
+
+/// Enhanced recovery decision with error priority classification
+struct ErrorRecoveryDecision {
+    let shouldRetry: Bool
+    let suggestedDelay: TimeInterval
+    let priority: ErrorPriority
+    let fallbackStrategy: FallbackStrategy
+    let reasoning: String
+}
+
+/// Error priority levels for resource management
+enum ErrorPriority {
+    case trainingCritical    // Must fix for training to work (device activation, playlist start)
+    case trainingEnhancing   // Nice to have during training (track polling, artwork)  
+    case background          // Non-training maintenance (token refresh when idle)
+}
+
+/// Fallback strategies when recovery fails or is not possible
+enum FallbackStrategy {
+    case degradeToWebAPI     // Switch to Web API if AppRemote fails
+    case continueWithoutData // Proceed without track info
+    case notifyUser          // Show error message
+    case silentFailure       // Log and continue
 }
 
 /// Enhanced error types with recovery context
@@ -170,6 +194,150 @@ class SpotifyErrorHandler: ObservableObject {
         return action
     }
     
+    /// NEW: Pure decision engine - analyzes error and returns structured decision
+    func shouldRecover(from error: SpotifyRecoverableError, context: ErrorContext) -> ErrorRecoveryDecision {
+        print("🔍 [ErrorHandler] Analyzing \(error.errorDescription ?? "Unknown") for \(context.operation) with intent: \(context.currentIntent)")
+        
+        // Respect explicit disconnection intent - never recover
+        if context.currentIntent == .disconnected {
+            return ErrorRecoveryDecision(
+                shouldRetry: false,
+                suggestedDelay: 0,
+                priority: .background,
+                fallbackStrategy: .silentFailure,
+                reasoning: "Explicit disconnection intent - no recovery needed"
+            )
+        }
+        
+        switch error {
+        case .appRemoteConnectionFailed, .appRemoteDisconnected:
+            let shouldRetry: Bool
+            let priority: ErrorPriority
+            let reasoning: String
+            
+            switch context.currentIntent {
+            case .training:
+                shouldRetry = context.attemptNumber < maxRetryAttempts
+                priority = .trainingCritical
+                reasoning = "AppRemote critical for training playlist control"
+                
+            case .idle:
+                shouldRetry = false  // Don't aggressively reconnect when idle
+                priority = .background
+                reasoning = "AppRemote disconnection during idle - expected behavior"
+                
+            case .disconnected:
+                shouldRetry = false  // Already handled above
+                priority = .background
+                reasoning = "Explicit disconnection"
+            }
+            
+            return ErrorRecoveryDecision(
+                shouldRetry: shouldRetry,
+                suggestedDelay: exponentialBackoff(attempt: context.attemptNumber),
+                priority: priority,
+                fallbackStrategy: .degradeToWebAPI,
+                reasoning: reasoning
+            )
+            
+        case .tokenExpired, .authenticationRevoked:
+            return ErrorRecoveryDecision(
+                shouldRetry: true, // Always attempt token refresh
+                suggestedDelay: 0.1,
+                priority: .trainingCritical, // Tokens needed for all operations
+                fallbackStrategy: .notifyUser,
+                reasoning: "Token required for all Spotify operations"
+            )
+            
+        case .networkTimeout, .networkUnavailable:
+            return ErrorRecoveryDecision(
+                shouldRetry: context.attemptNumber < 2,
+                suggestedDelay: min(2.0 * Double(context.attemptNumber), 8.0),
+                priority: context.currentIntent == .training ? .trainingEnhancing : .background,
+                fallbackStrategy: .continueWithoutData,
+                reasoning: "Network issue - \(context.currentIntent == .training ? "training can continue with cached data" : "background operation")"
+            )
+            
+        case .playlistNotFound:
+            return ErrorRecoveryDecision(
+                shouldRetry: false, // Content errors don't benefit from retry
+                suggestedDelay: 0,
+                priority: .trainingEnhancing,
+                fallbackStrategy: .continueWithoutData,
+                reasoning: "Content not found - user notification or fallback needed"
+            )
+            
+        case .deviceNotFound:
+            return ErrorRecoveryDecision(
+                shouldRetry: false, // User action required
+                suggestedDelay: 0,
+                priority: .trainingCritical,
+                fallbackStrategy: .notifyUser,
+                reasoning: "User action required to resolve issue"
+            )
+            
+        case .rateLimited(let retryAfter):
+            let delay = retryAfter ?? 5.0
+            return ErrorRecoveryDecision(
+                shouldRetry: context.attemptNumber < 2,
+                suggestedDelay: delay, // Wait for rate limit to reset
+                priority: context.currentIntent == .training ? .trainingEnhancing : .background,
+                fallbackStrategy: .degradeToWebAPI,
+                reasoning: "Rate limited - wait and potentially switch to Web API"
+            )
+            
+        case .insufficientPermissions:
+            return ErrorRecoveryDecision(
+                shouldRetry: false, // User action required
+                suggestedDelay: 0,
+                priority: .trainingCritical,
+                fallbackStrategy: .notifyUser,
+                reasoning: "User action required - insufficient permissions"
+            )
+            
+        case .apiError(_, _):
+            return ErrorRecoveryDecision(
+                shouldRetry: context.attemptNumber < 2,
+                suggestedDelay: exponentialBackoff(attempt: context.attemptNumber),
+                priority: context.currentIntent == .training ? .trainingEnhancing : .background,
+                fallbackStrategy: .degradeToWebAPI,
+                reasoning: "API error - retry with backoff and fallback to Web API"
+            )
+            
+        case .serviceUnavailable:
+            return ErrorRecoveryDecision(
+                shouldRetry: context.attemptNumber < 2,
+                suggestedDelay: exponentialBackoff(attempt: context.attemptNumber),
+                priority: context.currentIntent == .training ? .trainingEnhancing : .background,
+                fallbackStrategy: .degradeToWebAPI,
+                reasoning: "Service unavailable - retry with backoff and fallback to Web API"
+            )
+            
+        case .noData(let operation), .invalidResponse(let operation), .decodingFailed(let operation, _):
+            return ErrorRecoveryDecision(
+                shouldRetry: context.attemptNumber < 1, // Single retry for data issues
+                suggestedDelay: 1.0,
+                priority: context.currentIntent == .training ? .trainingEnhancing : .background,
+                fallbackStrategy: .continueWithoutData,
+                reasoning: "Data issue with \(operation) - single retry attempt"
+            )
+            
+        case .spotifyNotInstalled:
+            return ErrorRecoveryDecision(
+                shouldRetry: false, // User action required
+                suggestedDelay: 0,
+                priority: .trainingCritical,
+                fallbackStrategy: .degradeToWebAPI,
+                reasoning: "Spotify app not installed - fallback to Web API"
+            )
+        }
+    }
+    
+    /// Helper: Calculate exponential backoff delay
+    private func exponentialBackoff(attempt: Int) -> TimeInterval {
+        return min(exponentialBackoffBase * pow(2.0, Double(attempt - 1)), maxBackoffDelay)
+    }
+    
     /// Records a successful operation to reset retry tracking
     func recordSuccess(for operation: String) {
         lastSuccessTimes[operation] = Date()
@@ -284,7 +452,7 @@ class SpotifyErrorHandler: ObservableObject {
         
         if attempts < maxRetryAttempts {
             // During training, be more aggressive with reconnection but gentle in background
-            if context.isTrainingActive {
+            if context.currentIntent == .training {
                 if isBackground {
                     // In background during training, use Web API fallback instead of aggressive reconnection
                     return .degradeToWebAPIOnly
