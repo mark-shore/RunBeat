@@ -153,12 +153,7 @@ class VO2MaxTrainingManager: ObservableObject {
             self.currentInterval = 0
         }
         
-        // Stop music and track polling
-        spotifyViewModel.pause()
-        
-        // Get final track state before stopping polling (for display consistency)
-        spotifyViewModel.refreshCurrentTrack()
-        
+        // Stop track polling (but let music continue playing)
         spotifyViewModel.stopTrackPolling()
         
         // Reset device activation state for next training session

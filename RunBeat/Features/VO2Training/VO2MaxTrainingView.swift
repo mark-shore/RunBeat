@@ -93,7 +93,6 @@ struct VO2MaxTrainingView: View {
                             // Setup State: Show start button
                             AppButton("Start Training", style: .primary) {
                                 appState.startVO2Training()
-                                trainingManager.startTraining()
                             }
                             
                         case .active:
@@ -123,7 +122,6 @@ struct VO2MaxTrainingView: View {
                                 AppButton("Start New Session", style: .primary) {
                                     trainingManager.resetToSetup()
                                     appState.startVO2Training()
-                                    trainingManager.startTraining()
                                 }
                             }
                         }
