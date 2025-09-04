@@ -7,6 +7,38 @@ class AppState: ObservableObject {
     @Published var currentBPM: Int = 0
     @Published var activeTrainingMode: TrainingMode = .none
     
+    // VO2 Training UI State - Bridged from VO2MaxTrainingManager
+    @Published var vo2TimeRemaining: TimeInterval = 0
+    @Published var vo2CurrentPhase: VO2MaxTrainingManager.TrainingPhase = .notStarted
+    @Published var vo2CurrentInterval: Int = 0
+    @Published var vo2TotalIntervals: Int = 4
+    @Published var vo2TrainingState: VO2MaxTrainingManager.TrainingState = .setup
+    
+    // VO2 Training Computed Properties - Clean interface for UI
+    var vo2FormattedTimeRemaining: String {
+        let minutes = Int(vo2TimeRemaining) / 60
+        let seconds = Int(vo2TimeRemaining) % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+    
+    var vo2PhaseDescription: String {
+        switch vo2CurrentPhase {
+        case .notStarted:
+            return "Ready to Start"
+        case .highIntensity:
+            return "High Intensity"
+        case .rest:
+            return "Rest"
+        case .completed:
+            return "Training Complete!"
+        }
+    }
+    
+    var vo2ProgressPercentage: Double {
+        guard vo2TotalIntervals > 0 else { return 0.0 }
+        return Double(vo2CurrentInterval - 1) / Double(vo2TotalIntervals)
+    }
+    
     // Legacy compatibility for existing UI
     var isSessionActive: Bool {
         return activeTrainingMode == .free
@@ -28,8 +60,9 @@ class AppState: ObservableObject {
         setupAudioManagement()
         setupAnnouncementHandling() // NEW: NotificationCenter observer
         observeHeartRateSettings()
+        observeVO2TrainingUpdates() // NEW: Bridge VO2 training UI state
 
-        print("🚀 AppState initialized – ready for dual training mode architecture")
+        print("🚀 AppState initialized – ready for dual training mode architecture with proper separation of concerns")
     }
     
     private func setupHeartRateMonitoring() {
@@ -109,6 +142,16 @@ class AppState: ObservableObject {
     }
     
     func startVO2Training() {
+        // Handle restart from complete state
+        if activeTrainingMode == .vo2Max && vo2TrainingState == .complete {
+            print("🔄 Restarting VO2 training from complete state")
+            Task { @MainActor in
+                vo2TrainingManager.resetToSetup()
+                vo2TrainingManager.startTraining()
+            }
+            return
+        }
+        
         guard activeTrainingMode == .none else {
             print("⚠️ Cannot start VO2 training - another mode is active: \(activeTrainingMode)")
             return
@@ -172,6 +215,36 @@ class AppState: ObservableObject {
             }
         }
         .store(in: &cancellables)
+    }
+    
+    private func observeVO2TrainingUpdates() {
+        // Bridge all VO2 training UI state from manager to AppState
+        vo2TrainingManager.$timeRemaining
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.vo2TimeRemaining, on: self)
+            .store(in: &cancellables)
+            
+        vo2TrainingManager.$currentPhase
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.vo2CurrentPhase, on: self)
+            .store(in: &cancellables)
+            
+        vo2TrainingManager.$currentInterval
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.vo2CurrentInterval, on: self)
+            .store(in: &cancellables)
+            
+        vo2TrainingManager.$totalIntervals
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.vo2TotalIntervals, on: self)
+            .store(in: &cancellables)
+            
+        vo2TrainingManager.$trainingState
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.vo2TrainingState, on: self)
+            .store(in: &cancellables)
+            
+        print("🔗 VO2 training state bridging established")
     }
     
     private var cancellables = Set<AnyCancellable>()

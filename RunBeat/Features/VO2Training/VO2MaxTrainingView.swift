@@ -10,7 +10,7 @@ import Foundation
 import Combine
 
 struct VO2MaxTrainingView: View {
-    @StateObject private var trainingManager = VO2MaxTrainingManager.shared
+    // ✅ View only talks to coordination layer - no direct manager access
     @StateObject private var spotifyViewModel = SpotifyViewModel.shared
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
@@ -40,11 +40,11 @@ struct VO2MaxTrainingView: View {
                     // Timer Display
                     VStack(alignment: .center, spacing: AppSpacing.md) {
                         // Timer text
-                        Text(trainingManager.formattedTimeRemaining())
+                        Text(appState.vo2FormattedTimeRemaining)
                             .font(.system(size: 28, weight: .medium, design: .monospaced))
-                            .foregroundColor(getPhaseColor(for: trainingManager.currentPhase))
+                            .foregroundColor(getPhaseColor(for: appState.vo2CurrentPhase))
                         
-                        if trainingManager.isTraining {
+                        if appState.vo2TrainingState == .active {
                             // Heart rate information during training
                             HStack(spacing: AppSpacing.lg) {
                                 // BPM display
@@ -65,13 +65,13 @@ struct VO2MaxTrainingView: View {
                             }
                         } else {
                             // Ready to Start text when not training
-                            Text(trainingManager.getPhaseDescription())
+                            Text(appState.vo2PhaseDescription)
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(getPhaseColor(for: trainingManager.currentPhase))
+                                .foregroundColor(getPhaseColor(for: appState.vo2CurrentPhase))
                         }
                         
                         // Interval counter
-                        Text("Interval \(trainingManager.currentInterval)/\(trainingManager.totalIntervals)")
+                        Text("Interval \(appState.vo2CurrentInterval)/\(appState.vo2TotalIntervals)")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondary)
                     }
@@ -81,14 +81,14 @@ struct VO2MaxTrainingView: View {
                     // Buttons Section
                     VStack(spacing: AppSpacing.md) {
                         // Select Playlists button (only when not training)
-                        if !trainingManager.isTraining {
+                        if appState.vo2TrainingState != .active {
                             AppButton("Select Playlists", style: .secondary) {
                                 showingPlaylistSelection = true
                             }
                         }
                         
                         // Training Control Buttons
-                        switch trainingManager.trainingState {
+                        switch appState.vo2TrainingState {
                         case .setup:
                             // Setup State: Show start button
                             AppButton("Start Training", style: .primary) {
@@ -99,7 +99,7 @@ struct VO2MaxTrainingView: View {
                             // Active State: Show stop button only
                             HStack(spacing: AppSpacing.lg) {
                                 Button(action: {
-                                    trainingManager.stopTraining()
+                                    // ✅ Single source of truth - only AppState controls training
                                     appState.stopVO2Training()
                                 }) {
                                     Image(systemName: "stop.fill")
@@ -120,7 +120,7 @@ struct VO2MaxTrainingView: View {
                                     .fontWeight(.bold)
                                 
                                 AppButton("Start New Session", style: .primary) {
-                                    trainingManager.resetToSetup()
+                                    // ✅ AppState will coordinate reset and start
                                     appState.startVO2Training()
                                 }
                             }
@@ -166,7 +166,7 @@ struct VO2MaxTrainingView: View {
                 // No need to make API calls just for viewing the screen
             }
         }
-        .onChange(of: trainingManager.trainingState) { oldValue, newValue in
+        .onChange(of: appState.vo2TrainingState) { oldValue, newValue in
             switch newValue {
             case .active:
                 // Training started - polling is handled by VO2MaxTrainingManager
@@ -180,7 +180,7 @@ struct VO2MaxTrainingView: View {
         }
         .onDisappear {
             // Ensure polling stops when view disappears (training manager handles its own polling)
-            if trainingManager.trainingState == .setup || trainingManager.trainingState == .complete {
+            if appState.vo2TrainingState == .setup || appState.vo2TrainingState == .complete {
                 spotifyViewModel.stopTrackPolling()
             }
         }
