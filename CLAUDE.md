@@ -36,7 +36,7 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - `HeartRateManager`: CoreBluetooth heart rate monitoring - working perfectly
 - Background execution logic for continuous monitoring
 - Audio announcement timing and cooldown system
-- **Spotify architecture**: Recently refactored (Phase 1-4) with robust connection management, error recovery, and persistent authentication
+- **Spotify architecture**: Recently refactored (Phase 1-6) with intent-based lifecycle management, robust connection management, error recovery, and persistent authentication
 
 ### Core Modules
 
@@ -64,6 +64,8 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - `SpotifyErrorHandler.swift`: Structured error recovery with background execution support
 - `SpotifyViewModel.swift`: UI state management with persistent authentication
 - `KeychainWrapper.swift`: Secure token storage (eliminates repeated OAuth)
+- **Intent-Based Architecture**: SpotifyIntent enum (.training, .idle, .background) controls AppRemote lifecycle and eliminates wasteful background reconnection cycles
+- **AppState Bridging**: Moved from direct trainingManager access in views to AppState-mediated access, eliminating dual ownership patterns
 - **Token Management**: Centralized `makeAuthenticatedAPICall()` method handles automatic token refresh on 401 responses
 - Features: Seamless training integration, reliable background playlist switching, automatic activation tracking
 

@@ -209,6 +209,7 @@ The Spotify integration uses a modular architecture with specialized components:
 
 #### SpotifyService
 - Core orchestration and business logic coordination
+- Intent-based lifecycle management with SpotifyIntent (.training, .idle, .background)
 - OAuth authentication with persistent keychain storage
 - Device activation and automatic playlist management
 - Coordinates between connection manager, data coordinator, and error handler
@@ -227,6 +228,7 @@ The Spotify integration uses a modular architecture with specialized components:
 
 #### SpotifyErrorHandler
 - Structured error recovery with context-aware strategies
+- Intent-aware error recovery that respects current context (no recovery during .idle)
 - Exponential backoff retry logic for network issues
 - Training-aware error handling (more aggressive during workouts)
 - User-friendly error messages and recovery guidance
@@ -374,6 +376,7 @@ VO2MaxTrainingManager ─┘
 
 ### State Management
 - **AppState coordinates dual training modes** with mutual exclusion (only one active at a time)
+- **AppState bridging** eliminates dual ownership patterns where views had both @StateObject trainingManager and @EnvironmentObject appState
 - **Shared services pattern** eliminates duplication between training modes
 - **NotificationCenter routing** for announcements from coordinators to AppState to SpeechAnnouncer
 - ViewModels manage UI state with `@Published` properties

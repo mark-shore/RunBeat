@@ -260,14 +260,16 @@ case .rest:
 - ✅ Background execution reliability (playlist switching during phone-away training)
 - ✅ **Playlist restart interruptions** - App switching no longer disrupts music playback
 - ✅ **Backend token management** - Centralized token storage and refresh with intelligent iOS caching
+- ✅ **Intent-based lifecycle management** - Eliminates wasteful background reconnection cycles and improves separation of concerns
 
 **Architecture Benefits**:
 - **User Experience**: Seamless authentication and music control with no app-switching interruptions
-- **Maintainability**: Clear separation of concerns and single responsibilities
+- **Maintainability**: Clear separation of concerns and single responsibilities with intent-based resource management
 - **Reliability**: Robust error handling and state management across all execution contexts
-- **Performance**: Optimized data processing, connection management, and intelligent token caching
+- **Performance**: Optimized data processing, connection management, intelligent token caching, and efficient battery usage
 - **Background Training**: Reliable playlist switching during phone-away workouts
 - **Scalability**: Backend service supports multi-device token management and monitoring
+- **Resource Efficiency**: Intent-based lifecycle eliminates unnecessary background connections
 
 ## Implementation Roadmap Status
 
@@ -276,7 +278,8 @@ case .rest:
 - ✅ **Phase 3: Data Source Simplification** - Complete
 - ✅ **Phase 4: Error Handling Enhancement** - Complete (includes background execution regression fix)
 - ✅ **Phase 5: Backend Integration & Playlist Restart Elimination** - Complete
-- ⏸️ **Phase 6: Dependency Injection** - Deferred
+- ✅ **Phase 6: Intent-Based Architecture** - Complete
+- ⏸️ **Phase 7: Dependency Injection** - Deferred
 
 **Phase 5 Completion Notes**: Successfully implemented FastAPI backend service with Railway deployment for centralized token management. Added intelligent iOS token caching based on app lifecycle. Most importantly, eliminated automatic playlist restart interruptions when users switch between apps - music now continues uninterrupted when returning from Spotify.
 
@@ -287,7 +290,28 @@ case .rest:
 - Maintained legitimate playlist changes during training phase transitions
 - Added comprehensive backend monitoring and admin endpoints
 
-**Phase 6 Status**: Dependency injection (removing singleton patterns, protocol-based dependencies) has been deferred as the current architecture provides excellent functionality and maintainability. The singleton pattern works well for this app's scale and use case.
+### ✅ Phase 6: Intent-Based Architecture (2025)
+**Problem Solved**: Separation of concerns issues and wasteful background reconnection cycles.
+
+**Solutions Implemented**:
+1. **SpotifyIntent Enum** - Controls AppRemote lifecycle based on app context
+   - `.training` - Active training session requiring music control
+   - `.idle` - App active but no training (minimal Spotify connection) 
+   - `.background` - App backgrounded (suspended connections)
+
+2. **AppState Bridging** - Eliminates dual ownership patterns
+   - Views no longer have both `@StateObject trainingManager` and `@EnvironmentObject appState`
+   - Single source of truth through AppState for training coordination
+   - Cleaner view hierarchy without competing state managers
+
+3. **Intent-Aware Error Recovery** - Context-sensitive error handling
+   - Error recovery respects current intent (no recovery during `.idle`)
+   - Training sessions get aggressive reconnection, idle state stays minimal
+   - Background intent prevents unnecessary connection attempts
+
+**Technical Implementation**: Intent-based architecture provides intelligent resource management where Spotify connections are only maintained when needed for training, eliminating wasteful background cycles and improving battery life.
+
+**Phase 7 Status**: Dependency injection (removing singleton patterns, protocol-based dependencies) has been deferred as the current architecture provides excellent functionality and maintainability. The singleton pattern works well for this app's scale and use case.
 
 ## Testing Strategy
 
@@ -326,4 +350,11 @@ Current architecture supports:
 - **Multi-Device**: Verify backend handles multiple devices with same user account
 - **Token Refresh**: Test automatic backend token refresh while app suspended
 
-The Spotify integration is now architecturally sound, user-friendly, interruption-free, backend-integrated, and ready for long-term maintenance.
+### Intent-Based Architecture Testing
+- **Resource Management**: Verify Spotify connections are only active during `.training` intent
+- **State Bridging**: Test that views access training state only through AppState (no dual ownership)
+- **Error Recovery Context**: Confirm error recovery respects current intent (minimal during `.idle`)
+- **Battery Usage**: Monitor background connection cycles - should be eliminated with intent-based lifecycle
+- **Training Transitions**: Verify intent changes properly during training start/stop cycles
+
+The Spotify integration is now architecturally sound, user-friendly, interruption-free, backend-integrated, resource-efficient, and ready for long-term maintenance.

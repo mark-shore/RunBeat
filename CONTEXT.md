@@ -27,7 +27,7 @@ Audio-first iOS heart rate training app. Users start workout, put phone away, ge
 - **Dual training mode coordination** - AppState mutual exclusion system
 - Background execution logic for continuous monitoring
 - Audio announcement timing and cooldown system
-- **Spotify architecture** - centralized token refresh, reconnection observers, training-aware handling
+- **Spotify architecture** - intent-based lifecycle management, centralized token refresh, reconnection observers, training-aware handling
 - **Backend service** - FastAPI backend with intelligent token caching and Railway deployment
 - **Playlist restart elimination** - App switching no longer interrupts music playback
 
@@ -70,7 +70,7 @@ Audio-first iOS heart rate training app. Users start workout, put phone away, ge
 - **Shared Services Pattern**: HeartRateService + ZoneAnnouncementCoordinator eliminate duplication between training modes
 - **Dual Training Architecture**: AppState coordinates mutual exclusion between Free Training and VO2 Max Training
 - **Heart Rate**: Pure CoreBluetooth with shared processing service and background execution
-- **Spotify**: Modular design with centralized token refresh and automatic reconnection
+- **Spotify**: Intent-based architecture with SpotifyIntent enum controls lifecycle, AppState bridging eliminates dual ownership patterns, centralized error recovery respects training context
 - **Training**: Two independent modes using shared services for consistent HR processing
 - **UI**: Design system with `AppColors`, `AppTypography`, `AppButton`, etc.
 
