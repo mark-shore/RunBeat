@@ -250,7 +250,7 @@ struct AutoZonesDisplay: View {
                 }
                 
                 let zones = autoZones
-                let zoneColors: [Color] = [AppColors.zone5, AppColors.zone4, AppColors.zone3, AppColors.zone2, AppColors.zone1]
+                let zoneColors: [Color] = [AppColors.zone1, AppColors.zone2, AppColors.zone3, AppColors.zone4, AppColors.zone5]
                 let zoneRanges = [
                     (zones.0, zones.1), // Zone 1: zone1Lower to zone1Upper
                     (zones.1 + 1, zones.2), // Zone 2: zone1Upper+1 to zone2Upper
