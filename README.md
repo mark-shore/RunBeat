@@ -28,6 +28,9 @@ An audio-first iOS app for heart rate zone training and VO2 max intervals with S
 - **Primary Brand Color**: Red-Orange (#FF4500) 
 - **Theme**: Dark mode with true black backgrounds
 - **Typography**: iOS-native font system with custom weights for displays
+  - `hrDisplay`: 56px bold rounded for heart rate numbers
+  - `hrIcon`: 24px medium weight for heart rate icons
+  - `timerDisplay`: 36px medium monospace for training timers
 - **Components**: Card-based UI with native iOS button styles
 
 ### Design System Structure
@@ -41,6 +44,7 @@ RunBeat/
 │   │   └── Components/
 │   │       ├── AppButton.swift   # Unified button component
 │   │       ├── AppCard.swift     # Card container component
+│   │       ├── BPMDisplayView.swift # Animated heart rate display with zone colors
 │   │       └── ZoneDisplay.swift # Heart rate zone display
 
 ## Architecture Overview
@@ -357,10 +361,21 @@ VO2MaxTrainingManager ─┘
 
 ### Design System Usage
 - Use `AppColors` for all color values
-- Apply `AppTypography` for consistent text styling
+- Apply `AppTypography` for consistent text styling  
 - Use `AppSpacing` for margins and padding
 - Implement `AppButton` for all interactive buttons
+- Use `BPMDisplayView` for heart rate displays with zone indication
 - Wrap content sections in `AppCard` components
+
+### UI Components
+
+#### BPMDisplayView
+- **Animated heart rate display** with zone-colored background circle
+- **Real-time visual feedback** during training with pulse animation (0.9-1.05 scale)
+- **Zone color integration** using AppColors.zone0-zone5 for instant zone recognition
+- **Training-optimized sizing**: 56px BPM number with 24px heart icon in 150px circle
+- **Reusable component** accepts BPM value and zone as parameters
+- **Enhanced glanceability** designed for quick reads during intense VO2 intervals
 
 ### MVVM Principles
 - **Separation of Concerns**: Each component has a single responsibility

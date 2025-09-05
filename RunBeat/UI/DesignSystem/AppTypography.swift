@@ -15,7 +15,8 @@ struct AppTypography {
     static let caption2 = Font.caption2
     
     // Custom styles for specific use cases
-    static let hrDisplay = Font.system(size: 48, weight: .bold, design: .rounded)
+    static let hrDisplay = Font.system(size: 56, weight: .bold, design: .rounded)
+    static let hrIcon = Font.system(size: 24, weight: .medium)
     static let timerDisplay = Font.system(size: 36, weight: .medium, design: .monospaced)
     static let zoneLabel = Font.system(size: 20, weight: .semibold)
     static let buttonText = Font.system(size: 17, weight: .semibold)

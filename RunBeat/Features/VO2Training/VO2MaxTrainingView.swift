@@ -44,24 +44,8 @@ struct VO2MaxTrainingView: View {
                             .foregroundColor(getPhaseColor(for: appState.vo2CurrentPhase))
                         
                         if appState.vo2TrainingState == .active {
-                            // Heart rate information during training
-                            HStack(spacing: AppSpacing.lg) {
-                                // BPM display
-                                VStack(spacing: AppSpacing.xs) {
-                                    Text("\(appState.currentBPM)")
-                                        .font(AppTypography.displayMedium)
-                                        .foregroundColor(AppColors.onBackground)
-                                    
-                                    Text("BPM")
-                                        .font(AppTypography.bodySmall)
-                                        .foregroundColor(AppColors.secondary)
-                                }
-                                
-                                // Current zone
-                                Text(getCurrentZoneText())
-                                    .font(AppTypography.headlineMedium)
-                                    .foregroundColor(getCurrentZoneColor())
-                            }
+                            // Heart rate information during training with animated zone-colored display
+                            BPMDisplayView(bpm: appState.currentBPM, zone: getCurrentZone())
                         } else {
                             // Ready to Start text when not training
                             Text(appState.vo2PhaseDescription)
@@ -187,8 +171,8 @@ struct VO2MaxTrainingView: View {
     
     // MARK: - Helper Methods
     
-    private func getCurrentZoneText() -> String {
-        guard appState.currentBPM > 0 else { return "Zone 0" }
+    private func getCurrentZone() -> Int {
+        guard appState.currentBPM > 0 else { return 0 }
         
         let currentZone = HeartRateZoneCalculator.calculateZone(
             for: appState.currentBPM,
@@ -205,38 +189,7 @@ struct VO2MaxTrainingView: View {
             )
         )
         
-        return currentZone != nil ? "Zone \(currentZone!)" : "Zone 0"
-    }
-    
-    private func getCurrentZoneColor() -> Color {
-        guard appState.currentBPM > 0 else { return AppColors.zone0 }
-        
-        let currentZone = HeartRateZoneCalculator.calculateZone(
-            for: appState.currentBPM,
-            restingHR: appState.heartRateViewModel.restingHR,
-            maxHR: appState.heartRateViewModel.maxHR,
-            useAutoZones: appState.heartRateViewModel.useAutoZones,
-            manualZones: (
-                zone1Lower: appState.heartRateViewModel.zone1Lower,
-                zone1Upper: appState.heartRateViewModel.zone1Upper,
-                zone2Upper: appState.heartRateViewModel.zone2Upper,
-                zone3Upper: appState.heartRateViewModel.zone3Upper,
-                zone4Upper: appState.heartRateViewModel.zone4Upper,
-                zone5Upper: appState.heartRateViewModel.zone5Upper
-            )
-        )
-        
-        guard let zone = currentZone else { return AppColors.zone0 }
-        
-        switch zone {
-        case 0: return AppColors.zone0
-        case 1: return AppColors.zone1
-        case 2: return AppColors.zone2
-        case 3: return AppColors.zone3
-        case 4: return AppColors.zone4
-        case 5: return AppColors.zone5
-        default: return AppColors.zone0
-        }
+        return currentZone ?? 0
     }
     
     private func getPhaseColor(for phase: VO2MaxTrainingManager.TrainingPhase) -> Color {
