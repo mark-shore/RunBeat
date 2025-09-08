@@ -33,7 +33,10 @@ struct BPMDisplayView: View {
             }
         }
         .onAppear {
-            isAnimating = true
+            isAnimating = false // Reset first
+            withAnimation(.none) {
+                isAnimating = true
+            }
         }
     }
     

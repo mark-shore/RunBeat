@@ -44,11 +44,21 @@ struct VO2MaxTrainingView: View {
                         if appState.vo2TrainingState == .active {
                             // Heart rate information during training with animated zone-colored display
                             BPMDisplayView(bpm: appState.currentBPM, zone: getCurrentZone())
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .id("bpm-display")
+                                .animation(.none, value: appState.currentBPM)
+                        } else if appState.currentBPM > 0 {
+                            // NEW: Show BPM during setup if HR detected
+                            BPMDisplayView(bpm: appState.currentBPM, zone: getCurrentZone())
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .id("bpm-display")
+                                .animation(.none, value: appState.currentBPM)
                         } else {
-                            // Ready to Start text when not training
-                            Text(appState.vo2PhaseDescription)
+                            // Fallback: No HR available text when no HR detected
+                            Text("No HR available")
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(getPhaseColor(for: appState.vo2CurrentPhase))
+                                .foregroundColor(AppColors.secondary)
+                                .frame(maxWidth: .infinity, alignment: .center)
                         }
                         
                         // Interval counter
@@ -132,6 +142,12 @@ struct VO2MaxTrainingView: View {
         .onAppear {
             print("VO2 Max Training view appeared")
             
+            // Start HR monitoring for setup screen
+            if appState.vo2TrainingState == .setup {
+                print("💓 Starting HR monitoring for VO2 setup screen")
+                appState.hrManager.startMonitoring()
+            }
+            
             // Ensure playlist fetch happens if connected
             if spotifyViewModel.isConnected {
                 if spotifyViewModel.availablePlaylists.isEmpty {
@@ -160,6 +176,12 @@ struct VO2MaxTrainingView: View {
             }
         }
         .onDisappear {
+            // Stop HR monitoring if we're still in setup state
+            if appState.vo2TrainingState == .setup {
+                print("💓 Stopping HR monitoring for VO2 setup screen")
+                appState.hrManager.stopMonitoring()
+            }
+            
             // Ensure polling stops when view disappears (training manager handles its own polling)
             if appState.vo2TrainingState == .setup || appState.vo2TrainingState == .complete {
                 spotifyViewModel.stopTrackPolling()

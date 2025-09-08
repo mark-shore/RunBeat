@@ -44,7 +44,7 @@ class AppState: ObservableObject {
         return activeTrainingMode == .free
     }
 
-    private let hrManager = HeartRateManager()
+    let hrManager = HeartRateManager()
     private let announcer = SpeechAnnouncer()
     private let audioService = AudioService()
     
@@ -184,6 +184,7 @@ class AppState: ObservableObject {
             stopVO2Training()
         }
     }
+    
     
     // LEGACY: Keep for backward compatibility during migration
     func startSession() {
