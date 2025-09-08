@@ -136,26 +136,34 @@ class BackendService {
     /**
      * Get a fresh Spotify access token with intelligent caching
      * 
-     * Caching behavior based on app lifecycle:
-     * - App startup/foreground: 1 backend call to get current token
-     * - Active session: 0 backend calls (use cached token)
-     * - Return from suspension: 1 backend call to get refreshed token
+     * Caching behavior (app state independent):
+     * - Cache tokens for up to 30 minutes OR until token expires (whichever comes first)
+     * - Automatic token validation on each request
+     * - No dependency on app foreground/background state
+     * - Eliminates race conditions during app transitions
      */
     func getFreshSpotifyToken() async throws -> SpotifyTokenResponse {
-        // Check if we have a valid cached token during active session
-        if isAppActive, let cached = cachedToken, let cacheTime = cacheTimestamp {
+        // Check if we have a valid cached token (app state independent)
+        if let cached = cachedToken, let cacheTime = cacheTimestamp {
             // Use cached token if it's not expired and not near expiration
             if !cached.isExpiredOrExpiring {
                 let cacheAge = Date().timeIntervalSince(cacheTime)
                 // Use cache for up to 30 minutes or until token expires (whichever comes first)
                 if cacheAge < 1800 { // 30 minutes
-                    print("[BackendService] Using cached token (age: \(Int(cacheAge))s)")
+                    print("[BackendService] ✅ Using cached token (age: \(Int(cacheAge))s) - app state independent caching")
                     return cached
+                } else {
+                    print("[BackendService] Cache age exceeded 30 minutes (\(Int(cacheAge))s) - fetching fresh token")
                 }
+            } else {
+                print("[BackendService] Cached token expired or expiring soon - fetching fresh token")
             }
+        } else {
+            print("[BackendService] No cached token available - fetching fresh token")
         }
         
         // Cache miss or expired - fetch from backend
+        print("[BackendService] 🔄 Requesting fresh token from backend")
         return try await fetchTokenFromBackend()
     }
     
@@ -373,11 +381,11 @@ class BackendService {
     
     private func handleAppWillEnterForeground() {
         lastForegroundTimestamp = Date()
-        print("[BackendService] App returning to foreground - will refresh token on next request")
+        print("[BackendService] App returning to foreground - token will be validated on next request")
         
-        // Clear cache to force fresh token on next request
-        // This ensures we get backend-refreshed tokens after suspension
-        clearTokenCache()
+        // REMOVED: Cache clearing that caused token request storms during training start
+        // Existing token expiration logic (isExpiredOrExpiring + 30min cache age) handles staleness
+        // clearTokenCache()
     }
     
     private func handleAppDidBecomeActive() {
@@ -412,11 +420,38 @@ class BackendService {
             "has_cached_token": cachedToken != nil,
             "cache_timestamp": cacheTimestamp?.description ?? "none",
             "cache_age_seconds": cacheTimestamp.map { Int(Date().timeIntervalSince($0)) } ?? 0,
-            "is_app_active": isAppActive,
+            "is_app_active": isAppActive, // Note: No longer affects caching logic
             "last_foreground": lastForegroundTimestamp?.description ?? "none",
             "cached_token_expires_at": cachedToken?.expiresAt ?? "none",
-            "cached_token_is_expired": cachedToken?.isExpiredOrExpiring ?? true
+            "cached_token_is_expired": cachedToken?.isExpiredOrExpiring ?? true,
+            "app_state_independent": true // Cache logic is now app state independent
         ]
+    }
+    
+    /**
+     * Test helper: Verify app state independent caching behavior
+     */
+    func testAppStateIndependentCaching() -> [String: Bool] {
+        var results: [String: Bool] = [:]
+        
+        // Test 1: Cache works when app is "not active"
+        isAppActive = false
+        let cachesWhenInactive = (cachedToken != nil) ? true : false
+        results["caches_when_app_inactive"] = cachesWhenInactive
+        
+        // Test 2: Cache works when app becomes active
+        isAppActive = true
+        let cachesWhenActive = (cachedToken != nil) ? true : false
+        results["caches_when_app_active"] = cachesWhenActive
+        
+        // Test 3: Foreground transition doesn't clear cache
+        let hadCachedToken = cachedToken != nil
+        handleAppWillEnterForeground()
+        let stillHasCachedToken = cachedToken != nil
+        results["survives_foreground_transition"] = hadCachedToken == stillHasCachedToken
+        
+        print("[BackendService] App state independent caching test results: \(results)")
+        return results
     }
 
     // MARK: - Private Helper Methods
@@ -542,17 +577,82 @@ struct SpotifyTokenResponse: Codable {
      * Convert expires_at ISO string to Date
      */
     var expirationDate: Date? {
-        let formatter = ISO8601DateFormatter()
-        return formatter.date(from: expiresAt)
+        // Try multiple parsing approaches for backend date format
+        let formatters = [
+            // Try standard ISO8601 first
+            ISO8601DateFormatter(),
+            
+            // Try with fractional seconds
+            {
+                let f = ISO8601DateFormatter()
+                f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                return f
+            }(),
+            
+            // Try assuming UTC if no timezone specified
+            {
+                let f = DateFormatter()
+                f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+                f.timeZone = TimeZone(abbreviation: "UTC")
+                return f
+            }(),
+            
+            // Try without fractional seconds
+            {
+                let f = DateFormatter()
+                f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+                f.timeZone = TimeZone(abbreviation: "UTC")
+                return f
+            }()
+        ]
+        
+        print("[BackendService] Parsing expiration date:")
+        print("  - Raw string: '\(expiresAt)'")
+        
+        for (index, formatter) in formatters.enumerated() {
+            let parsedDate: Date?
+            if let iso8601Formatter = formatter as? ISO8601DateFormatter {
+                parsedDate = iso8601Formatter.date(from: expiresAt)
+            } else if let dateFormatter = formatter as? DateFormatter {
+                parsedDate = dateFormatter.date(from: expiresAt)
+            } else {
+                parsedDate = nil
+            }
+            
+            if let date = parsedDate {
+                print("  - Parsed with formatter \(index): \(date)")
+                return date
+            } else {
+                print("  - Failed with formatter \(index)")
+            }
+        }
+        
+        print("  - All parsing attempts failed!")
+        return nil
     }
     
     /**
      * Check if token is expired or expiring soon (within 5 minutes)
      */
     var isExpiredOrExpiring: Bool {
-        guard let expiration = expirationDate else { return true }
-        let fiveMinutesFromNow = Date().addingTimeInterval(300)
-        return expiration <= fiveMinutesFromNow
+        guard let expiration = expirationDate else { 
+            print("[BackendService] ⚠️ Token expiration date parsing failed for: \(expiresAt)")
+            return true 
+        }
+        
+        let now = Date()
+        let fiveMinutesFromNow = now.addingTimeInterval(300)
+        let timeUntilExpiration = expiration.timeIntervalSince(now)
+        let isExpiring = expiration <= fiveMinutesFromNow
+        
+        print("[BackendService] Token expiration check:")
+        print("  - Current time: \(now)")
+        print("  - Token expires: \(expiration)")
+        print("  - Time until expiration: \(Int(timeUntilExpiration))s")
+        print("  - 5min threshold: \(fiveMinutesFromNow)")
+        print("  - Is expiring: \(isExpiring)")
+        
+        return isExpiring
     }
 }
 

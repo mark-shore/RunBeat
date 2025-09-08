@@ -846,11 +846,11 @@ class SpotifyService: NSObject {
             
             print("🎵 [Intent] Spotify intent: \(oldIntent) → \(intent)")
             
-            // Synchronously update all systems to prevent race conditions
+            // Update systems on main thread to handle UI-related operations
             if Thread.isMainThread {
                 updateSystemsForIntentChange(from: oldIntent, to: intent)
             } else {
-                DispatchQueue.main.sync {
+                DispatchQueue.main.async { [self] in
                     updateSystemsForIntentChange(from: oldIntent, to: intent)
                 }
             }
