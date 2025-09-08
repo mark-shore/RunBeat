@@ -70,7 +70,7 @@ async def store_spotify_tokens(device_id: str, request: SpotifyTokenStoreRequest
         return {
             "success": True,
             "message": "Tokens stored successfully",
-            "expires_at": expires_at.isoformat()
+            "expires_at": expires_at.isoformat() + "Z"
         }
         
     except FirebaseError as e:
@@ -126,7 +126,7 @@ async def get_spotify_token(device_id: str) -> SpotifyTokenResponse:
                 access_token=token_data["access_token"],
                 refresh_token=token_data["refresh_token"],
                 expires_in=expires_in,
-                expires_at=expires_at.isoformat()
+                expires_at=expires_at.isoformat() + "Z"
             )
         
         # Token is expired, refresh it
@@ -239,7 +239,7 @@ async def refresh_spotify_token(request: SpotifyTokenRequest) -> SpotifyTokenRes
             access_token=token_data["access_token"],
             refresh_token=token_data.get("refresh_token"),  # May be None
             expires_in=expires_in,
-            expires_at=expires_at.isoformat()
+            expires_at=expires_at.isoformat() + "Z"
         )
         
         logger.info(

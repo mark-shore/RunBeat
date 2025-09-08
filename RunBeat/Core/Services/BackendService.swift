@@ -577,82 +577,18 @@ struct SpotifyTokenResponse: Codable {
      * Convert expires_at ISO string to Date
      */
     var expirationDate: Date? {
-        // Try multiple parsing approaches for backend date format
-        let formatters = [
-            // Try standard ISO8601 first
-            ISO8601DateFormatter(),
-            
-            // Try with fractional seconds
-            {
-                let f = ISO8601DateFormatter()
-                f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                return f
-            }(),
-            
-            // Try assuming UTC if no timezone specified
-            {
-                let f = DateFormatter()
-                f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
-                f.timeZone = TimeZone(abbreviation: "UTC")
-                return f
-            }(),
-            
-            // Try without fractional seconds
-            {
-                let f = DateFormatter()
-                f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-                f.timeZone = TimeZone(abbreviation: "UTC")
-                return f
-            }()
-        ]
-        
-        print("[BackendService] Parsing expiration date:")
-        print("  - Raw string: '\(expiresAt)'")
-        
-        for (index, formatter) in formatters.enumerated() {
-            let parsedDate: Date?
-            if let iso8601Formatter = formatter as? ISO8601DateFormatter {
-                parsedDate = iso8601Formatter.date(from: expiresAt)
-            } else if let dateFormatter = formatter as? DateFormatter {
-                parsedDate = dateFormatter.date(from: expiresAt)
-            } else {
-                parsedDate = nil
-            }
-            
-            if let date = parsedDate {
-                print("  - Parsed with formatter \(index): \(date)")
-                return date
-            } else {
-                print("  - Failed with formatter \(index)")
-            }
-        }
-        
-        print("  - All parsing attempts failed!")
-        return nil
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: expiresAt)
     }
     
     /**
      * Check if token is expired or expiring soon (within 5 minutes)
      */
     var isExpiredOrExpiring: Bool {
-        guard let expiration = expirationDate else { 
-            print("[BackendService] ⚠️ Token expiration date parsing failed for: \(expiresAt)")
-            return true 
-        }
-        
-        let now = Date()
-        let fiveMinutesFromNow = now.addingTimeInterval(300)
-        let timeUntilExpiration = expiration.timeIntervalSince(now)
-        let isExpiring = expiration <= fiveMinutesFromNow
-        
-        print("[BackendService] Token expiration check:")
-        print("  - Current time: \(now)")
-        print("  - Token expires: \(expiration)")
-        print("  - Time until expiration: \(Int(timeUntilExpiration))s")
-        print("  - 5min threshold: \(fiveMinutesFromNow)")
-        print("  - Is expiring: \(isExpiring)")
-        
-        return isExpiring
+        guard let expiration = expirationDate else { return true }
+        let fiveMinutesFromNow = Date().addingTimeInterval(300)
+        return expiration <= fiveMinutesFromNow
     }
 }
 
