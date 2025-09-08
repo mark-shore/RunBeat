@@ -99,9 +99,9 @@ class SpotifyDataCoordinator: ObservableObject {
             if self.hasDataChanged(current: self.appRemoteData, new: newData) {
                 self.appRemoteData = newData
                 self.consolidateData()
-                print("📊 [DataCoordinator] AppRemote update - Track: '\(name)' by '\(artist)' Playing: \(isPlaying)")
+                AppLogger.playerState("AppRemote update", trackName: name, artist: artist, isPlaying: isPlaying, component: "DataCoordinator")
             } else {
-                print("📊 [DataCoordinator] AppRemote data unchanged, skipping duplicate update")
+                AppLogger.rateLimited(.debug, message: "AppRemote data unchanged, skipping duplicate", key: "appremote_unchanged", component: "DataCoordinator")
             }
         }
     }
@@ -134,9 +134,9 @@ class SpotifyDataCoordinator: ObservableObject {
             if self.hasDataChanged(current: self.webAPIData, new: newData) {
                 self.webAPIData = newData
                 self.consolidateData()
-                print("📊 [DataCoordinator] WebAPI update - Track: '\(name)' by '\(artist)' Playing: \(isPlaying)")
+                AppLogger.playerState("WebAPI update", trackName: name, artist: artist, isPlaying: isPlaying, component: "DataCoordinator")
             } else {
-                print("📊 [DataCoordinator] WebAPI data unchanged, skipping duplicate update")
+                AppLogger.rateLimited(.debug, message: "WebAPI data unchanged, skipping duplicate", key: "webapi_unchanged", component: "DataCoordinator")
             }
         }
     }
@@ -169,9 +169,9 @@ class SpotifyDataCoordinator: ObservableObject {
             if self.hasDataChanged(current: self.optimisticData, new: newData) {
                 self.optimisticData = newData
                 self.consolidateData()
-                print("📊 [DataCoordinator] Optimistic update - Track: '\(name)' by '\(artist)' Playing: \(isPlaying)")
+                AppLogger.playerState("Optimistic update", trackName: name, artist: artist, isPlaying: isPlaying, component: "DataCoordinator")
             } else {
-                print("📊 [DataCoordinator] Optimistic data unchanged, skipping duplicate update")
+                AppLogger.rateLimited(.debug, message: "Optimistic data unchanged, skipping duplicate", key: "optimistic_unchanged", component: "DataCoordinator")
             }
         }
     }
@@ -191,7 +191,7 @@ class SpotifyDataCoordinator: ObservableObject {
             }
             
             self.consolidateData()
-            print("📊 [DataCoordinator] Cleared \(source.rawValue) data source")
+            AppLogger.debug("Cleared \(source.rawValue) data source", component: "DataCoordinator")
         }
     }
     
@@ -205,7 +205,7 @@ class SpotifyDataCoordinator: ObservableObject {
             self.optimisticData = .empty
             self.consolidateData()
             
-            print("📊 [DataCoordinator] Cleared all data sources")
+            AppLogger.debug("Cleared all data sources", component: "DataCoordinator")
         }
     }
     
@@ -240,7 +240,7 @@ class SpotifyDataCoordinator: ObservableObject {
             // Allow periodic updates every 30 seconds even if data is identical
             // This ensures we don't suppress legitimate updates indefinitely
             if timeSinceLastUpdate > 30.0 {
-                print("📊 [DataCoordinator] Allowing periodic update after 30s of identical data")
+                AppLogger.debug("Allowing periodic update after 30s of identical data", component: "DataCoordinator")
                 return true
             }
         }
@@ -267,9 +267,9 @@ class SpotifyDataCoordinator: ObservableObject {
                 self.dataSourceInUse = bestData.source
                 self.lastUpdated = Date()
                 
-                print("📊 [DataCoordinator] Consolidated -> Using \(bestData.source.rawValue) data")
+                AppLogger.debug("Consolidated -> Using \(bestData.source.rawValue) data", component: "DataCoordinator")
                 if !bestData.isEmpty {
-                    print("📊 [DataCoordinator] Final: '\(bestData.name)' by '\(bestData.artist)' Playing: \(bestData.isPlaying)")
+                    AppLogger.playerState("Final consolidated result", trackName: bestData.name, artist: bestData.artist, isPlaying: bestData.isPlaying, component: "DataCoordinator")
                 }
             }
         }
@@ -293,10 +293,10 @@ class SpotifyDataCoordinator: ObservableObject {
         let isConsistent = trackNames.count <= 1 && playingStates.count <= 1
         
         if !isConsistent {
-            print("⚠️ [DataCoordinator] Data inconsistency detected:")
-            for (sourceName, data) in sources {
-                print("  - \(sourceName): '\(data.name)' Playing: \(data.isPlaying)")
-            }
+            let inconsistencies = sources
+                .map { "\($0.0): '\($0.1.name)' Playing: \($0.1.isPlaying)" }
+                .joined(separator: ", ")
+            AppLogger.warn("Data inconsistency detected: \(inconsistencies)", component: "DataCoordinator")
         }
         
         return isConsistent

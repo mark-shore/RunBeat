@@ -1492,11 +1492,8 @@ class SpotifyService: NSObject {
         let fetchType = isInitialWorkoutFetch ? "workout start" : (isValidationFetch ? "validation" : "regular")
         let requestTimestamp = Date()
         
-        print("🔍 [WEB API DEBUG] Starting Web API track fetch")
-        print("🔍 [WEB API DEBUG] Endpoint: \(currentlyPlayingURL.absoluteString)")
-        print("🔍 [WEB API DEBUG] Fetch type: \(fetchType)")
-        print("🔍 [WEB API DEBUG] Request timestamp: \(requestTimestamp)")
-        print("🔍 [WEB API DEBUG] Access token prefix: \(accessToken.prefix(20))...")
+        AppLogger.debug("Starting Web API track fetch (\(fetchType))", component: "WebAPI")
+        AppLogger.verbose("Endpoint: \(currentlyPlayingURL.absoluteString)", component: "WebAPI")
         
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self else { return }
@@ -1504,21 +1501,19 @@ class SpotifyService: NSObject {
             let responseTimestamp = Date()
             let requestDuration = responseTimestamp.timeIntervalSince(requestTimestamp)
             
-            print("🔍 [WEB API DEBUG] Response received after \(String(format: "%.3f", requestDuration))s")
-            print("🔍 [WEB API DEBUG] Response timestamp: \(responseTimestamp)")
+            AppLogger.debug("Response received after \(String(format: "%.3f", requestDuration))s", component: "WebAPI")
             
             if let error = error {
-                print("❌ [WEB API DEBUG] Network error: \(error)")
+                AppLogger.error("Network error: \(error)", component: "WebAPI")
                 return
             }
             
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("❌ [WEB API DEBUG] Invalid response from currently-playing API")
+                AppLogger.error("Invalid response from currently-playing API", component: "WebAPI")
                 return
             }
             
-            print("🔍 [WEB API DEBUG] HTTP Status: \(httpResponse.statusCode)")
-            print("🔍 [WEB API DEBUG] Response Headers:")
+            AppLogger.apiResponse("Currently-playing API response", statusCode: httpResponse.statusCode, dataSize: data?.count, component: "WebAPI")
             for (key, value) in httpResponse.allHeaderFields {
                 print("  \(key): \(value)")
             }
@@ -1526,16 +1521,16 @@ class SpotifyService: NSObject {
             switch httpResponse.statusCode {
             case 200:
                 if let data = data {
-                    print("🔍 [WEB API DEBUG] Response data size: \(data.count) bytes")
+                    AppLogger.debug("Response data size: \(data.count) bytes", component: "WebAPI")
                     self.parseCurrentlyPlayingResponseWithDebug(data, requestTimestamp: requestTimestamp, responseTimestamp: responseTimestamp)
                 } else {
-                    print("❌ [WEB API DEBUG] No data in currently-playing response")
+                    AppLogger.warn("No data in currently-playing response", component: "WebAPI")
                 }
             case 204:
-                print("ℹ️ [WEB API DEBUG] No music currently playing (204 response)")
+                AppLogger.info("No music currently playing (204 response)", component: "WebAPI")
                 self.notifyPlayerStateChange(isPlaying: false, trackName: "", artistName: "", artworkURL: "")
             case 401:
-                print("❌ [WEB API DEBUG] Unauthorized - access token expired, attempting refresh")
+                AppLogger.warn("Unauthorized - access token expired, attempting refresh", component: "WebAPI")
                 // Use new training-state-aware error recovery system
                 let recoverableError = SpotifyRecoverableError.tokenExpired
                 let context = ErrorContext(
@@ -1567,11 +1562,11 @@ class SpotifyService: NSObject {
                     self.handleTokenExpired()
                 }
             case 429:
-                print("❌ [WEB API DEBUG] Rate limited - will retry later")
+                AppLogger.warn("Rate limited - will retry later", component: "WebAPI")
             default:
-                print("❌ [WEB API DEBUG] API Error - Status: \(httpResponse.statusCode)")
+                AppLogger.error("API Error - Status: \(httpResponse.statusCode)", component: "WebAPI")
                 if let data = data, let errorString = String(data: data, encoding: .utf8) {
-                    print("❌ [WEB API DEBUG] Error response body: \(errorString)")
+                    AppLogger.error("Error response body: \(errorString)", component: "WebAPI")
                 }
             }
         }.resume()
@@ -1581,24 +1576,15 @@ class SpotifyService: NSObject {
         do {
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 
-                // Log the complete API response
-                print("🔍 [WEB API DEBUG] Complete API Response JSON:")
-                if let jsonData = try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted),
-                   let prettyString = String(data: jsonData, encoding: .utf8) {
-                    print(prettyString)
-                } else {
-                    print("Could not pretty-print JSON")
-                }
+                // Log complete JSON only at verbose level for debugging
+                AppLogger.verbose("Complete API Response JSON: \(String(data: try! JSONSerialization.data(withJSONObject: json), encoding: .utf8) ?? "N/A")", component: "WebAPI")
                 
                 // Extract timing information
                 let timestamp = json["timestamp"] as? Int64
                 let progressMs = json["progress_ms"] as? Int
                 let isPlaying = json["is_playing"] as? Bool ?? false
                 
-                print("🔍 [WEB API DEBUG] Playback State:")
-                print("  - Is Playing: \(isPlaying)")
-                print("  - Progress (ms): \(progressMs ?? -1)")
-                print("  - Spotify Timestamp: \(timestamp ?? -1)")
+                AppLogger.debug("Playback state: \(isPlaying ? "▶️" : "⏸️") Progress: \(progressMs ?? -1)ms", component: "WebAPI")
                 
                 // Extract device information
                 if let device = json["device"] as? [String: Any] {
@@ -1610,14 +1596,7 @@ class SpotifyService: NSObject {
                     let isRestricted = device["is_restricted"] as? Bool ?? false
                     let volumePercent = device["volume_percent"] as? Int ?? -1
                     
-                    print("🔍 [WEB API DEBUG] Device Information:")
-                    print("  - Device ID: \(deviceId)")
-                    print("  - Device Name: \(deviceName)")
-                    print("  - Device Type: \(deviceType)")
-                    print("  - Is Active: \(isActive)")
-                    print("  - Is Private Session: \(isPrivateSession)")
-                    print("  - Is Restricted: \(isRestricted)")
-                    print("  - Volume: \(volumePercent)%")
+                    AppLogger.debug("Device: \(deviceName) (\(deviceType)) Active: \(isActive) Vol: \(volumePercent)%", component: "WebAPI")
                 }
                 
                 // Extract context information
@@ -1627,10 +1606,7 @@ class SpotifyService: NSObject {
                     let externalUrls = context["external_urls"] as? [String: Any]
                     let spotifyUrl = externalUrls?["spotify"] as? String ?? ""
                     
-                    print("🔍 [WEB API DEBUG] Context Information:")
-                    print("  - Context Type: \(contextType)")
-                    print("  - Context URI: \(contextUri)")
-                    print("  - Spotify URL: \(spotifyUrl)")
+                    AppLogger.debug("Context: \(contextType) URI: \(contextUri)", component: "WebAPI")
                 }
                 
                 if let item = json["item"] as? [String: Any] {
@@ -1641,25 +1617,13 @@ class SpotifyService: NSObject {
                     let popularity = item["popularity"] as? Int ?? 0
                     let explicit = item["explicit"] as? Bool ?? false
                     
-                    print("🔍 [WEB API DEBUG] Track Information:")
-                    print("  - Track Name: '\(trackName)'")
-                    print("  - Track ID: \(trackId)")
-                    print("  - Track URI: \(trackUri)")
-                    print("  - Duration (ms): \(durationMs)")
-                    print("  - Popularity: \(popularity)")
-                    print("  - Explicit: \(explicit)")
+                    AppLogger.debug("Track: '\(trackName)' Duration: \(durationMs)ms", component: "WebAPI")
                     
                     // Get artist name(s) with detailed info
                     var artistName = ""
                     if let artists = item["artists"] as? [[String: Any]], !artists.isEmpty {
-                        print("🔍 [WEB API DEBUG] Artist Information:")
-                        for (index, artist) in artists.enumerated() {
-                            let name = artist["name"] as? String ?? ""
-                            let id = artist["id"] as? String ?? ""
-                            let uri = artist["uri"] as? String ?? ""
-                            print("  - Artist \(index + 1): '\(name)' (ID: \(id), URI: \(uri))")
-                        }
                         let artistNames = artists.compactMap { $0["name"] as? String }
+                        AppLogger.debug("Artists: \(artistNames.joined(separator: ", "))", component: "WebAPI")
                         artistName = artistNames.joined(separator: ", ")
                     }
                     
@@ -1671,20 +1635,10 @@ class SpotifyService: NSObject {
                         let albumType = album["album_type"] as? String ?? ""
                         let releaseDate = album["release_date"] as? String ?? ""
                         
-                        print("🔍 [WEB API DEBUG] Album Information:")
-                        print("  - Album Name: '\(albumName)'")
-                        print("  - Album ID: \(albumId)")
-                        print("  - Album Type: \(albumType)")
-                        print("  - Release Date: \(releaseDate)")
+                        AppLogger.debug("Album: '\(albumName)' (\(albumType)) Released: \(releaseDate)", component: "WebAPI")
                         
                         if let images = album["images"] as? [[String: Any]], !images.isEmpty {
-                            print("🔍 [WEB API DEBUG] Album Images (\(images.count) available):")
-                            for (index, image) in images.enumerated() {
-                                let url = image["url"] as? String ?? ""
-                                let width = image["width"] as? Int ?? 0
-                                let height = image["height"] as? Int ?? 0
-                                print("  - Image \(index + 1): \(width)x\(height) - \(url)")
-                            }
+                            AppLogger.verbose("Album has \(images.count) artwork images available", component: "WebAPI")
                             
                             // Get the smallest image (usually 64x64) for efficiency
                             let sortedImages = images.sorted { (img1, img2) in
@@ -1693,7 +1647,7 @@ class SpotifyService: NSObject {
                                 return height1 < height2
                             }
                             artworkURL = sortedImages.first?["url"] as? String ?? ""
-                            print("🔍 [WEB API DEBUG] Selected artwork URL: \(artworkURL)")
+                            AppLogger.debug("Selected artwork URL: \(artworkURL)", component: "WebAPI")
                         }
                     }
                     
@@ -1701,20 +1655,9 @@ class SpotifyService: NSObject {
                     let timeSinceRequest = Date().timeIntervalSince(requestTimestamp)
                     let timeSinceResponse = Date().timeIntervalSince(responseTimestamp)
                     
-                    print("🔍 [WEB API DEBUG] Timing Analysis:")
-                    print("  - Time since request started: \(String(format: "%.3f", timeSinceRequest))s")
-                    print("  - Time since response received: \(String(format: "%.3f", timeSinceResponse))s")
-                    if let timestamp = timestamp {
-                        let spotifyTimestamp = Date(timeIntervalSince1970: TimeInterval(timestamp) / 1000.0)
-                        let timeSinceSpotifyTimestamp = Date().timeIntervalSince(spotifyTimestamp)
-                        print("  - Time since Spotify timestamp: \(String(format: "%.3f", timeSinceSpotifyTimestamp))s")
-                    }
+                    AppLogger.verbose("Timing: Request took \(String(format: "%.3f", timeSinceRequest))s, processed in \(String(format: "%.3f", timeSinceResponse))s", component: "WebAPI")
                     
-                    print("✅ [WEB API DEBUG] Final parsed Web API track data:")
-                    print("  - Track: '\(trackName)'")
-                    print("  - Artist: '\(artistName)'")
-                    print("  - Playing: \(isPlaying)")
-                    print("  - Artwork: '\(artworkURL)'")
+                    AppLogger.playerState("WebAPI parsed track data", trackName: trackName, artist: artistName, isPlaying: isPlaying, component: "WebAPI")
                     
                     // Track the last fetched track for stale data detection
                     self.lastFetchedTrackName = trackName
@@ -1725,13 +1668,13 @@ class SpotifyService: NSObject {
                     // Check data source prioritization before updating UI
                     self.handleWebAPITrackData(isPlaying: isPlaying, trackName: trackName, artistName: artistName, artworkURL: displayableArtworkURL)
                 } else {
-                    print("ℹ️ [WEB API DEBUG] No track item in currently-playing response")
+                    AppLogger.debug("No track item in currently-playing response", component: "WebAPI")
                     // Only update UI with "no music" if AppRemote is not providing data
                     self.handleWebAPITrackData(isPlaying: false, trackName: "", artistName: "", artworkURL: "")
                 }
             }
         } catch {
-            print("❌ [WEB API DEBUG] Error parsing currently-playing response: \(error)")
+            AppLogger.error("Error parsing currently-playing response: \(error)", component: "WebAPI")
         }
     }
     
@@ -2023,22 +1966,18 @@ class SpotifyService: NSObject {
             let hash = String(artworkString.dropFirst("spotify:image:".count))
             let convertedURL = "https://i.scdn.co/image/\(hash)"
             
-            print("🖼️ [IMAGE CONVERSION] Spotify identifier → URL:")
-            print("  - Original: '\(artworkString)'")
-            print("  - Converted: '\(convertedURL)'")
+            AppLogger.rateLimited(.debug, message: "Spotify identifier → URL: \(artworkString) → \(convertedURL)", key: "image_convert_\(hash)", component: "ImageConvert")
             
             return convertedURL
         } else if artworkString.hasPrefix("https://") || artworkString.hasPrefix("http://") {
             // Already a full URL - return as-is
-            print("🖼️ [IMAGE CONVERSION] Already a URL: '\(artworkString)'")
+            AppLogger.rateLimited(.debug, message: "Already a URL: \(artworkString)", key: "image_already_url", component: "ImageConvert")
             return artworkString
         } else {
             // Assume it's just a hash without prefix (AppRemote sometimes provides just the hash)
             let convertedURL = "https://i.scdn.co/image/\(artworkString)"
             
-            print("🖼️ [IMAGE CONVERSION] Hash → URL:")
-            print("  - Original: '\(artworkString)'")  
-            print("  - Converted: '\(convertedURL)'")
+            AppLogger.rateLimited(.debug, message: "Hash → URL: \(artworkString) → \(convertedURL)", key: "image_convert_hash_\(artworkString)", component: "ImageConvert")
             
             return convertedURL
         }
@@ -2081,11 +2020,7 @@ class SpotifyService: NSObject {
     }
     
     private func notifyPlayerStateChange(isPlaying: Bool, trackName: String, artistName: String = "", artworkURL: String = "") {
-        print("🎵 [SpotifyService] Notifying delegate with player state:")
-        print("  - Track: '\(trackName)'")
-        print("  - Artist: '\(artistName)'")
-        print("  - Artwork: '\(artworkURL)'")
-        print("  - Playing: \(isPlaying)")
+        AppLogger.playerState("Player state change", trackName: trackName, artist: artistName, isPlaying: isPlaying, component: "Spotify")
         
         delegate?.spotifyServicePlayerStateDidChange(isPlaying: isPlaying, trackName: trackName, artistName: artistName, artworkURL: artworkURL)
     }
@@ -2427,23 +2362,23 @@ extension SpotifyService: SPTAppRemoteDelegate {
         if appRemoteSubscriptionID == nil {
             appRemote.playerAPI?.subscribe(toPlayerState: { [weak self] (result, error) in
                 if let error = error {
-                    print("Error subscribing to player state: \(error)")
+                    AppLogger.error("Error subscribing to player state: \(error)", component: "Spotify")
                 } else {
-                    print("✅ Successfully subscribed to player state updates")
+                    AppLogger.info("Successfully subscribed to player state updates", component: "Spotify")
                     // Store subscription ID to prevent duplicates
                     self?.appRemoteSubscriptionID = result
                 }
             })
         } else {
-            print("📊 [AppRemote] Already subscribed to player state, skipping duplicate subscription")
+            AppLogger.debug("Already subscribed to player state, skipping duplicate subscription", component: "Spotify")
         }
         
         // Also get current player state immediately
         appRemote.playerAPI?.getPlayerState { (playerState, error) in
             if let error = error {
-                print("Error getting initial player state: \(error)")
+                AppLogger.error("Error getting initial player state: \(error)", component: "Spotify")
             } else if let playerState = playerState as? SPTAppRemotePlayerState {
-                print("🎵 Got initial player state")
+                AppLogger.debug("Got initial player state", component: "Spotify")
                 self.playerStateDidChange(playerState)
             }
         }
@@ -2555,16 +2490,11 @@ extension SpotifyService: SPTAppRemotePlayerStateDelegate {
         let imageIdentifier = playerState.track.imageIdentifier
         let artworkURL = convertToDisplayableImageURL(imageIdentifier)
         
-        print("🎵 [APPREMOTE DEBUG] Player state changed at \(timestamp)")
-        print("🎵 [APPREMOTE DEBUG] Track Details:")
-        print("  - Track Name: '\(trackName)'")
-        print("  - Artist Name: '\(artistName)'")  
-        print("  - Track URI: \(trackURI)")
-        print("  - Duration: \(duration)ms")
-        print("  - Playback Position: \(playbackPosition)ms")
-        print("  - Is Playing: \(isPlaying)")
-        print("  - Image Identifier: \(imageIdentifier)")
-        print("  - Artwork URL: \(artworkURL)")
+        // Log detailed track info only at verbose level
+        AppLogger.verbose("AppRemote player state: \(trackName) - \(artistName) [\(isPlaying ? "▶️" : "⏸️")] URI: \(trackURI)", component: "Spotify")
+        
+        // Use specialized player state logging for track changes
+        AppLogger.playerState("AppRemote update", trackName: trackName, artist: artistName, isPlaying: isPlaying, component: "Spotify")
         
         // AppRemote data is always prioritized as the authoritative source
         // Update data coordinator with AppRemote data

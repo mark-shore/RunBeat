@@ -73,9 +73,9 @@ class BackendService {
         
         self.activeBaseURL = fallbackEndpoints[0]
         
-        print("[BackendService] Initialized with device ID: \(deviceID)")
-        print("[BackendService] Primary endpoint: \(activeBaseURL)")
-        print("[BackendService] Fallback endpoints: \(fallbackEndpoints)")
+        AppLogger.info("Initialized with device ID: \(deviceID)", component: "Backend")
+        AppLogger.info("Primary endpoint: \(activeBaseURL)", component: "Backend")
+        AppLogger.debug("Fallback endpoints: \(fallbackEndpoints)", component: "Backend")
         
         // Set up app lifecycle observers
         setupAppLifecycleObservers()
@@ -109,18 +109,18 @@ class BackendService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         
-        print("[BackendService] Storing tokens for device \(deviceID)")
+        AppLogger.debug("Storing tokens for device \(deviceID)", component: "Backend")
         
         do {
             let (data, response) = try await performRequest(request)
             
             if let httpResponse = response as? HTTPURLResponse {
                 if httpResponse.statusCode == 200 {
-                    print("[BackendService] Tokens stored successfully")
+                    AppLogger.info("Tokens stored successfully", component: "Backend")
                     
                     // Parse response for confirmation
                     if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                        print("[BackendService] Server response: \(json)")
+                        AppLogger.verbose("Server response: \(json)", component: "Backend")
                     }
                 } else {
                     let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error"
@@ -128,7 +128,7 @@ class BackendService {
                 }
             }
         } catch {
-            print("[BackendService] Failed to store tokens: \(error)")
+            AppLogger.error("Failed to store tokens: \(error)", component: "Backend")
             throw BackendError.networkError(error)
         }
     }
@@ -150,20 +150,20 @@ class BackendService {
                 let cacheAge = Date().timeIntervalSince(cacheTime)
                 // Use cache for up to 30 minutes or until token expires (whichever comes first)
                 if cacheAge < 1800 { // 30 minutes
-                    print("[BackendService] ✅ Using cached token (age: \(Int(cacheAge))s) - app state independent caching")
+                    AppLogger.rateLimited(.info, message: "Using cached token (age: \(Int(cacheAge))s)", key: "cached_token_use", component: "Backend")
                     return cached
                 } else {
-                    print("[BackendService] Cache age exceeded 30 minutes (\(Int(cacheAge))s) - fetching fresh token")
+                    AppLogger.debug("Cache age exceeded 30 minutes (\(Int(cacheAge))s) - fetching fresh token", component: "Backend")
                 }
             } else {
-                print("[BackendService] Cached token expired or expiring soon - fetching fresh token")
+                AppLogger.debug("Cached token expired or expiring soon - fetching fresh token", component: "Backend")
             }
         } else {
-            print("[BackendService] No cached token available - fetching fresh token")
+            AppLogger.debug("No cached token available - fetching fresh token", component: "Backend")
         }
         
         // Cache miss or expired - fetch from backend
-        print("[BackendService] 🔄 Requesting fresh token from backend")
+        AppLogger.info("Requesting fresh token from backend", component: "Backend")
         return try await fetchTokenFromBackend()
     }
     
@@ -176,7 +176,7 @@ class BackendService {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         
-        print("[BackendService] Requesting fresh token for device \(deviceID)")
+        AppLogger.debug("Requesting fresh token for device \(deviceID)", component: "Backend")
         
         do {
             let (data, response) = try await performRequest(request)
@@ -189,7 +189,7 @@ class BackendService {
                     cachedToken = tokenResponse
                     cacheTimestamp = Date()
                     
-                    print("[BackendService] Fresh token received and cached, expires at: \(tokenResponse.expiresAt)")
+                    AppLogger.info("Fresh token received and cached, expires at: \(tokenResponse.expiresAt)", component: "Backend")
                     return tokenResponse
                 } else if httpResponse.statusCode == 404 {
                     // Clear cache on 404
@@ -205,7 +205,7 @@ class BackendService {
         } catch let error as BackendError {
             throw error
         } catch {
-            print("[BackendService] Failed to get fresh token: \(error)")
+            AppLogger.error("Failed to get fresh token: \(error)", component: "Backend")
             throw BackendError.networkError(error)
         }
     }
@@ -219,21 +219,21 @@ class BackendService {
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         
-        print("[BackendService] Deleting tokens for device \(deviceID)")
+        AppLogger.info("Deleting tokens for device \(deviceID)", component: "Backend")
         
         do {
             let (data, response) = try await performRequest(request)
             
             if let httpResponse = response as? HTTPURLResponse {
                 if httpResponse.statusCode == 200 {
-                    print("[BackendService] Tokens deleted successfully")
+                    AppLogger.info("Tokens deleted successfully", component: "Backend")
                 } else {
                     let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error"
                     throw BackendError.httpError(httpResponse.statusCode, errorMsg)
                 }
             }
         } catch {
-            print("[BackendService] Failed to delete tokens: \(error)")
+            AppLogger.error("Failed to delete tokens: \(error)", component: "Backend")
             throw BackendError.networkError(error)
         }
         
@@ -259,7 +259,7 @@ class BackendService {
             }
             return false
         } catch {
-            print("[BackendService] Health check failed: \(error)")
+            AppLogger.debug("Health check failed: \(error)", component: "Backend")
             return false
         }
     }
@@ -270,7 +270,7 @@ class BackendService {
      * Test connectivity to all endpoints and select the best one
      */
     private func testConnectivity() async {
-        print("[BackendService] Testing connectivity to \(fallbackEndpoints.count) endpoints...")
+        AppLogger.info("Testing connectivity to \(fallbackEndpoints.count) endpoints", component: "Backend")
         
         for (index, endpoint) in fallbackEndpoints.enumerated() {
             let healthURL = URL(string: "\(endpoint)/api/v1/health")!
@@ -281,16 +281,16 @@ class BackendService {
             do {
                 let (_, response) = try await session.data(for: request)
                 if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                    print("[BackendService] ✅ Connectivity test successful: \(endpoint)")
+                    AppLogger.info("Connectivity test successful: \(endpoint)", component: "Backend")
                     await switchToEndpoint(index)
                     return
                 }
             } catch {
-                print("[BackendService] ❌ Connectivity test failed for \(endpoint): \(error.localizedDescription)")
+                AppLogger.debug("Connectivity test failed for \(endpoint): \(error.localizedDescription)", component: "Backend")
             }
         }
         
-        print("[BackendService] ⚠️ No endpoints are reachable, using primary: \(activeBaseURL)")
+        AppLogger.warn("No endpoints are reachable, using primary: \(activeBaseURL)", component: "Backend")
     }
     
     /**
@@ -302,7 +302,7 @@ class BackendService {
         
         let newEndpoint = fallbackEndpoints[index]
         if newEndpoint != activeBaseURL {
-            print("[BackendService] 🔄 Switching from \(activeBaseURL) to \(newEndpoint)")
+            AppLogger.info("Switching from \(activeBaseURL) to \(newEndpoint)", component: "Backend")
             activeBaseURL = newEndpoint
             currentEndpointIndex = index
         }
@@ -319,7 +319,7 @@ class BackendService {
         }
         
         let nextEndpoint = fallbackEndpoints[nextIndex]
-        print("[BackendService] 🔄 Trying next endpoint: \(nextEndpoint)")
+        AppLogger.debug("Trying next endpoint: \(nextEndpoint)", component: "Backend")
         
         // Quick health check on the next endpoint
         let healthURL = URL(string: "\(nextEndpoint)/api/v1/health")!
@@ -334,7 +334,7 @@ class BackendService {
                 return true
             }
         } catch {
-            print("[BackendService] ❌ Next endpoint \(nextEndpoint) also failed: \(error.localizedDescription)")
+            AppLogger.debug("Next endpoint \(nextEndpoint) also failed: \(error.localizedDescription)", component: "Backend")
         }
         
         return false
@@ -376,12 +376,12 @@ class BackendService {
     
     private func handleAppDidEnterBackground() {
         isAppActive = false
-        print("[BackendService] App entered background - token cache will be validated on foreground")
+        AppLogger.debug("App entered background - token cache will be validated on foreground", component: "Backend")
     }
     
     private func handleAppWillEnterForeground() {
         lastForegroundTimestamp = Date()
-        print("[BackendService] App returning to foreground - token will be validated on next request")
+        AppLogger.debug("App returning to foreground - token will be validated on next request", component: "Backend")
         
         // REMOVED: Cache clearing that caused token request storms during training start
         // Existing token expiration logic (isExpiredOrExpiring + 30min cache age) handles staleness
@@ -390,7 +390,7 @@ class BackendService {
     
     private func handleAppDidBecomeActive() {
         isAppActive = true
-        print("[BackendService] App became active - caching enabled")
+        AppLogger.debug("App became active - caching enabled", component: "Backend")
     }
     
     /**
@@ -399,7 +399,7 @@ class BackendService {
     private func clearTokenCache() {
         cachedToken = nil
         cacheTimestamp = nil
-        print("[BackendService] Token cache cleared")
+        AppLogger.debug("Token cache cleared", component: "Backend")
     }
     
     // MARK: - Cache Management
@@ -409,7 +409,7 @@ class BackendService {
      */
     func invalidateTokenCache() {
         clearTokenCache()
-        print("[BackendService] Token cache manually invalidated")
+        AppLogger.debug("Token cache manually invalidated", component: "Backend")
     }
     
     /**
@@ -450,7 +450,7 @@ class BackendService {
         let stillHasCachedToken = cachedToken != nil
         results["survives_foreground_transition"] = hadCachedToken == stillHasCachedToken
         
-        print("[BackendService] App state independent caching test results: \(results)")
+        AppLogger.verbose("App state independent caching test results: \(results)", component: "Backend")
         return results
     }
 
@@ -468,32 +468,32 @@ class BackendService {
             let activeRequest = createRequestWithActiveURL(from: request)
             
             do {
-                print("[BackendService] Attempt \(attempt)/\(maxRetries) on \(activeBaseURL): \(activeRequest.httpMethod ?? "GET") \(activeRequest.url?.path ?? "")")
+                AppLogger.debug("Attempt \(attempt)/\(maxRetries) on \(activeBaseURL): \(activeRequest.httpMethod ?? "GET") \(activeRequest.url?.path ?? "")", component: "Backend")
                 
                 let (data, response) = try await session.data(for: activeRequest)
                 
                 // Check for successful response
                 if let httpResponse = response as? HTTPURLResponse {
                     if httpResponse.statusCode < 400 {
-                        print("[BackendService] ✅ Request successful on \(activeBaseURL)")
+                        AppLogger.debug("Request successful on \(activeBaseURL)", component: "Backend")
                         return (data, response)
                     } else {
-                        print("[BackendService] ❌ HTTP error \(httpResponse.statusCode) on \(activeBaseURL)")
+                        AppLogger.warn("HTTP error \(httpResponse.statusCode) on \(activeBaseURL)", component: "Backend")
                         lastError = BackendError.httpError(httpResponse.statusCode)
                     }
                 }
                 
             } catch {
                 lastError = error
-                print("[BackendService] ❌ Network error on \(activeBaseURL): \(error.localizedDescription)")
+                AppLogger.debug("Network error on \(activeBaseURL): \(error.localizedDescription)", component: "Backend")
                 
                 // Check if this looks like a connectivity issue
                 if isConnectivityError(error) {
-                    print("[BackendService] 🔄 Connectivity issue detected, trying endpoint fallback...")
+                    AppLogger.info("Connectivity issue detected, trying endpoint fallback", component: "Backend")
                     
                     // Try next endpoint
                     if await tryNextEndpoint() {
-                        print("[BackendService] ✅ Switched to working endpoint, retrying request...")
+                        AppLogger.info("Switched to working endpoint, retrying request", component: "Backend")
                         continue  // Retry with new endpoint
                     }
                 }
