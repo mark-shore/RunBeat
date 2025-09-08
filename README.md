@@ -67,6 +67,7 @@ RunBeat/
 │   │   ├── ZoneAnnouncementCoordinator.swift # Per-training-mode announcement management
 │   │   ├── BackendService.swift   # FastAPI backend integration with intelligent caching
 │   │   ├── DeviceIDManager.swift  # Device identification for backend communication
+│   │   ├── AppLogger.swift        # Centralized logging system with rate limiting
 │   │   └── FirebaseService.swift  # Firebase integration (legacy)
 │   ├── Models/                    # Data models
 │   └── Utils/                     # Utility classes
@@ -347,13 +348,18 @@ VO2MaxTrainingManager ─┘
 ## Known Issues & Planned Improvements
 
 ### Current Issues
-1. **Spotify Token Management**: Client-only OAuth creates UX friction - backend service planned to resolve
-2. **Heart Rate Display**: Live BPM not visible on main training screens
+1. **Heart Rate Display**: Live BPM not visible on main training screens
+2. **User Onboarding**: Could be more guided for new users
 
-### Planned Improvements
-1. **Backend Service**: Add backend to handle Spotify OAuth and token management 
-2. **Live Heart Rate Display**: Add current BPM to active training cards
-3. **Training History**: Add workout history and statistics tracking with Firebase integration
+### Recently Resolved (2025)
+1. ✅ **Backend Service**: Implemented FastAPI backend with intelligent token caching and Railway deployment
+2. ✅ **Spotify Token Management**: Fixed token expiration and playlist restart issues with centralized refresh system
+3. ✅ **Logging System**: Replaced 642+ print statements with structured AppLogger featuring rate limiting and environment-aware levels
+
+### Planned Improvements  
+1. **Live Heart Rate Display**: Add current BPM to active training cards
+2. **Training History**: Add workout history and statistics tracking with Firebase integration
+3. **Apple Music Integration**: Consider adding as alternative to Spotify
 4. **Audio Settings**: Make announcement settings more accessible
 5. **Onboarding Flow**: Guide new users through HR zone setup
 
@@ -445,7 +451,9 @@ VO2MaxTrainingManager ─┘
 
 ### Debug Tips
 - Use Xcode's Debug Navigator to monitor background tasks
-- Check Console app for background execution logs
+- Check Console app for background execution logs using structured AppLogger output
+- Monitor log levels: ERROR (issues), WARN (recoverable), INFO (key events), DEBUG/VERBOSE (development)
+- Use AppLogger's rate limiting to reduce log spam from repetitive operations
 - Verify entitlements and Info.plist configuration
 - Test on physical device (background modes don't work in simulator)
 - Force-quit app after deployment to clear development state

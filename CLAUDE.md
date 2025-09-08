@@ -52,6 +52,7 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - `AudioService.swift`: Audio session and volume management
 - `BackendService.swift`: FastAPI backend integration with intelligent token caching
 - `DeviceIDManager.swift`: Consistent device identification for backend communication
+- `AppLogger.swift`: Centralized logging system with rate limiting and structured output
 
 #### Free Training Module (`Features/FreeTraining/`)
 - `FreeTrainingManager.swift`: Simple background HR monitoring with announcements (replaces legacy HeartRateTrainingManager)
@@ -146,6 +147,7 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - ✅ **Music Recovery After Reconnection**: Fixed with automatic Spotify reconnection observers
 - ✅ **Playlist Restart Interruptions**: Fixed automatic playlist restarts when switching between apps
 - ✅ **Backend Service Integration**: Implemented FastAPI backend with intelligent token caching and Railway deployment
+- ✅ **Logging System Overhaul**: Replaced 642+ print statements with structured AppLogger system featuring rate limiting and environment-aware log levels
 
 ### Current Areas for Improvement
 - Live BPM not displayed during training screens
@@ -153,12 +155,20 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - Apple Music integration not available (Spotify-only currently)
 - Training analytics and workout history tracking
 
+### Logging Guidelines
+- **Use AppLogger instead of print()**: All logging should use `AppLogger` with appropriate log levels
+- **Log Levels**: ERROR (production issues), WARN (recoverable issues), INFO (key events), DEBUG (development info), VERBOSE (detailed debugging)
+- **Rate Limiting**: AppLogger automatically prevents spam with 5-second rate limiting windows
+- **Specialized Methods**: Use `AppLogger.playerState()` for Spotify state, `AppLogger.apiResponse()` for API calls
+- **Environment Aware**: Production defaults to INFO level, debug builds use VERBOSE
+
 ### Development Rules
 - Never modify `HeartRateManager`'s core Bluetooth logic
 - Preserve all background execution functionality (working reliably)
 - Keep audio announcement timing unchanged
 - **Spotify Architecture**: Recent improvements to token management and error handling - architecture is stable
 - **Token Management**: Use `makeAuthenticatedAPICall()` for new Spotify API calls to get automatic token refresh
+- **Logging**: Use `AppLogger` instead of `print()` statements for all new code
 - Test on physical device for realistic behavior
 - Use design system components consistently
 
@@ -211,3 +221,25 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
    - Maintained legitimate playlist changes during training phase transitions
 
 **Technical Implementation**: Backend handles token refresh automatically while users sleep/suspend app, iOS requests fresh tokens only when needed, eliminating redundant API calls and playlist interruptions.
+
+### Logging System Implementation (2025)
+
+**Problem Solved**: Unstructured print statements created noise in development and production, making debugging difficult.
+
+**Solutions Implemented**:
+1. **Centralized AppLogger System** (`Core/Services/AppLogger.swift`)
+   - Structured log levels: ERROR, WARN, INFO, DEBUG, VERBOSE
+   - Environment-aware defaults (INFO in production, VERBOSE in debug)
+   - Thread-safe implementation with proper queuing
+
+2. **Automatic Rate Limiting**
+   - Prevents duplicate logs within 5-second windows
+   - Shows "...repeated X times" counters for suppressed logs
+   - Eliminates spam from repetitive operations
+
+3. **Specialized Logging Methods**
+   - `playerState()`: Consolidates Spotify track/artist/playing status with deduplication
+   - `apiResponse()`: Concise API summaries instead of full JSON dumps
+   - `rateLimited()`: Built-in spam prevention for high-frequency events
+
+**Impact**: Replaced 642+ print statements across 21 files with clean, structured logging that adapts between development (verbose) and production (clean) environments while maintaining all critical debugging information.
