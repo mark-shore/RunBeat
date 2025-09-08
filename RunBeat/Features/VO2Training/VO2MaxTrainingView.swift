@@ -12,11 +12,9 @@ struct VO2MaxTrainingView: View {
     // ✅ View only talks to coordination layer - no direct manager access
     @StateObject private var spotifyViewModel = SpotifyViewModel.shared
     @EnvironmentObject var appState: AppState
-    @Environment(\.dismiss) private var dismiss
     @State private var showingPlaylistSelection = false
     
     var body: some View {
-        NavigationView {
             ZStack {
                 // Dark background
                 AppColors.background
@@ -118,16 +116,16 @@ struct VO2MaxTrainingView: View {
                 .padding(.horizontal, 12) // Reduced horizontal padding for wider cards
                 .padding(.vertical, AppSpacing.screenMargin)
             }
+            .navigationTitle("VO₂ Max Training")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(appState.vo2TrainingState == .active)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
+                if appState.vo2TrainingState != .active {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Text("") // Empty toolbar item when not training
                     }
-                    .foregroundColor(AppColors.onBackground)
                 }
             }
-        }
         .sheet(isPresented: $showingPlaylistSelection) {
             PlaylistSelectionView()
         }

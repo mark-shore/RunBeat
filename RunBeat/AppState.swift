@@ -170,12 +170,19 @@ class AppState: ObservableObject {
         guard activeTrainingMode == .vo2Max else { return }
         
         Task { @MainActor in
-            vo2TrainingManager.stopTraining()
+            vo2TrainingManager.endTraining()
         }
         hrManager.stopMonitoring()
         audioService.deactivateAudioSession()
         activeTrainingMode = .none
         print("⏹️ VO2 Max training mode stopped")
+    }
+    
+    /// Simplified cleanup method for consistent termination
+    func cleanupVO2Training() {
+        if activeTrainingMode == .vo2Max {
+            stopVO2Training()
+        }
     }
     
     // LEGACY: Keep for backward compatibility during migration

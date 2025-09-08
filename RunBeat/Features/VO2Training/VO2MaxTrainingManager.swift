@@ -140,10 +140,10 @@ class VO2MaxTrainingManager: ObservableObject {
         }
     }
     
-    /// Stops the training session and returns to setup state
+    /// Ends the training session and returns to setup state
     @MainActor
-    func stopTraining() {
-        print("⏹️ Stopping VO2 Max training...")
+    func endTraining() {
+        print("⏹️ Ending VO2 Max training...")
         
         timer?.invalidate()
         timer = nil
@@ -170,6 +170,12 @@ class VO2MaxTrainingManager: ObservableObject {
         announcements.resetState()
     }
     
+    /// Legacy compatibility - calls endTraining()
+    @MainActor
+    func stopTraining() {
+        endTraining()
+    }
+    
     /// Resets the training session to setup state (for completed training)
     @MainActor
     func resetToSetup() {
@@ -192,6 +198,7 @@ class VO2MaxTrainingManager: ObservableObject {
         announcements.resetState()
     }
     
+    @MainActor
     private func startNextInterval() {
         print("Starting next interval: \(currentInterval)")
         
@@ -283,6 +290,7 @@ class VO2MaxTrainingManager: ObservableObject {
         }
     }
     
+    @MainActor
     private func completeTraining() {
         print("🎉 VO2 Max training completed!")
         
@@ -296,12 +304,18 @@ class VO2MaxTrainingManager: ObservableObject {
             self.timeRemaining = 0
         }
         
-        // Stop music and track polling
-        spotifyViewModel.pause()
+        // Deactivate Spotify training state - stops unnecessary reconnection attempts  
+        spotifyViewModel.setIntent(.idle)
+        
+        // Stop track polling (but let music continue playing)
         spotifyViewModel.stopTrackPolling()
         
         // Reset device activation state for next training session
         spotifyViewModel.resetDeviceActivationState()
+        
+        // NEW: Reset services
+        HeartRateService.shared.resetState()
+        announcements.resetState()
     }
     
     // MARK: - Helper Methods

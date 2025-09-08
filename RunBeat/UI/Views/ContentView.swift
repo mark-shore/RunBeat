@@ -6,7 +6,7 @@ struct ContentView: View {
     @State private var showingVO2MaxTraining = false
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 // Dark background using design system
                 AppColors.background
@@ -132,13 +132,10 @@ struct ContentView: View {
                     SettingsView(appState: appState, heartRateViewModel: appState.heartRateViewModel)
                 }
             }
-            .sheet(isPresented: $showingVO2MaxTraining) {
+            .navigationDestination(isPresented: $showingVO2MaxTraining) {
                 VO2MaxTrainingView()
                     .environmentObject(appState)
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.hidden)
             }
         }
-        .navigationViewStyle(StackNavigationViewStyle())
     }
 }

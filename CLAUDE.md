@@ -243,3 +243,30 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
    - `rateLimited()`: Built-in spam prevention for high-frequency events
 
 **Impact**: Replaced 642+ print statements across 21 files with clean, structured logging that adapts between development (verbose) and production (clean) environments while maintaining all critical debugging information.
+
+### VO2 Max Training Navigation Architecture (2025)
+
+**Problem Solved**: VO2 Max Training was presented as a modal that could be accidentally dismissed during serious 28-minute athletic training sessions, creating poor UX.
+
+**Solutions Implemented**:
+1. **Full-Screen Navigation Architecture** (`ContentView.swift`)
+   - Replaced `.sheet()` modal presentation with `.navigationDestination()`
+   - Updated from `NavigationView` to `NavigationStack` for modern iOS 16+ navigation compatibility
+   - Implemented state-based navigation with `isPresented` binding for reliable button interaction
+
+2. **Training Session Protection** (`VO2MaxTrainingView.swift`)
+   - Hidden navigation back button during active training (`navigationBarBackButtonHidden`)
+   - Proper navigation titles and toolbar management
+   - Removed modal-specific presentation modifiers
+
+3. **Unified Training Termination** (`VO2MaxTrainingManager.swift`)
+   - Created single `endTraining()` method for consistent cleanup behavior
+   - Fixed Spotify behavior inconsistency - both manual stop and natural completion continue music playback
+   - Added `@MainActor` annotations for proper Swift concurrency handling
+   - Maintained backward compatibility with legacy `stopTraining()` method
+
+4. **Consistent State Management** (`AppState.swift`)
+   - Updated to use unified `endTraining()` method throughout
+   - Added `cleanupVO2Training()` convenience method for consistent termination
+
+**Technical Benefits**: Eliminates accidental workout dismissal during serious training, provides consistent music behavior, maintains all existing background execution and Spotify integration while modernizing navigation patterns for iOS 16+ compatibility.
