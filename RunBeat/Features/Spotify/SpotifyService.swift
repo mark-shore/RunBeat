@@ -379,7 +379,7 @@ class SpotifyService: NSObject {
                 let tokenResponse = try await BackendService.shared.getFreshSpotifyToken()
                 
                 // Update local keychain with fresh token (fallback storage)
-                let success = keychainWrapper.store(tokenResponse.accessToken, forKey: tokenKeychainKey)
+                keychainWrapper.store(tokenResponse.accessToken, forKey: tokenKeychainKey)
                 
                 if let newRefreshToken = tokenResponse.refreshToken {
                     keychainWrapper.store(newRefreshToken, forKey: refreshTokenKeychainKey)
@@ -1580,7 +1580,6 @@ class SpotifyService: NSObject {
                 AppLogger.verbose("Complete API Response JSON: \(String(data: try! JSONSerialization.data(withJSONObject: json), encoding: .utf8) ?? "N/A")", component: "WebAPI")
                 
                 // Extract timing information
-                let timestamp = json["timestamp"] as? Int64
                 let progressMs = json["progress_ms"] as? Int
                 let isPlaying = json["is_playing"] as? Bool ?? false
                 
@@ -1588,12 +1587,9 @@ class SpotifyService: NSObject {
                 
                 // Extract device information
                 if let device = json["device"] as? [String: Any] {
-                    let deviceId = device["id"] as? String ?? ""
                     let deviceName = device["name"] as? String ?? ""
                     let deviceType = device["type"] as? String ?? ""
                     let isActive = device["is_active"] as? Bool ?? false
-                    let isPrivateSession = device["is_private_session"] as? Bool ?? false
-                    let isRestricted = device["is_restricted"] as? Bool ?? false
                     let volumePercent = device["volume_percent"] as? Int ?? -1
                     
                     AppLogger.debug("Device: \(deviceName) (\(deviceType)) Active: \(isActive) Vol: \(volumePercent)%", component: "WebAPI")
@@ -1603,19 +1599,13 @@ class SpotifyService: NSObject {
                 if let context = json["context"] as? [String: Any] {
                     let contextType = context["type"] as? String ?? ""
                     let contextUri = context["uri"] as? String ?? ""
-                    let externalUrls = context["external_urls"] as? [String: Any]
-                    let spotifyUrl = externalUrls?["spotify"] as? String ?? ""
                     
                     AppLogger.debug("Context: \(contextType) URI: \(contextUri)", component: "WebAPI")
                 }
                 
                 if let item = json["item"] as? [String: Any] {
                     let trackName = item["name"] as? String ?? ""
-                    let trackId = item["id"] as? String ?? ""
-                    let trackUri = item["uri"] as? String ?? ""
                     let durationMs = item["duration_ms"] as? Int ?? 0
-                    let popularity = item["popularity"] as? Int ?? 0
-                    let explicit = item["explicit"] as? Bool ?? false
                     
                     AppLogger.debug("Track: '\(trackName)' Duration: \(durationMs)ms", component: "WebAPI")
                     
@@ -1631,7 +1621,6 @@ class SpotifyService: NSObject {
                     var artworkURL = ""
                     if let album = item["album"] as? [String: Any] {
                         let albumName = album["name"] as? String ?? ""
-                        let albumId = album["id"] as? String ?? ""
                         let albumType = album["album_type"] as? String ?? ""
                         let releaseDate = album["release_date"] as? String ?? ""
                         
@@ -2478,7 +2467,6 @@ extension SpotifyService: SPTAppRemoteDelegate {
 // MARK: - SPTAppRemotePlayerStateDelegate
 extension SpotifyService: SPTAppRemotePlayerStateDelegate {
     func playerStateDidChange(_ playerState: SPTAppRemotePlayerState) {
-        let timestamp = Date()
         let isPlaying = !playerState.isPaused
         let trackName = playerState.track.name
         let artistName = playerState.track.artist.name
