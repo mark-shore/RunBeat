@@ -13,7 +13,7 @@ from typing import Dict, Any
 
 # Test configuration
 BASE_URL = "http://localhost:8001/api/v1"
-TEST_DEVICE_ID = "refresh-test-device"
+TEST_USER_ID = "refresh-test-device"
 
 class RefreshSystemTester:
     """Test client for refresh system endpoints"""
@@ -113,7 +113,7 @@ class RefreshSystemTester:
                 devices = overview.get('devices', [])
                 if devices:
                     print("   Recent devices:")
-                    for device in devices[:3]:  # Show first 3
+                    for user in devices[:3]:  # Show first 3
                         print(f"     {device.get('device_id')}: {device.get('status')} (expires in {device.get('minutes_until_expiry', 'N/A')} min)")
                 
                 return True
@@ -189,7 +189,7 @@ class RefreshSystemTester:
         
         print("🔍 Creating test token near expiry")
         
-        url = f"{BASE_URL}/devices/{TEST_DEVICE_ID}/spotify-tokens"
+        url = f"{BASE_URL}/users/{TEST_USER_ID}/spotify-tokens"
         
         # Create token that expires in 5 minutes (should trigger refresh)
         test_tokens = {
@@ -217,7 +217,7 @@ class RefreshSystemTester:
         
         print("🔍 Cleaning up test token")
         
-        url = f"{BASE_URL}/devices/{TEST_DEVICE_ID}/spotify-tokens"
+        url = f"{BASE_URL}/users/{TEST_USER_ID}/spotify-tokens"
         
         try:
             response = await self.client.delete(url)

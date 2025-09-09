@@ -114,6 +114,7 @@ class SpotifyService: NSObject {
         setupSpotify()
         setupAppLifecycleMonitoring()
         setupConnectionManagerObservation()
+        setupFirebaseAuthNotifications()
         
         // Try to restore persisted authentication
         attemptTokenRestoration()
@@ -343,7 +344,7 @@ class SpotifyService: NSObject {
                 if !success {
                     // Refresh failed, remove tokens and disconnect
                     print("🗑️ [SpotifyService] Token refresh failed - removing invalid stored tokens")
-                    self?.removeStoredToken()
+                    // self?.removeStoredToken() // Temporarily disabled - preserve tokens during auth timing issues
                     DispatchQueue.main.async {
                         self?.connectionManager.disconnect()
                     }
@@ -396,17 +397,45 @@ class SpotifyService: NSObject {
             } catch {
                 print("❌ [SpotifyService] Backend token refresh failed: \(error.localizedDescription)")
                 
-                // Fallback to local token refresh if backend is unavailable
-                if let backendError = error as? BackendError, backendError.isNetworkUnavailable {
-                    print("🔄 [SpotifyService] Backend unavailable, attempting local token refresh fallback...")
-                    self.refreshAccessTokenLocal(refreshToken: refreshToken, completion: completion)
-                } else {
-                    DispatchQueue.main.async { [weak self] in
-                        self?.isTokenRefreshInProgress = false
-                        completion(false)
+                // Check if this is an authentication-related error
+                if let backendError = error as? BackendError {
+                    switch backendError {
+                    case .authenticationRequired:
+                        print("🔄 [SpotifyService] Authentication in progress - will retry when Firebase auth completes")
+                        // Don't delete tokens - authentication is just in progress
+                        DispatchQueue.main.async { [weak self] in
+                            self?.isTokenRefreshInProgress = false
+                            // Return false but don't delete tokens
+                            completion(false)
+                        }
+                        return
+                        
+                    case .networkError, .httpError, .allEndpointsUnavailable:
+                        print("🔄 [SpotifyService] Backend unavailable, attempting local token refresh fallback...")
+                        self.refreshAccessTokenLocal(refreshToken: refreshToken, completion: completion)
+                        return
+                        
+                    default:
+                        break
                     }
                 }
+                
+                // For other errors, fail normally
+                DispatchQueue.main.async { [weak self] in
+                    self?.isTokenRefreshInProgress = false
+                    completion(false)
+                }
             }
+        }
+    }
+    
+    /// Retry token operations after Firebase authentication completes
+    func retryTokenOperationsAfterAuth() {
+        print("🔄 [SpotifyService] Retrying token operations after authentication completion")
+        
+        // If we have stored tokens, try to refresh them now that auth is available
+        if let _ = retrieveStoredRefreshToken() {
+            attemptTokenRestoration()
         }
     }
     
@@ -508,6 +537,14 @@ class SpotifyService: NSObject {
         NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)
             .sink { [weak self] _ in
                 self?.handleAppWillEnterForeground()
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func setupFirebaseAuthNotifications() {
+        NotificationCenter.default.publisher(for: NSNotification.Name("FirebaseAuthenticationCompleted"))
+            .sink { [weak self] _ in
+                self?.retryTokenOperationsAfterAuth()
             }
             .store(in: &cancellables)
     }

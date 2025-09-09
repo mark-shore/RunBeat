@@ -44,13 +44,16 @@ class FirebaseService: ObservableObject {
                     // Notify BackendService of user ID for user-scoped endpoints
                     BackendService.shared.setUserID(userId)
                     AppLogger.info("Backend service notified of user ID", component: "Firebase")
+                    
+                    // Post notification for Spotify service to retry operations
+                    NotificationCenter.default.post(name: NSNotification.Name("FirebaseAuthenticationCompleted"), object: nil)
                 } else {
                     AppLogger.warn("Firebase user not authenticated - attempting anonymous sign-in", component: "Firebase")
                     
-                    // Clear user ID from BackendService (fallback to device mode)
-                    BackendService.shared.setUserID(nil)
+                    // Set backend service to in-progress state
+                    BackendService.shared.setAuthenticationInProgress()
                     
-                    // Attempt anonymous sign-in
+                    // Attempt anonymous sign-in (critical for backend operation)
                     self?.signInAnonymously()
                 }
             }
@@ -63,9 +66,8 @@ class FirebaseService: ObservableObject {
                 if let error = error {
                     AppLogger.error("Firebase anonymous auth failed: \(error.localizedDescription)", component: "Firebase")
                     
-                    // Ensure BackendService falls back to device mode
-                    BackendService.shared.setUserID(nil)
-                    AppLogger.info("Backend service remains in device-scoped mode due to auth failure", component: "Firebase")
+                    // Notify BackendService of authentication failure
+                    BackendService.shared.setAuthenticationFailed()
                 } else if let user = result?.user {
                     AppLogger.info("Firebase anonymous auth success: \(user.uid)", component: "Firebase")
                     
@@ -76,6 +78,9 @@ class FirebaseService: ObservableObject {
                     // Notify BackendService of user ID
                     BackendService.shared.setUserID(user.uid)
                     AppLogger.info("Backend service switched to user-scoped mode", component: "Firebase")
+                    
+                    // Post notification for Spotify service to retry operations
+                    NotificationCenter.default.post(name: NSNotification.Name("FirebaseAuthenticationCompleted"), object: nil)
                 }
             }
         }

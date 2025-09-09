@@ -13,7 +13,7 @@ from typing import Dict, Any
 
 # Test configuration
 BASE_URL = "http://localhost:8001/api/v1"
-TEST_DEVICE_ID = "test-device-123"
+TEST_USER_ID = "test-user-123"
 
 # Sample token data for testing
 SAMPLE_TOKENS = {
@@ -37,9 +37,9 @@ class EndpointTester:
     async def test_store_tokens(self) -> bool:
         """Test storing Spotify tokens"""
         
-        print(f"🔍 Testing: Store tokens for device {TEST_DEVICE_ID}")
+        print(f"🔍 Testing: Store tokens for user {TEST_USER_ID}")
         
-        url = f"{BASE_URL}/devices/{TEST_DEVICE_ID}/spotify-tokens"
+        url = f"{BASE_URL}/users/{TEST_USER_ID}/spotify-tokens"
         
         try:
             response = await self.client.post(url, json=SAMPLE_TOKENS)
@@ -59,9 +59,9 @@ class EndpointTester:
     async def test_get_token(self) -> bool:
         """Test retrieving Spotify token"""
         
-        print(f"🔍 Testing: Get token for device {TEST_DEVICE_ID}")
+        print(f"🔍 Testing: Get token for user {TEST_USER_ID}")
         
-        url = f"{BASE_URL}/devices/{TEST_DEVICE_ID}/spotify-token"
+        url = f"{BASE_URL}/users/{TEST_USER_ID}/spotify-token"
         
         try:
             response = await self.client.get(url)
@@ -81,9 +81,9 @@ class EndpointTester:
     async def test_delete_tokens(self) -> bool:
         """Test deleting Spotify tokens"""
         
-        print(f"🔍 Testing: Delete tokens for device {TEST_DEVICE_ID}")
+        print(f"🔍 Testing: Delete tokens for user {TEST_USER_ID}")
         
-        url = f"{BASE_URL}/devices/{TEST_DEVICE_ID}/spotify-tokens"
+        url = f"{BASE_URL}/users/{TEST_USER_ID}/spotify-tokens"
         
         try:
             response = await self.client.delete(url)
@@ -105,7 +105,7 @@ class EndpointTester:
         
         print(f"🔍 Testing: Get token after deletion (expecting 404)")
         
-        url = f"{BASE_URL}/devices/{TEST_DEVICE_ID}/spotify-token"
+        url = f"{BASE_URL}/users/{TEST_USER_ID}/spotify-token"
         
         try:
             response = await self.client.get(url)

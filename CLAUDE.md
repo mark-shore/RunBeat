@@ -36,7 +36,7 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - `HeartRateManager`: CoreBluetooth heart rate monitoring - working perfectly
 - Background execution logic for continuous monitoring
 - Audio announcement timing and cooldown system
-- **User-scoped authentication**: Production-ready Firebase anonymous auth with backend token management
+- **User-scoped authentication**: Production-ready Firebase anonymous auth with backend token management and authentication timing resolution
 - **Spotify architecture**: Complete with intent-based lifecycle management, robust connection management, error recovery, and persistent authentication
 
 ### Core Modules
@@ -51,8 +51,8 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - `ZoneAnnouncementCoordinator.swift`: Per-training-mode announcement management
 - `SpeechAnnouncer.swift`: Audio announcement execution
 - `AudioService.swift`: Audio session and volume management
-- `BackendService.swift`: FastAPI backend integration with user-scoped token management and intelligent caching
-- `FirebaseService.swift`: Firebase anonymous authentication with automatic user ID propagation
+- `BackendService.swift`: FastAPI backend integration with user-scoped token management, intelligent caching, and authentication state coordination
+- `FirebaseService.swift`: Firebase anonymous authentication with automatic user ID propagation and authentication completion notifications
 - `AppLogger.swift`: Centralized logging system with rate limiting and structured output
 
 #### Free Training Module (`Features/FreeTraining/`)
@@ -68,7 +68,7 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - `KeychainWrapper.swift`: Secure token storage (eliminates repeated OAuth)
 - **Intent-Based Architecture**: SpotifyIntent enum (.training, .idle, .background) controls AppRemote lifecycle and eliminates wasteful background reconnection cycles
 - **AppState Bridging**: Moved from direct trainingManager access in views to AppState-mediated access, eliminating dual ownership patterns
-- **Token Management**: Centralized `makeAuthenticatedAPICall()` method handles automatic token refresh on 401 responses
+- **Token Management**: Centralized `makeAuthenticatedAPICall()` method handles automatic token refresh on 401 responses with authentication timing coordination
 - Features: Seamless training integration, reliable background playlist switching, automatic activation tracking
 
 #### VO2 Training Module (`Features/VO2Training/`)
@@ -126,6 +126,7 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - **Token Expiration Testing**: Leave app closed for 2+ hours → start VO2 training → verify graceful token refresh
 - **Reconnection Testing**: Start training → force Spotify disconnect → verify music resumes when reconnected
 - **App Switching Testing**: Start training → switch to Spotify briefly → return to RunBeat → verify music continues uninterrupted
+- **Authentication Timing Testing**: Cold app start → verify token operations wait for Firebase auth completion → verify automatic retry
 - **User-Scoped Testing**: Verify Firebase anonymous auth → backend user ID propagation → token refresh cycles
 - **Background Token Refresh Testing**: Leave app closed for hours → verify backend automatically refreshes user tokens
 
@@ -144,6 +145,7 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 ## Known Issues
 
 ### Production-Ready Systems
+- ✅ **Authentication Timing Resolution**: Firebase auth completion detection with operation queueing and automatic retry
 - ✅ **User-Scoped Authentication**: Complete Firebase anonymous auth with backend integration
 - ✅ **Background Token Refresh**: Automatic user-scoped token refresh service runs server-side
 - ✅ **Token Expiration During Training**: Fixed with centralized token refresh and graceful error handling
@@ -170,9 +172,10 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - Never modify `HeartRateManager`'s core Bluetooth logic
 - Preserve all background execution functionality (working reliably)
 - Keep audio announcement timing unchanged
-- **User-Scoped Architecture**: Firebase anonymous auth and backend user endpoints are production-ready - do not revert to device-based
-- **Token Management**: Use `makeAuthenticatedAPICall()` for new Spotify API calls to get automatic token refresh
-- **Backend Integration**: Use `BackendService.shared` for all backend communication - handles user ID routing automatically
+- **User-Scoped Architecture**: Complete Firebase anonymous auth with authentication timing resolution - production-ready and stable
+- **Authentication Timing**: All backend operations automatically handle Firebase auth delays via operation queueing - no manual handling needed
+- **Token Management**: Use `makeAuthenticatedAPICall()` for new Spotify API calls to get automatic token refresh with auth coordination
+- **Backend Integration**: Use `BackendService.shared` for all backend communication - handles user ID routing and auth state automatically
 - **Logging**: Use `AppLogger` instead of `print()` statements for all new code
 - Test on physical device for realistic behavior
 - Use design system components consistently
@@ -206,7 +209,7 @@ The following systems have been implemented and are production-ready:
 
 ### User-Scoped Backend Architecture (2025)
 
-**System Overview**: Complete user-scoped authentication and token management system.
+**System Overview**: Complete user-scoped authentication and token management system with authentication timing resolution.
 
 **Architecture Components**:
 1. **Firebase Anonymous Authentication** (`FirebaseService.swift`)
@@ -235,6 +238,42 @@ The following systems have been implemented and are production-ready:
    - Admin monitoring and manual trigger endpoints
 
 **Technical Benefits**: Users get seamless authentication, server handles token refresh automatically, eliminates client-side OAuth friction, provides scalable user-based architecture.
+
+### Authentication Timing Resolution (2025)
+
+**Problem Solved**: Spotify token refresh failed during app startup because Firebase authentication hadn't completed yet, causing unnecessary token deletion and user re-authentication.
+
+**Error Sequence Eliminated**:
+- App starts → Validates stored Spotify token (fails with 401)
+- Tries to refresh token via backend → Backend requires user ID
+- Firebase auth still in progress → Backend throws "Authentication required"
+- Token refresh fails → App deletes all stored tokens ❌
+- Firebase auth completes → But tokens are already gone ❌
+
+**Solutions Implemented**:
+1. **Authentication State Management** (`BackendService.swift`)
+   - `AuthenticationState` enum: `.notStarted`, `.inProgress`, `.authenticated(userID)`, `.failed`
+   - Operation queueing system for delayed token operations
+   - Graceful handling with `handleTokenRefreshDuringAuth()` method
+
+2. **Firebase Authentication Coordination** (`FirebaseService.swift`)
+   - Notifies `BackendService` of authentication state changes
+   - Posts "FirebaseAuthenticationCompleted" notifications
+   - Automatic user ID propagation on auth completion
+
+3. **Spotify Token Preservation** (`SpotifyService.swift`)
+   - Firebase authentication notification observer
+   - `retryTokenOperationsAfterAuth()` method for deferred operations
+   - Preserves tokens during authentication timing issues (no premature deletion)
+
+**Current Flow**:
+- App starts → Validates stored Spotify token (fails with 401)
+- Tries to refresh token via backend → Backend detects auth in progress
+- Operations queued until Firebase auth completes ✅
+- Firebase auth completes → Notification triggers queued operations ✅
+- Token refresh succeeds with user ID → Tokens preserved ✅
+
+**Technical Benefits**: Eliminates unnecessary user re-authentication, preserves valid tokens during startup timing, maintains clean user-scoped architecture without fallbacks.
 
 ### Logging System Implementation (2025)
 

@@ -14,12 +14,37 @@ extension Array where Element: Equatable {
     }
 }
 
+// MARK: - Authentication State
+
+enum AuthenticationState {
+    case notStarted
+    case inProgress
+    case authenticated(String) // user ID
+    case failed
+    
+    var userID: String? {
+        if case .authenticated(let id) = self {
+            return id
+        }
+        return nil
+    }
+    
+    var isAuthenticated: Bool {
+        if case .authenticated = self {
+            return true
+        }
+        return false
+    }
+}
+
 /**
  * BackendService
  *
  * Handles HTTP communication with the RunBeat FastAPI backend.
  * Manages Spotify token storage, retrieval, and network error handling.
  * Implements intelligent token caching based on iOS app lifecycle.
+ * 
+ * Gracefully handles Firebase authentication timing during app startup.
  */
 class BackendService {
     
@@ -27,10 +52,11 @@ class BackendService {
     
     private let session: URLSession
     private var activeBaseURL: String
-    private let deviceID: String
+    // Firebase authentication state tracking
+    private var authState: AuthenticationState = .notStarted
     
-    // Firebase user ID for user-scoped endpoints
-    private var currentUserID: String?
+    // Queued operations waiting for authentication
+    private var queuedOperations: [(AuthenticationState) async throws -> Void] = []
     
     // Network configuration
     private let timeoutInterval: TimeInterval = 15.0
@@ -59,9 +85,6 @@ class BackendService {
         
         self.session = URLSession(configuration: config)
         
-        // Get device ID
-        self.deviceID = DeviceIDManager.shared.deviceID
-        
         // Set up endpoint fallback list
         let configuredURL = ConfigurationManager.shared.getValue(for: "BackendBaseURL") ?? "https://runbeat-backend-production.up.railway.app"
         
@@ -76,11 +99,10 @@ class BackendService {
         
         self.activeBaseURL = fallbackEndpoints[0]
         
-        AppLogger.info("Initialized with device ID: \(deviceID)", component: "Backend")
         AppLogger.info("Primary endpoint: \(activeBaseURL)", component: "Backend")
         AppLogger.debug("Fallback endpoints: \(fallbackEndpoints)", component: "Backend")
         
-        AppLogger.debug("Backend service initialized - will use device-based endpoints until Firebase user ID is set", component: "Backend")
+        AppLogger.debug("Backend service initialized - requires Firebase user ID for operation", component: "Backend")
         
         // Set up app lifecycle observers
         setupAppLifecycleObservers()
@@ -96,40 +118,87 @@ class BackendService {
     /**
      * Set the current Firebase user ID for user-scoped backend calls
      * 
-     * When a user ID is set, all Spotify token operations will use user-scoped endpoints.
-     * When nil, falls back to device-based endpoints for backwards compatibility.
+     * Triggers processing of queued operations and updates authentication state.
      */
-    func setUserID(_ userID: String?) {
-        let previousUserID = currentUserID
-        currentUserID = userID
+    func setUserID(_ userID: String) {
+        let previousState = authState
+        authState = .authenticated(userID)
         
-        if let userID = userID {
-            AppLogger.info("Backend service switching to user-scoped mode (user: \(userID))", component: "Backend")
-            
-            // Only clear token cache when switching to a DIFFERENT user
-            // Don't clear on initial user authentication (device -> user)
-            if let previousUserID = previousUserID, previousUserID != userID {
-                clearTokenCache()
-                AppLogger.debug("Token cache cleared due to user ID change (\(previousUserID) -> \(userID))", component: "Backend")
-            } else if previousUserID == nil {
-                AppLogger.debug("Initial user authentication - preserving token cache", component: "Backend")
-            }
-        } else {
-            AppLogger.info("Backend service falling back to device-scoped mode", component: "Backend")
-            
-            // Only clear cache when falling back from user mode
-            if previousUserID != nil {
-                clearTokenCache()
-                AppLogger.debug("Token cache cleared due to fallback to device mode", component: "Backend")
+        AppLogger.info("Backend service authenticated for user: \(userID)", component: "Backend")
+        
+        // Only clear token cache when switching to a DIFFERENT user
+        if let previousUserID = previousState.userID, previousUserID != userID {
+            clearTokenCache()
+            AppLogger.debug("Token cache cleared due to user ID change (\(previousUserID) -> \(userID))", component: "Backend")
+        }
+        
+        // Process any queued operations
+        Task {
+            await processQueuedOperations()
+        }
+    }
+    
+    /**
+     * Set authentication state to in-progress
+     */
+    func setAuthenticationInProgress() {
+        authState = .inProgress
+        AppLogger.debug("Firebase authentication in progress", component: "Backend")
+    }
+    
+    /**
+     * Set authentication state to failed
+     */
+    func setAuthenticationFailed() {
+        authState = .failed
+        AppLogger.error("Firebase authentication failed - backend operations limited", component: "Backend")
+    }
+    
+    /**
+     * Get current authentication state for debugging
+     */
+    var currentAuthState: AuthenticationState {
+        return authState
+    }
+    
+    /**
+     * Get current user ID for debugging
+     */
+    var currentUser: String? {
+        return authState.userID
+    }
+    
+    // MARK: - Authentication Queue Management
+    
+    /**
+     * Process queued operations after authentication completes
+     */
+    private func processQueuedOperations() async {
+        guard authState.isAuthenticated else {
+            AppLogger.debug("Authentication not complete - keeping operations queued", component: "Backend")
+            return
+        }
+        
+        AppLogger.info("Processing \(queuedOperations.count) queued operations", component: "Backend")
+        
+        let operations = queuedOperations
+        queuedOperations.removeAll()
+        
+        for operation in operations {
+            do {
+                try await operation(authState)
+            } catch {
+                AppLogger.error("Queued operation failed: \(error)", component: "Backend")
             }
         }
     }
     
     /**
-     * Get current operation mode for debugging
+     * Queue an operation to be executed after authentication completes
      */
-    var operationMode: String {
-        return currentUserID != nil ? "user-scoped" : "device-scoped"
+    private func queueOperation(_ operation: @escaping (AuthenticationState) async throws -> Void) {
+        queuedOperations.append(operation)
+        AppLogger.debug("Operation queued (total: \(queuedOperations.count))", component: "Backend")
     }
     
     // MARK: - Spotify Token Management
@@ -142,7 +211,7 @@ class BackendService {
         refreshToken: String,
         expiresIn: Int
     ) async throws {
-        let endpoint = getSpotifyTokensEndpoint()
+        let endpoint = try getSpotifyTokensEndpoint()
         let url = URL(string: "\(activeBaseURL)\(endpoint)")!
         
         let requestBody: [String: Any] = [
@@ -156,7 +225,7 @@ class BackendService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         
-        AppLogger.debug("Storing tokens in \(operationMode) mode", component: "Backend")
+        AppLogger.debug("Storing tokens for user: \(authState.userID ?? "unknown")", component: "Backend")
         
         do {
             let (data, response) = try await performRequest(request)
@@ -209,22 +278,65 @@ class BackendService {
             AppLogger.debug("No cached token available - fetching fresh token", component: "Backend")
         }
         
-        // Cache miss or expired - fetch from backend
-        AppLogger.info("Requesting fresh token from backend", component: "Backend")
-        return try await fetchTokenFromBackend()
+        // Handle authentication state during token refresh
+        switch authState {
+        case .authenticated:
+            // Normal path - fetch from backend
+            AppLogger.info("Requesting fresh token from backend", component: "Backend")
+            return try await fetchTokenFromBackend()
+            
+        case .inProgress:
+            // Firebase auth in progress - try to refresh existing token or wait
+            AppLogger.info("Authentication in progress - attempting token refresh", component: "Backend")
+            return try await handleTokenRefreshDuringAuth()
+            
+        case .notStarted, .failed:
+            // Authentication not available - use cached token if available or fail gracefully
+            if let cached = cachedToken {
+                AppLogger.warn("Using cached token due to authentication unavailable", component: "Backend")
+                return cached
+            } else {
+                throw BackendError.authenticationRequired("Firebase authentication required for token operations")
+            }
+        }
+    }
+    
+    /**
+     * Handle token refresh when authentication is in progress
+     */
+    private func handleTokenRefreshDuringAuth() async throws -> SpotifyTokenResponse {
+        // First, try using any cached token we have
+        if let cached = cachedToken {
+            AppLogger.info("Using cached token while authentication in progress", component: "Backend")
+            return cached
+        }
+        
+        // If no cached token, we need to wait for authentication or queue the operation
+        AppLogger.info("No cached token available - queuing token refresh until auth completes", component: "Backend")
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            queueOperation { authState in
+                do {
+                    let token = try await self.fetchTokenFromBackend()
+                    continuation.resume(returning: token)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
     
     /**
      * Fetch token from backend and update cache
      */
     private func fetchTokenFromBackend() async throws -> SpotifyTokenResponse {
-        let endpoint = getSpotifyTokenEndpoint()
+        let endpoint = try getSpotifyTokenEndpoint()
         let url = URL(string: "\(activeBaseURL)\(endpoint)")!
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         
-        AppLogger.debug("Requesting fresh token in \(operationMode) mode", component: "Backend")
+        AppLogger.debug("Requesting fresh token for user: \(authState.userID ?? "unknown")", component: "Backend")
         
         do {
             let (data, response) = try await performRequest(request)
@@ -262,13 +374,13 @@ class BackendService {
      * Delete stored tokens from the backend (for logout)
      */
     func deleteSpotifyTokens() async throws {
-        let endpoint = getSpotifyTokensEndpoint()
+        let endpoint = try getSpotifyTokensEndpoint()
         let url = URL(string: "\(activeBaseURL)\(endpoint)")!
         
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         
-        AppLogger.info("Deleting tokens in \(operationMode) mode", component: "Backend")
+        AppLogger.info("Deleting tokens for user: \(authState.userID ?? "unknown")", component: "Backend")
         
         do {
             let (data, response) = try await performRequest(request)
@@ -474,9 +586,8 @@ class BackendService {
             "cached_token_expires_at": cachedToken?.expiresAt ?? "none",
             "cached_token_is_expired": cachedToken?.isExpiredOrExpiring ?? true,
             "app_state_independent": true, // Cache logic is now app state independent
-            "current_user_id": currentUserID ?? "none",
-            "operation_mode": operationMode,
-            "device_id": deviceID
+            "auth_state": String(describing: authState),
+            "user_id": authState.userID ?? "unknown"
         ]
     }
     
@@ -510,25 +621,28 @@ class BackendService {
     
     /**
      * Get the appropriate endpoint for Spotify token operations
-     * Returns user-scoped endpoint if user ID available, otherwise device-scoped endpoint
+     * Requires user ID to be set via setUserID()
      */
-    private func getSpotifyTokensEndpoint() -> String {
-        if let userID = currentUserID {
-            return "/api/v1/users/\(userID)/spotify-tokens"
-        } else {
-            return "/api/v1/devices/\(deviceID)/spotify-tokens"
+    private func getSpotifyTokensEndpoint() throws -> String {
+        guard let userID = authState.userID else {
+            throw BackendError.authenticationRequired("Firebase user ID is required for token storage operations")
         }
+        return "/api/v1/users/\(userID)/spotify-tokens"
     }
     
     /**
      * Get the appropriate endpoint for single Spotify token retrieval
-     * Returns user-scoped endpoint if user ID available, otherwise device-scoped endpoint
+     * Allows graceful handling during authentication startup
      */
-    private func getSpotifyTokenEndpoint() -> String {
-        if let userID = currentUserID {
+    private func getSpotifyTokenEndpoint(allowUnauthorized: Bool = false) throws -> String {
+        if let userID = authState.userID {
             return "/api/v1/users/\(userID)/spotify-token"
+        } else if allowUnauthorized {
+            // This should not be reached in current implementation
+            // But provides fallback path for token refresh during startup
+            throw BackendError.authenticationRequired("User authentication in progress")
         } else {
-            return "/api/v1/devices/\(deviceID)/spotify-token"
+            throw BackendError.authenticationRequired("Firebase user ID is required for token operations")
         }
     }
     
@@ -678,6 +792,7 @@ struct SpotifyTokenResponse: Codable {
 enum BackendError: Error, LocalizedError {
     case networkError(Error)
     case httpError(Int, String = "")
+    case authenticationRequired(String)
     case noTokensFound
     case invalidResponse
     case allEndpointsUnavailable
@@ -689,8 +804,10 @@ enum BackendError: Error, LocalizedError {
             return "Network error: \(error.localizedDescription)"
         case .httpError(let code, let message):
             return "HTTP \(code): \(message)"
+        case .authenticationRequired(let message):
+            return "Authentication required: \(message)"
         case .noTokensFound:
-            return "No Spotify tokens found for this device"
+            return "No Spotify tokens found for this user"
         case .invalidResponse:
             return "Invalid response from backend"
         case .allEndpointsUnavailable:

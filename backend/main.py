@@ -2,10 +2,10 @@
 RunBeat FastAPI Backend
 
 This backend service handles:
-- Spotify token management and refresh
-- Device registration and management
-- Firebase integration for user data
-- Background-safe API proxying for iOS app
+- User-scoped Spotify token management and refresh
+- Firebase anonymous authentication integration
+- Background token refresh service
+- User-based API endpoints for iOS app
 """
 
 from fastapi import FastAPI, HTTPException
@@ -16,7 +16,7 @@ import logging
 from datetime import datetime
 
 from app.core.config import settings
-from app.api.v1.routes import health, devices, spotify, admin
+from app.api.v1.routes import health, spotify, admin
 from app.core.logging_config import setup_logging
 from app.services.token_refresh_service import token_refresh_service
 
@@ -44,7 +44,6 @@ app.add_middleware(
 
 # Include API routes
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
-app.include_router(devices.router, prefix="/api/v1", tags=["devices"])
 app.include_router(spotify.router, prefix="/api/v1", tags=["spotify"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 

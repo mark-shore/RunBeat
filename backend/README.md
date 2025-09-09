@@ -1,13 +1,13 @@
 # RunBeat Backend API
 
-FastAPI backend service for the RunBeat iOS heart rate training app. Handles Spotify token management, device registration, and provides background-safe API proxying.
+FastAPI backend service for the RunBeat iOS heart rate training app. Handles user-scoped Spotify token management with Firebase anonymous authentication and provides background token refresh.
 
 ## Features
 
-- 🎵 **Spotify Token Management**: Server-side token refresh eliminates iOS background limitations
-- 📱 **Device Registration**: Track and manage iOS app installations
-- 🔥 **Firebase Integration**: User data storage and real-time workout tracking
-- 🛡️ **Background-Safe API**: Proxy Spotify API calls with automatic token handling
+- 🎵 **User-Scoped Token Management**: Server-side token refresh with Firebase anonymous auth
+- 🔥 **Firebase Integration**: Anonymous user authentication and token storage
+- ⏰ **Background Token Refresh**: Automatic token refresh every 15 minutes
+- 🛡️ **User-Based API**: All endpoints scoped to authenticated Firebase users
 - 🏥 **Health Checks**: Kubernetes-ready health endpoints
 - 📊 **Structured Logging**: JSON logging with request tracing
 
@@ -55,13 +55,12 @@ FastAPI backend service for the RunBeat iOS heart rate training app. Handles Spo
 - `GET /api/v1/health/ready` - Kubernetes readiness probe
 - `GET /api/v1/health/live` - Kubernetes liveness probe
 
-### Device Management
-- `POST /api/v1/devices/register` - Register iOS device
-- `GET /api/v1/devices/{device_id}` - Get device info
-- `PUT /api/v1/devices/{device_id}/heartbeat` - Update device last seen
-- `DELETE /api/v1/devices/{device_id}` - Unregister device
+### User-Scoped Spotify Integration
+- `POST /api/v1/users/{user_id}/spotify-tokens` - Store user Spotify tokens
+- `GET /api/v1/users/{user_id}/spotify-token` - Get fresh token (auto-refresh)
+- `DELETE /api/v1/users/{user_id}/spotify-tokens` - Delete user tokens
 
-### Spotify Integration
+### Spotify Configuration
 - `POST /api/v1/spotify/refresh-token` - Refresh Spotify access token
 - `POST /api/v1/spotify/api-proxy` - Proxy Spotify API calls (planned)
 - `GET /api/v1/spotify/playlists/default` - Get default training playlists

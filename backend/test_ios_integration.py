@@ -13,7 +13,7 @@ from typing import Dict, Any
 
 # Test configuration
 BASE_URL = "http://localhost:8001/api/v1"
-TEST_DEVICE_ID = "ios-integration-test-device"
+TEST_USER_ID = "ios-integration-test-device"
 
 # Simulate iOS token data
 IOS_TOKEN_DATA = {
@@ -75,7 +75,7 @@ class iOSIntegrationTester:
     async def _store_tokens(self) -> bool:
         """Simulate iOS app storing tokens after OAuth"""
         
-        url = f"{BASE_URL}/devices/{TEST_DEVICE_ID}/spotify-tokens"
+        url = f"{BASE_URL}/users/{TEST_USER_ID}/spotify-tokens"
         
         try:
             response = await self.client.post(url, json=IOS_TOKEN_DATA)
@@ -95,7 +95,7 @@ class iOSIntegrationTester:
     async def _get_fresh_token(self) -> Dict[str, Any]:
         """Simulate iOS app getting fresh token for API calls"""
         
-        url = f"{BASE_URL}/devices/{TEST_DEVICE_ID}/spotify-token"
+        url = f"{BASE_URL}/users/{TEST_USER_ID}/spotify-token"
         
         try:
             response = await self.client.get(url)
@@ -157,7 +157,7 @@ class iOSIntegrationTester:
     async def _cleanup_tokens(self) -> bool:
         """Simulate iOS app cleaning up tokens on logout"""
         
-        url = f"{BASE_URL}/devices/{TEST_DEVICE_ID}/spotify-tokens"
+        url = f"{BASE_URL}/users/{TEST_USER_ID}/spotify-tokens"
         
         try:
             response = await self.client.delete(url)
