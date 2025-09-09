@@ -16,6 +16,7 @@ class VO2MaxTrainingManager: ObservableObject {
     @Published var timeRemaining: TimeInterval = 0
     @Published var currentInterval = 0
     @Published var totalIntervals = VO2Config.totalIntervals
+    @Published var showingCompletionScreen: Bool = false
     
     private var timer: Timer?
     private var spotifyViewModel: SpotifyViewModel
@@ -140,7 +141,7 @@ class VO2MaxTrainingManager: ObservableObject {
         }
     }
     
-    /// Ends the training session and returns to setup state
+    /// Ends the training session and shows completion screen
     @MainActor
     func endTraining() {
         print("⏹️ Ending VO2 Max training...")
@@ -150,10 +151,10 @@ class VO2MaxTrainingManager: ObservableObject {
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.trainingState = .setup
-            self.currentPhase = .notStarted
+            self.trainingState = .complete
+            self.showingCompletionScreen = true
+            self.currentPhase = .completed
             self.timeRemaining = 0
-            self.currentInterval = 0
         }
         
         // Deactivate Spotify training state - stops unnecessary reconnection attempts  
@@ -174,6 +175,20 @@ class VO2MaxTrainingManager: ObservableObject {
     @MainActor
     func stopTraining() {
         endTraining()
+    }
+    
+    /// Dismisses completion screen and returns to setup state
+    @MainActor
+    func dismissCompletionScreen() {
+        print("🔄 Dismissing completion screen, returning to setup...")
+        
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.showingCompletionScreen = false
+            self.trainingState = .setup
+            self.currentPhase = .notStarted
+            self.currentInterval = 0
+        }
     }
     
     /// Resets the training session to setup state (for completed training)
@@ -203,7 +218,8 @@ class VO2MaxTrainingManager: ObservableObject {
         print("Starting next interval: \(currentInterval)")
         
         if currentInterval > totalIntervals {
-            completeTraining()
+            print("🎉 VO2 Max training completed!")
+            endTraining()
             return
         }
         
@@ -290,33 +306,6 @@ class VO2MaxTrainingManager: ObservableObject {
         }
     }
     
-    @MainActor
-    private func completeTraining() {
-        print("🎉 VO2 Max training completed!")
-        
-        timer?.invalidate()
-        timer = nil
-        
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.trainingState = .complete
-            self.currentPhase = .completed
-            self.timeRemaining = 0
-        }
-        
-        // Deactivate Spotify training state - stops unnecessary reconnection attempts  
-        spotifyViewModel.setIntent(.idle)
-        
-        // Stop track polling (but let music continue playing)
-        spotifyViewModel.stopTrackPolling()
-        
-        // Reset device activation state for next training session
-        spotifyViewModel.resetDeviceActivationState()
-        
-        // NEW: Reset services
-        HeartRateService.shared.resetState()
-        announcements.resetState()
-    }
     
     // MARK: - Helper Methods
     

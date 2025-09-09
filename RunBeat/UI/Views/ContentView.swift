@@ -133,7 +133,7 @@ struct ContentView: View {
                 }
             }
             .navigationDestination(isPresented: $showingVO2MaxTraining) {
-                VO2MaxTrainingView()
+                VO2MaxTrainingView(isPresented: $showingVO2MaxTraining)
                     .environmentObject(appState)
             }
         }

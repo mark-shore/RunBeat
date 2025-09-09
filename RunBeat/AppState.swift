@@ -185,6 +185,13 @@ class AppState: ObservableObject {
         }
     }
     
+    /// Dismisses VO2 completion screen and returns to setup
+    func dismissVO2CompletionScreen() {
+        Task { @MainActor in
+            vo2TrainingManager.dismissCompletionScreen()
+        }
+    }
+    
     
     // LEGACY: Keep for backward compatibility during migration
     func startSession() {

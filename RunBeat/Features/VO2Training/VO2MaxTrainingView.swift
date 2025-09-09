@@ -13,6 +13,7 @@ struct VO2MaxTrainingView: View {
     @StateObject private var spotifyViewModel = SpotifyViewModel.shared
     @EnvironmentObject var appState: AppState
     @State private var showingPlaylistSelection = false
+    @Binding var isPresented: Bool
     
     var body: some View {
             ZStack {
@@ -34,45 +35,47 @@ struct VO2MaxTrainingView: View {
                     
                     Spacer()
                     
-                    // Timer Display
-                    VStack(alignment: .center, spacing: AppSpacing.md) {
-                        // Timer text
-                        Text(appState.vo2FormattedTimeRemaining)
-                            .font(.system(size: 28, weight: .medium, design: .monospaced))
-                            .foregroundColor(getPhaseColor(for: appState.vo2CurrentPhase))
-                        
-                        if appState.vo2TrainingState == .active {
-                            // Heart rate information during training with animated zone-colored display
-                            BPMDisplayView(bpm: appState.currentBPM, zone: getCurrentZone())
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .id("bpm-display")
-                                .animation(.none, value: appState.currentBPM)
-                        } else if appState.currentBPM > 0 {
-                            // NEW: Show BPM during setup if HR detected
-                            BPMDisplayView(bpm: appState.currentBPM, zone: getCurrentZone())
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .id("bpm-display")
-                                .animation(.none, value: appState.currentBPM)
-                        } else {
-                            // Fallback: No HR available text when no HR detected
-                            Text("No HR available")
-                                .font(.system(size: 14, weight: .medium))
+                    // Timer Display (hidden during completion)
+                    if appState.vo2TrainingState != .complete {
+                        VStack(alignment: .center, spacing: AppSpacing.md) {
+                            // Timer text
+                            Text(appState.vo2FormattedTimeRemaining)
+                                .font(.system(size: 28, weight: .medium, design: .monospaced))
+                                .foregroundColor(getPhaseColor(for: appState.vo2CurrentPhase))
+                            
+                            if appState.vo2TrainingState == .active {
+                                // Heart rate information during training with animated zone-colored display
+                                BPMDisplayView(bpm: appState.currentBPM, zone: getCurrentZone())
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                                    .id("bpm-display")
+                                    .animation(.none, value: appState.currentBPM)
+                            } else if appState.currentBPM > 0 {
+                                // NEW: Show BPM during setup if HR detected
+                                BPMDisplayView(bpm: appState.currentBPM, zone: getCurrentZone())
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                                    .id("bpm-display")
+                                    .animation(.none, value: appState.currentBPM)
+                            } else {
+                                // Fallback: No HR available text when no HR detected
+                                Text("No HR available")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(AppColors.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                            }
+                            
+                            // Interval counter
+                            Text("Interval \(appState.vo2CurrentInterval)/\(appState.vo2TotalIntervals)")
+                                .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondary)
-                                .frame(maxWidth: .infinity, alignment: .center)
                         }
-                        
-                        // Interval counter
-                        Text("Interval \(appState.vo2CurrentInterval)/\(appState.vo2TotalIntervals)")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondary)
                     }
                     
                     Spacer()
                     
                     // Buttons Section
                     VStack(spacing: AppSpacing.md) {
-                        // Select Playlists button (only when not training)
-                        if appState.vo2TrainingState != .active {
+                        // Select Playlists button (only when not training and not complete)
+                        if appState.vo2TrainingState == .setup {
                             AppButton("Select Playlists", style: .secondary) {
                                 showingPlaylistSelection = true
                             }
@@ -103,16 +106,15 @@ struct VO2MaxTrainingView: View {
                             }
                             
                         case .complete:
-                            // Complete State: Show restart button
-                            VStack(spacing: AppSpacing.sm) {
-                                Text("Training Complete!")
+                            // Complete State: Show minimal completion screen
+                            VStack(spacing: AppSpacing.lg) {
+                                Text("Training Complete")
                                     .font(AppTypography.title2)
-                                    .foregroundColor(AppColors.success)
-                                    .fontWeight(.bold)
+                                    .foregroundColor(AppColors.onBackground)
                                 
-                                AppButton("Start New Session", style: .primary) {
-                                    // ✅ AppState will coordinate reset and start
-                                    appState.startVO2Training()
+                                AppButton("Done", style: .primary) {
+                                    appState.dismissVO2CompletionScreen()
+                                    isPresented = false
                                 }
                             }
                         }
@@ -120,15 +122,17 @@ struct VO2MaxTrainingView: View {
                     
                     Spacer(minLength: AppSpacing.md)
                     
-                    // Current Track Display (bottommost element)
-                    CurrentTrackView(track: spotifyViewModel.currentTrackInfo)
+                    // Current Track Display (hidden during completion)
+                    if appState.vo2TrainingState != .complete {
+                        CurrentTrackView(track: spotifyViewModel.currentTrackInfo)
+                    }
                 }
                 .padding(.horizontal, 12) // Reduced horizontal padding for wider cards
                 .padding(.vertical, AppSpacing.screenMargin)
             }
-            .navigationTitle("VO₂ Max Training")
+            .navigationTitle(appState.vo2TrainingState == .complete ? "Complete" : "VO₂ Max Training")
             .navigationBarTitleDisplayMode(.inline)
-            .navigationBarBackButtonHidden(appState.vo2TrainingState == .active)
+            .navigationBarBackButtonHidden(appState.vo2TrainingState == .active || appState.vo2TrainingState == .complete)
             .toolbar {
                 if appState.vo2TrainingState != .active {
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -176,8 +180,8 @@ struct VO2MaxTrainingView: View {
             }
         }
         .onDisappear {
-            // Stop HR monitoring if we're still in setup state
-            if appState.vo2TrainingState == .setup {
+            // Stop HR monitoring only if we're leaving from setup state (not after completion)
+            if appState.vo2TrainingState == .setup && appState.vo2CurrentPhase != .completed {
                 print("💓 Stopping HR monitoring for VO2 setup screen")
                 appState.hrManager.stopMonitoring()
             }
@@ -238,5 +242,5 @@ struct VO2MaxTrainingView: View {
 }
 
 #Preview {
-    VO2MaxTrainingView()
+    VO2MaxTrainingView(isPresented: .constant(true))
 }
