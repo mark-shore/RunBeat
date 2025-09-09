@@ -127,10 +127,11 @@ struct VO2MaxTrainingView: View {
                         CurrentTrackView(track: spotifyViewModel.currentTrackInfo)
                     }
                 }
+                .padding(.top, 50) // Generous top spacing for better visual balance
                 .padding(.horizontal, 12) // Reduced horizontal padding for wider cards
                 .padding(.vertical, AppSpacing.screenMargin)
             }
-            .navigationTitle(appState.vo2TrainingState == .complete ? "Complete" : "VO₂ Max Training")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
             .toolbar {
