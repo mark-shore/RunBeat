@@ -29,6 +29,9 @@ class BackendService {
     private var activeBaseURL: String
     private let deviceID: String
     
+    // Firebase user ID for user-scoped endpoints
+    private var currentUserID: String?
+    
     // Network configuration
     private let timeoutInterval: TimeInterval = 15.0
     private let maxRetries = 3
@@ -77,6 +80,8 @@ class BackendService {
         AppLogger.info("Primary endpoint: \(activeBaseURL)", component: "Backend")
         AppLogger.debug("Fallback endpoints: \(fallbackEndpoints)", component: "Backend")
         
+        AppLogger.debug("Backend service initialized - will use device-based endpoints until Firebase user ID is set", component: "Backend")
+        
         // Set up app lifecycle observers
         setupAppLifecycleObservers()
         
@@ -84,6 +89,47 @@ class BackendService {
         Task {
             await testConnectivity()
         }
+    }
+    
+    // MARK: - User ID Management
+    
+    /**
+     * Set the current Firebase user ID for user-scoped backend calls
+     * 
+     * When a user ID is set, all Spotify token operations will use user-scoped endpoints.
+     * When nil, falls back to device-based endpoints for backwards compatibility.
+     */
+    func setUserID(_ userID: String?) {
+        let previousUserID = currentUserID
+        currentUserID = userID
+        
+        if let userID = userID {
+            AppLogger.info("Backend service switching to user-scoped mode (user: \(userID))", component: "Backend")
+            
+            // Only clear token cache when switching to a DIFFERENT user
+            // Don't clear on initial user authentication (device -> user)
+            if let previousUserID = previousUserID, previousUserID != userID {
+                clearTokenCache()
+                AppLogger.debug("Token cache cleared due to user ID change (\(previousUserID) -> \(userID))", component: "Backend")
+            } else if previousUserID == nil {
+                AppLogger.debug("Initial user authentication - preserving token cache", component: "Backend")
+            }
+        } else {
+            AppLogger.info("Backend service falling back to device-scoped mode", component: "Backend")
+            
+            // Only clear cache when falling back from user mode
+            if previousUserID != nil {
+                clearTokenCache()
+                AppLogger.debug("Token cache cleared due to fallback to device mode", component: "Backend")
+            }
+        }
+    }
+    
+    /**
+     * Get current operation mode for debugging
+     */
+    var operationMode: String {
+        return currentUserID != nil ? "user-scoped" : "device-scoped"
     }
     
     // MARK: - Spotify Token Management
@@ -96,7 +142,8 @@ class BackendService {
         refreshToken: String,
         expiresIn: Int
     ) async throws {
-        let url = URL(string: "\(activeBaseURL)/api/v1/devices/\(deviceID)/spotify-tokens")!
+        let endpoint = getSpotifyTokensEndpoint()
+        let url = URL(string: "\(activeBaseURL)\(endpoint)")!
         
         let requestBody: [String: Any] = [
             "access_token": accessToken,
@@ -109,7 +156,7 @@ class BackendService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         
-        AppLogger.debug("Storing tokens for device \(deviceID)", component: "Backend")
+        AppLogger.debug("Storing tokens in \(operationMode) mode", component: "Backend")
         
         do {
             let (data, response) = try await performRequest(request)
@@ -171,12 +218,13 @@ class BackendService {
      * Fetch token from backend and update cache
      */
     private func fetchTokenFromBackend() async throws -> SpotifyTokenResponse {
-        let url = URL(string: "\(activeBaseURL)/api/v1/devices/\(deviceID)/spotify-token")!
+        let endpoint = getSpotifyTokenEndpoint()
+        let url = URL(string: "\(activeBaseURL)\(endpoint)")!
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         
-        AppLogger.debug("Requesting fresh token for device \(deviceID)", component: "Backend")
+        AppLogger.debug("Requesting fresh token in \(operationMode) mode", component: "Backend")
         
         do {
             let (data, response) = try await performRequest(request)
@@ -214,12 +262,13 @@ class BackendService {
      * Delete stored tokens from the backend (for logout)
      */
     func deleteSpotifyTokens() async throws {
-        let url = URL(string: "\(activeBaseURL)/api/v1/devices/\(deviceID)/spotify-tokens")!
+        let endpoint = getSpotifyTokensEndpoint()
+        let url = URL(string: "\(activeBaseURL)\(endpoint)")!
         
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         
-        AppLogger.info("Deleting tokens for device \(deviceID)", component: "Backend")
+        AppLogger.info("Deleting tokens in \(operationMode) mode", component: "Backend")
         
         do {
             let (data, response) = try await performRequest(request)
@@ -424,7 +473,10 @@ class BackendService {
             "last_foreground": lastForegroundTimestamp?.description ?? "none",
             "cached_token_expires_at": cachedToken?.expiresAt ?? "none",
             "cached_token_is_expired": cachedToken?.isExpiredOrExpiring ?? true,
-            "app_state_independent": true // Cache logic is now app state independent
+            "app_state_independent": true, // Cache logic is now app state independent
+            "current_user_id": currentUserID ?? "none",
+            "operation_mode": operationMode,
+            "device_id": deviceID
         ]
     }
     
@@ -454,6 +506,32 @@ class BackendService {
         return results
     }
 
+    // MARK: - Endpoint Construction
+    
+    /**
+     * Get the appropriate endpoint for Spotify token operations
+     * Returns user-scoped endpoint if user ID available, otherwise device-scoped endpoint
+     */
+    private func getSpotifyTokensEndpoint() -> String {
+        if let userID = currentUserID {
+            return "/api/v1/users/\(userID)/spotify-tokens"
+        } else {
+            return "/api/v1/devices/\(deviceID)/spotify-tokens"
+        }
+    }
+    
+    /**
+     * Get the appropriate endpoint for single Spotify token retrieval
+     * Returns user-scoped endpoint if user ID available, otherwise device-scoped endpoint
+     */
+    private func getSpotifyTokenEndpoint() -> String {
+        if let userID = currentUserID {
+            return "/api/v1/users/\(userID)/spotify-token"
+        } else {
+            return "/api/v1/devices/\(deviceID)/spotify-token"
+        }
+    }
+    
     // MARK: - Private Helper Methods
     
     /**

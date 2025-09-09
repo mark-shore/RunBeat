@@ -73,7 +73,7 @@ class SpotifyTokenRefreshService:
         self.is_running = False
         
         # Track failed refresh attempts for retry logic
-        self.failed_devices: Dict[str, datetime] = {}  # device_id -> failure_time
+        self.failed_users: Dict[str, datetime] = {}  # user_id -> failure_time
         
         # Spotify OAuth setup for token refresh
         self.spotify_oauth = SpotifyOAuth(
@@ -108,19 +108,19 @@ class SpotifyTokenRefreshService:
         self.scheduler.start()
         logger.info("Token refresh scheduler started successfully")
     
-    def _schedule_retry(self, device_id: str):
+    def _schedule_retry(self, user_id: str):
         """
-        Schedule a retry attempt for a failed device refresh after 5 minutes
+        Schedule a retry attempt for a failed user refresh after 5 minutes
         
         Args:
-            device_id: Device that failed to refresh
+            user_id: User that failed to refresh
         """
         
         if not self.scheduler:
             logger.warning("Cannot schedule retry - scheduler not running")
             return
         
-        retry_job_id = f"retry_refresh_{device_id}"
+        retry_job_id = f"retry_refresh_{user_id}"
         
         # Remove existing retry job if present
         try:
@@ -132,18 +132,18 @@ class SpotifyTokenRefreshService:
         retry_time = datetime.now() + timedelta(minutes=5)
         
         self.scheduler.add_job(
-            func=self._retry_single_device,
+            func=self._retry_single_user,
             trigger="date",
             run_date=retry_time,
-            args=[device_id],
+            args=[user_id],
             id=retry_job_id,
-            name=f"Retry Token Refresh - {device_id}",
+            name=f"Retry Token Refresh - {user_id}",
             max_instances=1
         )
         
         logger.info(
             "Scheduled token refresh retry",
-            device_id=device_id,
+            user_id=user_id,
             retry_time=retry_time.isoformat()
         )
     
@@ -159,45 +159,45 @@ class SpotifyTokenRefreshService:
         self.scheduler = None
         logger.info("Token refresh scheduler stopped")
     
-    async def _retry_single_device(self, device_id: str):
+    async def _retry_single_user(self, user_id: str):
         """
-        Retry token refresh for a single device that previously failed
+        Retry token refresh for a single user that previously failed
         
         Args:
-            device_id: Device to retry refresh for
+            user_id: User to retry refresh for
         """
         
-        logger.info("Retrying token refresh for device", device_id=device_id)
+        logger.info("Retrying token refresh for user", user_id=user_id)
         
         try:
             # Get current token data
-            token_data = await firebase_client.get_spotify_tokens(device_id)
+            token_data = await firebase_client.get_spotify_tokens(user_id)
             
             if not token_data:
-                logger.warning("No token data found for retry", device_id=device_id)
-                # Remove from failed devices since token doesn't exist
-                self.failed_devices.pop(device_id, None)
+                logger.warning("No token data found for retry", user_id=user_id)
+                # Remove from failed users since token doesn't exist
+                self.failed_users.pop(user_id, None)
                 return
             
             # Attempt refresh
-            await self._refresh_single_token(device_id, token_data)
+            await self._refresh_single_token(user_id, token_data)
             
-            # Success - remove from failed devices and update stats
-            self.failed_devices.pop(device_id, None)
+            # Success - remove from failed users and update stats
+            self.failed_users.pop(user_id, None)
             self.stats.retry_attempts += 1
             
-            logger.info("Token refresh retry successful", device_id=device_id)
+            logger.info("Token refresh retry successful", user_id=user_id)
             
         except Exception as e:
             logger.error(
                 "Token refresh retry failed",
-                device_id=device_id,
+                user_id=user_id,
                 error=str(e)
             )
             
             # Don't schedule another retry to avoid infinite loops
             # The regular refresh cycle will pick it up again
-            self.failed_devices.pop(device_id, None)
+            self.failed_users.pop(user_id, None)
     
     async def _refresh_expiring_tokens(self):
         """
@@ -226,18 +226,18 @@ class SpotifyTokenRefreshService:
             self.stats.tokens_requiring_refresh = len(expiring_tokens)
             
             # Refresh each token
-            for device_id, token_data in expiring_tokens.items():
+            for user_id, token_data in expiring_tokens.items():
                 try:
-                    await self._refresh_single_token(device_id, token_data)
+                    await self._refresh_single_token(user_id, token_data)
                     self.stats.successful_refreshes += 1
                     
-                    # Remove from failed devices if previously failed
-                    self.failed_devices.pop(device_id, None)
+                    # Remove from failed users if previously failed
+                    self.failed_users.pop(user_id, None)
                     
                 except Exception as e:
                     logger.error(
-                        "Failed to refresh token for device",
-                        device_id=device_id,
+                        "Failed to refresh token for user",
+                        user_id=user_id,
                         error=str(e)
                     )
                     self.stats.failed_refreshes += 1
@@ -247,18 +247,18 @@ class SpotifyTokenRefreshService:
                     is_invalid_token = "invalid_grant" in error_str or "invalid refresh token" in error_str
                     
                     if not is_invalid_token:
-                        # Track failed device and schedule retry
-                        self.failed_devices[device_id] = datetime.utcnow()
-                        self._schedule_retry(device_id)
+                        # Track failed user and schedule retry
+                        self.failed_users[user_id] = datetime.utcnow()
+                        self._schedule_retry(user_id)
                         
                         logger.info(
                             "Scheduled retry for failed token refresh",
-                            device_id=device_id
+                            user_id=user_id
                         )
                     else:
                         logger.info(
                             "Not scheduling retry for invalid refresh token",
-                            device_id=device_id
+                            user_id=user_id
                         )
                     
                 self.stats.total_refreshes += 1
@@ -286,7 +286,7 @@ class SpotifyTokenRefreshService:
         Find all tokens that will expire within the next 45 minutes
         
         Returns:
-            Dictionary mapping device_id to token data
+            Dictionary mapping user_id to token data
         """
         
         try:
@@ -312,9 +312,9 @@ class SpotifyTokenRefreshService:
                 
                 for doc in documents:
                     try:
-                        # Extract device ID from document name
+                        # Extract user ID from document name
                         doc_name = doc.get("name", "")
-                        device_id = doc_name.split("/")[-1]
+                        user_id = doc_name.split("/")[-1]
                         
                         # Extract token data
                         fields = doc.get("fields", {})
@@ -325,7 +325,7 @@ class SpotifyTokenRefreshService:
                         if not all([expires_at_str, refresh_token, access_token]):
                             logger.warning(
                                 "Token document missing required fields",
-                                device_id=device_id
+                                user_id=user_id
                             )
                             continue
                         
@@ -334,7 +334,7 @@ class SpotifyTokenRefreshService:
                         
                         # Check if token expires within 45 minutes
                         if expires_at <= cutoff_time:
-                            expiring_tokens[device_id] = {
+                            expiring_tokens[user_id] = {
                                 "access_token": access_token,
                                 "refresh_token": refresh_token,
                                 "expires_at": expires_at
@@ -342,7 +342,7 @@ class SpotifyTokenRefreshService:
                             
                             logger.debug(
                                 "Token expires soon",
-                                device_id=device_id,
+                                user_id=user_id,
                                 expires_at=expires_at.isoformat(),
                                 minutes_until_expiry=(expires_at - datetime.utcnow()).total_seconds() / 60
                             )
@@ -350,7 +350,7 @@ class SpotifyTokenRefreshService:
                     except Exception as e:
                         logger.error(
                             "Error processing token document",
-                            device_id=device_id if 'device_id' in locals() else "unknown",
+                            user_id=user_id if 'user_id' in locals() else "unknown",
                             error=str(e)
                         )
                         continue
@@ -367,16 +367,16 @@ class SpotifyTokenRefreshService:
             logger.error("Failed to find expiring tokens", error=str(e))
             return {}
     
-    async def _refresh_single_token(self, device_id: str, token_data: Dict[str, Any]):
+    async def _refresh_single_token(self, user_id: str, token_data: Dict[str, Any]):
         """
         Refresh a single Spotify token using spotipy
         
         Args:
-            device_id: Device identifier
+            user_id: User identifier
             token_data: Current token data including refresh_token
         """
         
-        logger.info("Refreshing token for device", device_id=device_id)
+        logger.info("Refreshing token for user", user_id=user_id)
         
         try:
             refresh_token = token_data["refresh_token"]
@@ -397,7 +397,7 @@ class SpotifyTokenRefreshService:
                 
                 # Store updated tokens in Firebase
                 await firebase_client.store_spotify_tokens(
-                    device_id=device_id,
+                    user_id=user_id,
                     access_token=new_token_info["access_token"],
                     refresh_token=new_refresh_token,
                     expires_at=expires_at
@@ -405,7 +405,7 @@ class SpotifyTokenRefreshService:
                 
                 logger.info(
                     "Token refreshed successfully",
-                    device_id=device_id,
+                    user_id=user_id,
                     new_expires_at=expires_at.isoformat()
                 )
                 
@@ -414,14 +414,14 @@ class SpotifyTokenRefreshService:
                 if e.http_status == 400 and "invalid_grant" in str(e):
                     logger.warning(
                         "Refresh token invalid, cleaning up stored tokens",
-                        device_id=device_id
+                        user_id=user_id
                     )
                     
                     # Remove invalid tokens
-                    await firebase_client.delete_spotify_tokens(device_id)
+                    await firebase_client.delete_spotify_tokens(user_id)
                     self.stats.invalid_tokens_cleaned += 1
                     
-                    raise Exception(f"Invalid refresh token for device {device_id}, tokens cleaned up")
+                    raise Exception(f"Invalid refresh token for user {user_id}, tokens cleaned up")
                 else:
                     raise Exception(f"Spotify API error: {str(e)}")
             
@@ -431,7 +431,7 @@ class SpotifyTokenRefreshService:
         except Exception as e:
             logger.error(
                 "Token refresh failed",
-                device_id=device_id,
+                user_id=user_id,
                 error=str(e)
             )
             raise
@@ -476,9 +476,9 @@ class SpotifyTokenRefreshService:
         if self.scheduler:
             for job in self.scheduler.get_jobs():
                 if job.id.startswith("retry_refresh_"):
-                    device_id = job.id.replace("retry_refresh_", "")
+                    user_id = job.id.replace("retry_refresh_", "")
                     retry_jobs.append({
-                        "device_id": device_id,
+                        "user_id": user_id,
                         "retry_time": job.next_run_time.isoformat() if job.next_run_time else None
                     })
         
@@ -490,11 +490,11 @@ class SpotifyTokenRefreshService:
                 if self.scheduler and self.scheduler.get_job("spotify_token_refresh")
                 else None
             ),
-            "pending_retries": len(self.failed_devices),
+            "pending_retries": len(self.failed_users),
             "retry_jobs": retry_jobs,
-            "failed_devices": {
-                device_id: failure_time.isoformat() 
-                for device_id, failure_time in self.failed_devices.items()
+            "failed_users": {
+                user_id: failure_time.isoformat() 
+                for user_id, failure_time in self.failed_users.items()
             },
             "stats": self.stats.to_dict()
         }

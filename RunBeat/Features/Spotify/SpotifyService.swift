@@ -1528,7 +1528,17 @@ class SpotifyService: NSObject {
                 }
             case 204:
                 AppLogger.info("No music currently playing (204 response)", component: "WebAPI")
-                self.notifyPlayerStateChange(isPlaying: false, trackName: "", artistName: "", artworkURL: "")
+                // Don't overwrite track info with empty strings - just update WebAPI data source
+                // This preserves AppRemote track info while indicating WebAPI sees no playback
+                self.dataCoordinator.updateFromWebAPI(
+                    name: "", 
+                    artist: "", 
+                    uri: "", 
+                    artworkURL: "", 
+                    duration: 0, 
+                    position: 0, 
+                    isPlaying: false
+                )
             case 401:
                 AppLogger.warn("Unauthorized - access token expired, attempting refresh", component: "WebAPI")
                 // Use new training-state-aware error recovery system

@@ -3,19 +3,16 @@
 //  RunBeat
 //
 //  Firebase integration service for RunBeat
-//  Handles Spotify token management, user settings sync, and real-time workout data
+//  Handles anonymous authentication for user-scoped backend endpoints
 //
 
 import Foundation
 import Firebase
 import FirebaseAuth
-import FirebaseFirestore
 import Combine
 
 class FirebaseService: ObservableObject {
     static let shared = FirebaseService()
-    
-    private let db = Firestore.firestore()
     
     @Published var isAuthenticated = false
     @Published var currentUserId: String?
@@ -42,10 +39,17 @@ class FirebaseService: ObservableObject {
                 self?.currentUserId = user?.uid
                 
                 if let userId = user?.uid {
-                    print("✅ [Firebase] User authenticated: \(userId)")
-                    self?.setupUserDocument(userId: userId)
+                    AppLogger.info("Firebase user authenticated: \(userId)", component: "Firebase")
+                    
+                    // Notify BackendService of user ID for user-scoped endpoints
+                    BackendService.shared.setUserID(userId)
+                    AppLogger.info("Backend service notified of user ID", component: "Firebase")
                 } else {
-                    print("❌ [Firebase] User not authenticated")
+                    AppLogger.warn("Firebase user not authenticated - attempting anonymous sign-in", component: "Firebase")
+                    
+                    // Clear user ID from BackendService (fallback to device mode)
+                    BackendService.shared.setUserID(nil)
+                    
                     // Attempt anonymous sign-in
                     self?.signInAnonymously()
                 }
@@ -55,210 +59,71 @@ class FirebaseService: ObservableObject {
     
     private func signInAnonymously() {
         Auth.auth().signInAnonymously { [weak self] result, error in
-            if let error = error {
-                print("❌ [Firebase] Anonymous auth failed: \(error.localizedDescription)")
-            } else if let user = result?.user {
-                print("✅ [Firebase] Anonymous auth success: \(user.uid)")
-                self?.setupUserDocument(userId: user.uid)
-            }
-        }
-    }
-    
-    private func setupUserDocument(userId: String) {
-        // Create user document if it doesn't exist
-        let userRef = db.collection("users").document(userId)
-        
-        userRef.getDocument { document, error in
-            if let error = error {
-                print("❌ [Firebase] Error checking user document: \(error)")
-                return
-            }
-            
-            if let document = document, !document.exists {
-                // Create new user document with default settings
-                let defaultData: [String: Any] = [
-                    "createdAt": FieldValue.serverTimestamp(),
-                    "lastActiveAt": FieldValue.serverTimestamp(),
-                    "settings": [
-                        "restingHR": 60,
-                        "maxHR": 190,
-                        "useAutoZones": true
-                    ]
-                ]
-                
-                userRef.setData(defaultData) { error in
-                    if let error = error {
-                        print("❌ [Firebase] Error creating user document: \(error)")
-                    } else {
-                        print("✅ [Firebase] User document created")
-                    }
+            DispatchQueue.main.async {
+                if let error = error {
+                    AppLogger.error("Firebase anonymous auth failed: \(error.localizedDescription)", component: "Firebase")
+                    
+                    // Ensure BackendService falls back to device mode
+                    BackendService.shared.setUserID(nil)
+                    AppLogger.info("Backend service remains in device-scoped mode due to auth failure", component: "Firebase")
+                } else if let user = result?.user {
+                    AppLogger.info("Firebase anonymous auth success: \(user.uid)", component: "Firebase")
+                    
+                    // Update published properties
+                    self?.isAuthenticated = true
+                    self?.currentUserId = user.uid
+                    
+                    // Notify BackendService of user ID
+                    BackendService.shared.setUserID(user.uid)
+                    AppLogger.info("Backend service switched to user-scoped mode", component: "Firebase")
                 }
-            } else {
-                // Update last active time
-                userRef.updateData(["lastActiveAt": FieldValue.serverTimestamp()])
             }
         }
     }
     
+    // MARK: - Manual Authentication Control
     
-    // MARK: - Spotify Token Management
-    // Note: Token refresh now handled by custom FastAPI backend
+    /**
+     * Force attempt anonymous sign-in (for testing/debugging)
+     */
+    func forceSignInAnonymously() {
+        AppLogger.debug("Forcing anonymous sign-in attempt", component: "Firebase")
+        signInAnonymously()
+    }
     
-    func storeSpotifyTokens(accessToken: String, refreshToken: String) async {
-        guard let userId = currentUserId else {
-            print("❌ [Firebase] No authenticated user for storing tokens")
-            return
-        }
-        
-        let userRef = db.collection("users").document(userId)
-        
+    /**
+     * Sign out current user
+     */
+    func signOut() {
         do {
-            try await userRef.updateData([
-                "spotifyAccessToken": accessToken,
-                "spotifyRefreshToken": refreshToken,
-                "tokenUpdatedAt": FieldValue.serverTimestamp()
-            ])
-            print("✅ [Firebase] Spotify tokens stored successfully")
+            try Auth.auth().signOut()
+            AppLogger.info("Firebase user signed out", component: "Firebase")
         } catch {
-            print("❌ [Firebase] Failed to store Spotify tokens: \(error.localizedDescription)")
+            AppLogger.error("Firebase sign out failed: \(error.localizedDescription)", component: "Firebase")
         }
     }
     
-    // MARK: - User Settings Sync
+    // MARK: - Status Information
     
-    func syncUserSettings(_ settings: UserSettings) async {
-        guard let userId = currentUserId else {
-            print("❌ [Firebase] No authenticated user for settings sync")
-            return
-        }
-        
-        let userRef = db.collection("users").document(userId)
-        
-        let settingsData: [String: Any] = [
-            "restingHR": settings.restingHR,
-            "maxHR": settings.maxHR,
-            "useAutoZones": settings.useAutoZones,
-            "zone1Lower": settings.zone1Lower,
-            "zone1Upper": settings.zone1Upper,
-            "zone2Upper": settings.zone2Upper,
-            "zone3Upper": settings.zone3Upper,
-            "zone4Upper": settings.zone4Upper,
-            "zone5Upper": settings.zone5Upper,
-            "updatedAt": FieldValue.serverTimestamp()
+    /**
+     * Get authentication status for debugging
+     */
+    var authStatus: [String: Any] {
+        return [
+            "is_authenticated": isAuthenticated,
+            "current_user_id": currentUserId ?? "none",
+            "auth_provider": Auth.auth().currentUser?.providerData.first?.providerID ?? "none",
+            "is_anonymous": Auth.auth().currentUser?.isAnonymous ?? false
         ]
-        
-        do {
-            try await userRef.updateData(["settings": settingsData])
-            print("✅ [Firebase] User settings synced successfully")
-        } catch {
-            print("❌ [Firebase] Failed to sync user settings: \(error.localizedDescription)")
-        }
     }
-    
-    func getUserSettings() async -> UserSettings? {
-        guard let userId = currentUserId else {
-            print("❌ [Firebase] No authenticated user for getting settings")
-            return nil
-        }
-        
-        let userRef = db.collection("users").document(userId)
-        
-        do {
-            let document = try await userRef.getDocument()
-            
-            if let data = document.data(),
-               let settings = data["settings"] as? [String: Any] {
-                
-                return UserSettings(
-                    restingHR: settings["restingHR"] as? Int ?? 60,
-                    maxHR: settings["maxHR"] as? Int ?? 190,
-                    useAutoZones: settings["useAutoZones"] as? Bool ?? true,
-                    zone1Lower: settings["zone1Lower"] as? Int ?? 60,
-                    zone1Upper: settings["zone1Upper"] as? Int ?? 70,
-                    zone2Upper: settings["zone2Upper"] as? Int ?? 80,
-                    zone3Upper: settings["zone3Upper"] as? Int ?? 90,
-                    zone4Upper: settings["zone4Upper"] as? Int ?? 100,
-                    zone5Upper: settings["zone5Upper"] as? Int ?? 110
-                )
-            } else {
-                print("ℹ️ [Firebase] No user settings found, using defaults")
-                return nil
-            }
-        } catch {
-            print("❌ [Firebase] Failed to get user settings: \(error.localizedDescription)")
-            return nil
-        }
-    }
-    
-    // MARK: - Real-time Workout Management
-    
-    func startWorkoutSession(type: WorkoutType, config: WorkoutConfig) async {
-        guard let userId = currentUserId else {
-            print("❌ [Firebase] No authenticated user for workout session")
-            return
-        }
-        
-        let sessionData: [String: Any] = [
-            "sessionType": type.rawValue,
-            "startedAt": FieldValue.serverTimestamp(),
-            "currentInterval": 1,
-            "currentPhase": "high",
-            "timeRemaining": config.highIntensityDuration,
-            "totalIntervals": config.totalIntervals,
-            "config": [
-                "highIntensityDuration": config.highIntensityDuration,
-                "restDuration": config.restDuration,
-                "totalIntervals": config.totalIntervals
-            ]
-        ]
-        
-        let workoutRef = db.collection("users").document(userId).collection("activeWorkout").document("session")
-        
-        do {
-            try await workoutRef.setData(sessionData)
-            print("✅ [Firebase] Workout session started")
-        } catch {
-            print("❌ [Firebase] Failed to start workout session: \(error.localizedDescription)")
-        }
-    }
-    
-    func updateHeartRate(bpm: Int, zone: Int) async {
-        guard let userId = currentUserId else { return }
-        
-        let workoutRef = db.collection("users").document(userId).collection("activeWorkout").document("session")
-        
-        do {
-            try await workoutRef.updateData([
-                "heartRate": [
-                    "current": bpm,
-                    "zone": zone,
-                    "lastUpdate": FieldValue.serverTimestamp()
-                ]
-            ])
-        } catch {
-            print("❌ [Firebase] Failed to update heart rate: \(error.localizedDescription)")
-        }
-    }
-    
-    func stopWorkoutSession() async {
-        guard let userId = currentUserId else { return }
-        
-        let workoutRef = db.collection("users").document(userId).collection("activeWorkout").document("session")
-        
-        do {
-            try await workoutRef.delete()
-            print("✅ [Firebase] Workout session stopped")
-        } catch {
-            print("❌ [Firebase] Failed to stop workout session: \(error.localizedDescription)")
-        }
-    }
-    
-    // MARK: - Push Notifications
-    // Note: Push notifications removed for now
 }
 
-// MARK: - Data Models
+// MARK: - Legacy Compatibility
 
+/**
+ * Data models maintained for compatibility with existing code
+ * All data operations are now handled by BackendService + FastAPI backend
+ */
 struct UserSettings {
     let restingHR: Int
     let maxHR: Int

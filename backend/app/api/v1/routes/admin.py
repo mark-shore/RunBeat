@@ -116,7 +116,7 @@ async def get_token_overview() -> Dict[str, Any]:
                     "expiring_soon": 0,  # Within 1 hour
                     "expired": 0
                 },
-                "devices": []
+                "users": []
             }
             
             now = datetime.utcnow()
@@ -126,7 +126,7 @@ async def get_token_overview() -> Dict[str, Any]:
                 try:
                     # Extract basic info
                     doc_name = doc.get("name", "")
-                    device_id = doc_name.split("/")[-1]
+                    user_id = doc_name.split("/")[-1]
                     
                     fields = doc.get("fields", {})
                     expires_at_str = fields.get("expires_at", {}).get("timestampValue")
@@ -146,9 +146,9 @@ async def get_token_overview() -> Dict[str, Any]:
                             status = "valid"
                             token_summary["tokens_by_status"]["valid"] += 1
                         
-                        # Add device info
-                        device_info = {
-                            "device_id": device_id,
+                        # Add user info
+                        user_info = {
+                            "user_id": user_id,
                             "status": status,
                             "expires_at": expires_at.isoformat(),
                             "minutes_until_expiry": int((expires_at - now).total_seconds() / 60)
@@ -156,21 +156,21 @@ async def get_token_overview() -> Dict[str, Any]:
                         
                         if created_at_str:
                             created_at = datetime.fromisoformat(created_at_str.rstrip("Z"))
-                            device_info["created_at"] = created_at.isoformat()
-                            device_info["age_hours"] = int((now - created_at).total_seconds() / 3600)
+                            user_info["created_at"] = created_at.isoformat()
+                            user_info["age_hours"] = int((now - created_at).total_seconds() / 3600)
                         
-                        token_summary["devices"].append(device_info)
+                        token_summary["users"].append(user_info)
                 
                 except Exception as e:
                     logger.warning(
                         "Failed to process token for overview",
-                        device_id=device_id if 'device_id' in locals() else "unknown",
+                        user_id=user_id if 'user_id' in locals() else "unknown",
                         error=str(e)
                     )
                     continue
             
-            # Sort devices by expiry time
-            token_summary["devices"].sort(
+            # Sort users by expiry time
+            token_summary["users"].sort(
                 key=lambda x: x.get("minutes_until_expiry", float('inf'))
             )
             
