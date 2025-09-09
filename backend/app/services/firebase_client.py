@@ -46,16 +46,16 @@ class FirebaseClient:
     
     async def store_spotify_tokens(
         self, 
-        device_id: str, 
+        user_id: str, 
         access_token: str, 
         refresh_token: str,
         expires_at: datetime
     ) -> bool:
         """
-        Store Spotify tokens for a device in Firestore
+        Store Spotify tokens for a user in Firestore
         
         Args:
-            device_id: Unique device identifier
+            user_id: Firebase anonymous user ID
             access_token: Spotify access token
             refresh_token: Spotify refresh token
             expires_at: Token expiration timestamp
@@ -64,7 +64,7 @@ class FirebaseClient:
             True if successful, raises FirebaseError on failure
         """
         
-        logger.info("Storing Spotify tokens", device_id=device_id)
+        logger.info("Storing Spotify tokens", user_id=user_id)
         
         document_data = {
             "fields": {
@@ -88,7 +88,7 @@ class FirebaseClient:
         
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                url = f"{self.base_url}/spotify_tokens/{quote(device_id)}"
+                url = f"{self.base_url}/spotify_tokens/{quote(user_id)}"
                 params = {"key": self.api_key}
                 
                 response = await client.patch(
@@ -99,32 +99,32 @@ class FirebaseClient:
                 )
                 
                 if response.status_code == 200:
-                    logger.info("Spotify tokens stored successfully", device_id=device_id)
+                    logger.info("Spotify tokens stored successfully", user_id=user_id)
                     return True
                 else:
                     error_detail = response.text
                     logger.error(
                         "Failed to store Spotify tokens",
-                        device_id=device_id,
+                        user_id=user_id,
                         status_code=response.status_code,
                         error=error_detail
                     )
                     raise FirebaseError(f"Failed to store tokens: {error_detail}")
                     
         except httpx.TimeoutException:
-            logger.error("Timeout storing Spotify tokens", device_id=device_id)
+            logger.error("Timeout storing Spotify tokens", user_id=user_id)
             raise FirebaseError("Request timeout")
             
         except Exception as e:
-            logger.error("Unexpected error storing tokens", device_id=device_id, error=str(e))
+            logger.error("Unexpected error storing tokens", user_id=user_id, error=str(e))
             raise FirebaseError(f"Unexpected error: {str(e)}")
     
-    async def get_spotify_tokens(self, device_id: str) -> Optional[Dict[str, Any]]:
+    async def get_spotify_tokens(self, user_id: str) -> Optional[Dict[str, Any]]:
         """
-        Retrieve Spotify tokens for a device from Firestore
+        Retrieve Spotify tokens for a user from Firestore
         
         Args:
-            device_id: Unique device identifier
+            user_id: Firebase anonymous user ID
             
         Returns:
             Dictionary containing token data or None if not found
@@ -133,17 +133,17 @@ class FirebaseClient:
             FirebaseError: On API errors
         """
         
-        logger.info("Retrieving Spotify tokens", device_id=device_id)
+        logger.info("Retrieving Spotify tokens", user_id=user_id)
         
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                url = f"{self.base_url}/spotify_tokens/{quote(device_id)}"
+                url = f"{self.base_url}/spotify_tokens/{quote(user_id)}"
                 params = {"key": self.api_key}
                 
                 response = await client.get(url, params=params)
                 
                 if response.status_code == 404:
-                    logger.info("Spotify tokens not found", device_id=device_id)
+                    logger.info("Spotify tokens not found", user_id=user_id)
                     return None
                     
                 elif response.status_code == 200:
@@ -160,33 +160,33 @@ class FirebaseClient:
                         "updated_at": fields.get("updated_at", {}).get("timestampValue")
                     }
                     
-                    logger.info("Spotify tokens retrieved successfully", device_id=device_id)
+                    logger.info("Spotify tokens retrieved successfully", user_id=user_id)
                     return token_data
                     
                 else:
                     error_detail = response.text
                     logger.error(
                         "Failed to retrieve Spotify tokens",
-                        device_id=device_id,
+                        user_id=user_id,
                         status_code=response.status_code,
                         error=error_detail
                     )
                     raise FirebaseError(f"Failed to retrieve tokens: {error_detail}")
                     
         except httpx.TimeoutException:
-            logger.error("Timeout retrieving Spotify tokens", device_id=device_id)
+            logger.error("Timeout retrieving Spotify tokens", user_id=user_id)
             raise FirebaseError("Request timeout")
             
         except Exception as e:
-            logger.error("Unexpected error retrieving tokens", device_id=device_id, error=str(e))
+            logger.error("Unexpected error retrieving tokens", user_id=user_id, error=str(e))
             raise FirebaseError(f"Unexpected error: {str(e)}")
     
-    async def delete_spotify_tokens(self, device_id: str) -> bool:
+    async def delete_spotify_tokens(self, user_id: str) -> bool:
         """
-        Delete Spotify tokens for a device from Firestore
+        Delete Spotify tokens for a user from Firestore
         
         Args:
-            device_id: Unique device identifier
+            user_id: Firebase anonymous user ID
             
         Returns:
             True if successful or document didn't exist
@@ -195,49 +195,49 @@ class FirebaseClient:
             FirebaseError: On API errors
         """
         
-        logger.info("Deleting Spotify tokens", device_id=device_id)
+        logger.info("Deleting Spotify tokens", user_id=user_id)
         
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                url = f"{self.base_url}/spotify_tokens/{quote(device_id)}"
+                url = f"{self.base_url}/spotify_tokens/{quote(user_id)}"
                 params = {"key": self.api_key}
                 
                 response = await client.delete(url, params=params)
                 
                 if response.status_code in [200, 404]:
-                    logger.info("Spotify tokens deleted successfully", device_id=device_id)
+                    logger.info("Spotify tokens deleted successfully", user_id=user_id)
                     return True
                 else:
                     error_detail = response.text
                     logger.error(
                         "Failed to delete Spotify tokens",
-                        device_id=device_id,
+                        user_id=user_id,
                         status_code=response.status_code,
                         error=error_detail
                     )
                     raise FirebaseError(f"Failed to delete tokens: {error_detail}")
                     
         except httpx.TimeoutException:
-            logger.error("Timeout deleting Spotify tokens", device_id=device_id)
+            logger.error("Timeout deleting Spotify tokens", user_id=user_id)
             raise FirebaseError("Request timeout")
             
         except Exception as e:
-            logger.error("Unexpected error deleting tokens", device_id=device_id, error=str(e))
+            logger.error("Unexpected error deleting tokens", user_id=user_id, error=str(e))
             raise FirebaseError(f"Unexpected error: {str(e)}")
     
-    async def is_token_expired(self, device_id: str, margin_seconds: int = 300) -> Optional[bool]:
+    async def is_token_expired(self, user_id: str, margin_seconds: int = 300) -> Optional[bool]:
         """
         Check if stored access token is expired or will expire within margin
         
         Args:
-            device_id: Unique device identifier
+            user_id: Firebase anonymous user ID
             margin_seconds: Safety margin in seconds (default 5 minutes)
             
         Returns:
             True if expired/expiring, False if valid, None if no token found
         """
         
-        token_data = await self.get_spotify_tokens(device_id)
+        token_data = await self.get_spotify_tokens(user_id)
         
         if not token_data or not token_data.get("expires_at"):
             return None
@@ -254,7 +254,7 @@ class FirebaseClient:
             
             logger.info(
                 "Token expiration check",
-                device_id=device_id,
+                user_id=user_id,
                 expires_at=expires_at.isoformat(),
                 is_expired=is_expired
             )
@@ -262,7 +262,7 @@ class FirebaseClient:
             return is_expired
             
         except (ValueError, TypeError) as e:
-            logger.error("Failed to parse token expiration", device_id=device_id, error=str(e))
+            logger.error("Failed to parse token expiration", user_id=user_id, error=str(e))
             return True  # Assume expired if we can't parse the date
     
     async def cleanup_expired_tokens(self, batch_size: int = 100) -> int:
@@ -300,9 +300,9 @@ class FirebaseClient:
                 
                 for doc in documents:
                     try:
-                        # Extract device ID from document name
+                        # Extract user ID from document name
                         doc_name = doc.get("name", "")
-                        device_id = doc_name.split("/")[-1]
+                        user_id = doc_name.split("/")[-1]
                         
                         # Extract expiration timestamp
                         fields = doc.get("fields", {})
@@ -312,9 +312,9 @@ class FirebaseClient:
                             expires_at = datetime.fromisoformat(expires_at_str.rstrip("Z"))
                             
                             if now >= expires_at:
-                                await self.delete_spotify_tokens(device_id)
+                                await self.delete_spotify_tokens(user_id)
                                 cleaned_count += 1
-                                logger.info("Cleaned up expired token", device_id=device_id)
+                                logger.info("Cleaned up expired token", user_id=user_id)
                                 
                     except Exception as e:
                         logger.error("Error processing document for cleanup", error=str(e))

@@ -14,10 +14,10 @@ from typing import Dict, Any
 
 # Test configuration
 BASE_URL = "http://localhost:8001/api/v1"
-TEST_DEVICE_IDS = [
-    "timing-test-valid",      # Valid token (expires in 60 min)
-    "timing-test-expiring",   # Expiring token (expires in 30 min) 
-    "timing-test-invalid"     # Invalid refresh token (should fail and not retry)
+TEST_USER_IDS = [
+    "timingtestvaliduser123456789",      # Valid token (expires in 60 min)
+    "timingtestexpiringuser123456",      # Expiring token (expires in 30 min) 
+    "timingtestinvaliduser1234567"       # Invalid refresh token (should fail and not retry)
 ]
 
 class TimingTester:
@@ -40,19 +40,19 @@ class TimingTester:
         test_cases = [
             # Valid token - expires in 60 minutes (should not be refreshed)
             {
-                "device_id": TEST_DEVICE_IDS[0],
+                "user_id": TEST_USER_IDS[0],
                 "expires_in": 3600,  # 60 minutes
                 "description": "Valid token (60 min)"
             },
             # Expiring token - expires in 30 minutes (should be refreshed)
             {
-                "device_id": TEST_DEVICE_IDS[1], 
+                "user_id": TEST_USER_IDS[1], 
                 "expires_in": 1800,  # 30 minutes
                 "description": "Expiring token (30 min)"
             },
             # Invalid token - will fail refresh but not retry
             {
-                "device_id": TEST_DEVICE_IDS[2],
+                "user_id": TEST_USER_IDS[2],
                 "expires_in": 1200,  # 20 minutes
                 "description": "Invalid token (20 min)"
             }
@@ -61,16 +61,16 @@ class TimingTester:
         success_count = 0
         
         for test_case in test_cases:
-            device_id = test_case["device_id"]
+            user_id = test_case["user_id"]
             expires_in = test_case["expires_in"]
             description = test_case["description"]
             
-            print(f"   Creating {description} for device {device_id}")
+            print(f"   Creating {description} for user {user_id}")
             
-            url = f"{BASE_URL}/devices/{device_id}/spotify-tokens"
+            url = f"{BASE_URL}/users/{user_id}/spotify-tokens"
             token_data = {
-                "access_token": f"BQTest_{device_id}_access",
-                "refresh_token": f"AQTest_{device_id}_refresh", 
+                "access_token": f"BQTest_{user_id}_access",
+                "refresh_token": f"AQTest_{user_id}_refresh", 
                 "expires_in": expires_in
             }
             
@@ -112,7 +112,7 @@ class TimingTester:
                 if retry_jobs:
                     print(f"   Scheduled retries:")
                     for retry in retry_jobs:
-                        print(f"     - {retry['device_id']}: {retry['retry_time']}")
+                        print(f"     - {retry['user_id']}: {retry['retry_time']}")
                 
                 # Show stats
                 stats = refresh_system.get('stats', {})
@@ -184,15 +184,15 @@ class TimingTester:
                 print(f"   Expiring soon (< 1 hour): {by_status.get('expiring_soon', 0)}")
                 print(f"   Expired: {by_status.get('expired', 0)}")
                 
-                # Show devices with their expiry status
-                devices = overview.get('devices', [])
-                print("   Device details:")
-                for device in devices:
-                    device_id = device.get('device_id', 'unknown')
-                    status = device.get('status', 'unknown')
-                    minutes_until_expiry = device.get('minutes_until_expiry', 'N/A')
+                # Show users with their expiry status
+                users = overview.get('users', [])
+                print("   User details:")
+                for user in users:
+                    user_id = user.get('user_id', 'unknown')
+                    status = user.get('status', 'unknown')
+                    minutes_until_expiry = user.get('minutes_until_expiry', 'N/A')
                     
-                    print(f"     {device_id}: {status} (expires in {minutes_until_expiry} min)")
+                    print(f"     {user_id}: {status} (expires in {minutes_until_expiry} min)")
                 
                 return True
                 
@@ -209,19 +209,19 @@ class TimingTester:
         
         print("🧹 Cleaning up test tokens...")
         
-        for device_id in TEST_DEVICE_IDS:
-            url = f"{BASE_URL}/devices/{device_id}/spotify-tokens"
+        for user_id in TEST_USER_IDS:
+            url = f"{BASE_URL}/users/{user_id}/spotify-tokens"
             
             try:
                 response = await self.client.delete(url)
                 
                 if response.status_code == 200:
-                    print(f"   ✅ Cleaned up {device_id}")
+                    print(f"   ✅ Cleaned up {user_id}")
                 else:
-                    print(f"   ⚠️ Cleanup {device_id}: {response.status_code}")
+                    print(f"   ⚠️ Cleanup {user_id}: {response.status_code}")
                     
             except Exception as e:
-                print(f"   ⚠️ Error cleaning up {device_id}: {str(e)}")
+                print(f"   ⚠️ Error cleaning up {user_id}: {str(e)}")
 
 async def main():
     """Run timing update tests"""
@@ -287,9 +287,9 @@ async def main():
         
         # Check if retry logic is working
         if pending_retries > 0:
-            print(f"✅ Retry logic: {pending_retries} devices scheduled for retry in 5 minutes")
+            print(f"✅ Retry logic: {pending_retries} users scheduled for retry in 5 minutes")
             for retry in retry_jobs:
-                print(f"   - {retry['device_id']} retry at {retry['retry_time']}")
+                print(f"   - {retry['user_id']} retry at {retry['retry_time']}")
         else:
             print("ℹ️ Retry logic: No retries scheduled (expected with mock tokens)")
         
@@ -303,7 +303,7 @@ async def main():
         print("  1. ✅ Refresh interval updated to 15 minutes")
         print("  2. ✅ Expiry detection window expanded to 45 minutes") 
         print("  3. ✅ Retry logic implemented with 5-minute delays")
-        print("  4. ✅ Failed device tracking and retry job scheduling")
+        print("  4. ✅ Failed user tracking and retry job scheduling")
         print("\n💡 These changes eliminate timing gaps and ensure tokens")
         print("   are refreshed well before expiration with automatic retries.")
 

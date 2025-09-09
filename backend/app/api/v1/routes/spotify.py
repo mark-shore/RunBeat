@@ -1,5 +1,6 @@
 """
 Spotify integration endpoints for token management and API proxying
+User-scoped implementation using Firebase anonymous authentication
 """
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -8,6 +9,7 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
 import httpx
 import base64
+import re
 
 from app.core.config import settings
 from app.core.logging_config import get_logger
@@ -18,7 +20,7 @@ logger = get_logger(__name__)
 
 class SpotifyTokenRequest(BaseModel):
     """Spotify token refresh request model"""
-    device_id: str = Field(..., description="Device identifier")
+    user_id: str = Field(..., description="Firebase anonymous user ID")
     refresh_token: str = Field(..., description="Spotify refresh token")
 
 class SpotifyTokenResponse(BaseModel):
@@ -37,21 +39,35 @@ class SpotifyTokenStoreRequest(BaseModel):
 
 class SpotifyAPIRequest(BaseModel):
     """Generic Spotify API request model"""
-    device_id: str = Field(..., description="Device identifier")
+    user_id: str = Field(..., description="Firebase anonymous user ID")
     endpoint: str = Field(..., description="Spotify API endpoint (without base URL)")
     method: str = Field(default="GET", description="HTTP method")
     data: Optional[Dict[str, Any]] = Field(None, description="Request body data")
 
-@router.post("/devices/{device_id}/spotify-tokens")
-async def store_spotify_tokens(device_id: str, request: SpotifyTokenStoreRequest) -> Dict[str, Any]:
+def validate_user_id(user_id: str) -> bool:
     """
-    Store Spotify tokens for a specific device
+    Validate Firebase anonymous user ID format
+    Firebase UIDs are typically 28 characters long and contain alphanumeric characters
+    """
+    if not user_id or len(user_id) < 20 or len(user_id) > 36:
+        return False
+    
+    # Allow alphanumeric characters only (Firebase UID pattern)
+    return re.match(r'^[a-zA-Z0-9]+$', user_id) is not None
+
+@router.post("/users/{user_id}/spotify-tokens")
+async def store_spotify_tokens(user_id: str, request: SpotifyTokenStoreRequest) -> Dict[str, Any]:
+    """
+    Store Spotify tokens for a specific user
     
     This endpoint allows the iOS app to store initial Spotify tokens
     after successful OAuth authentication.
     """
     
-    logger.info("Storing Spotify tokens for device", device_id=device_id)
+    if not validate_user_id(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user ID format")
+    
+    logger.info("Storing Spotify tokens for user", user_id=user_id)
     
     try:
         # Calculate expiration time
@@ -59,13 +75,13 @@ async def store_spotify_tokens(device_id: str, request: SpotifyTokenStoreRequest
         
         # Store tokens in Firebase
         await firebase_client.store_spotify_tokens(
-            device_id=device_id,
+            user_id=user_id,
             access_token=request.access_token,
             refresh_token=request.refresh_token,
             expires_at=expires_at
         )
         
-        logger.info("Spotify tokens stored successfully", device_id=device_id)
+        logger.info("Spotify tokens stored successfully", user_id=user_id)
         
         return {
             "success": True,
@@ -74,44 +90,47 @@ async def store_spotify_tokens(device_id: str, request: SpotifyTokenStoreRequest
         }
         
     except FirebaseError as e:
-        logger.error("Failed to store Spotify tokens", device_id=device_id, error=str(e))
+        logger.error("Failed to store Spotify tokens", user_id=user_id, error=str(e))
         raise HTTPException(status_code=500, detail=f"Failed to store tokens: {str(e)}")
     
     except Exception as e:
-        logger.error("Unexpected error storing tokens", device_id=device_id, error=str(e))
+        logger.error("Unexpected error storing tokens", user_id=user_id, error=str(e))
         raise HTTPException(status_code=500, detail="Failed to store tokens")
 
-@router.get("/devices/{device_id}/spotify-token")
-async def get_spotify_token(device_id: str) -> SpotifyTokenResponse:
+@router.get("/users/{user_id}/spotify-token")
+async def get_spotify_token(user_id: str) -> SpotifyTokenResponse:
     """
-    Get a fresh Spotify access token for a device
+    Get a fresh Spotify access token for a user
     
     This endpoint retrieves the stored token if it's still valid,
     or automatically refreshes it if expired.
     """
     
-    logger.info("Getting Spotify token for device", device_id=device_id)
+    if not validate_user_id(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user ID format")
+    
+    logger.info("Getting Spotify token for user", user_id=user_id)
     
     try:
         # Check if token exists and is expired
         is_expired = await firebase_client.is_token_expired(
-            device_id, 
+            user_id, 
             margin_seconds=settings.SPOTIFY_TOKEN_REFRESH_MARGIN
         )
         
         if is_expired is None:
             raise HTTPException(
                 status_code=404, 
-                detail="No tokens found for this device"
+                detail="No tokens found for this user"
             )
         
         # Get current tokens
-        token_data = await firebase_client.get_spotify_tokens(device_id)
+        token_data = await firebase_client.get_spotify_tokens(user_id)
         
         if not token_data:
             raise HTTPException(
                 status_code=404,
-                detail="No tokens found for this device"
+                detail="No tokens found for this user"
             )
         
         # If token is not expired, return it
@@ -120,7 +139,7 @@ async def get_spotify_token(device_id: str) -> SpotifyTokenResponse:
             expires_at = datetime.fromisoformat(expires_at_str)
             expires_in = int((expires_at - datetime.utcnow()).total_seconds())
             
-            logger.info("Returning existing valid token", device_id=device_id)
+            logger.info("Returning existing valid token", user_id=user_id)
             
             return SpotifyTokenResponse(
                 access_token=token_data["access_token"],
@@ -130,10 +149,10 @@ async def get_spotify_token(device_id: str) -> SpotifyTokenResponse:
             )
         
         # Token is expired, refresh it
-        logger.info("Token expired, refreshing", device_id=device_id)
+        logger.info("Token expired, refreshing", user_id=user_id)
         
         refresh_request = SpotifyTokenRequest(
-            device_id=device_id,
+            user_id=user_id,
             refresh_token=token_data["refresh_token"]
         )
         
@@ -142,27 +161,30 @@ async def get_spotify_token(device_id: str) -> SpotifyTokenResponse:
     except HTTPException:
         raise
     except FirebaseError as e:
-        logger.error("Firebase error getting token", device_id=device_id, error=str(e))
+        logger.error("Firebase error getting token", user_id=user_id, error=str(e))
         raise HTTPException(status_code=500, detail=f"Failed to retrieve token: {str(e)}")
     except Exception as e:
-        logger.error("Unexpected error getting token", device_id=device_id, error=str(e))
+        logger.error("Unexpected error getting token", user_id=user_id, error=str(e))
         raise HTTPException(status_code=500, detail="Failed to retrieve token")
 
-@router.delete("/devices/{device_id}/spotify-tokens")
-async def delete_spotify_tokens(device_id: str) -> Dict[str, Any]:
+@router.delete("/users/{user_id}/spotify-tokens")
+async def delete_spotify_tokens(user_id: str) -> Dict[str, Any]:
     """
-    Delete stored Spotify tokens for a device
+    Delete stored Spotify tokens for a user
     
-    This endpoint removes all stored tokens for the device,
+    This endpoint removes all stored tokens for the user,
     useful for logout or cleanup operations.
     """
     
-    logger.info("Deleting Spotify tokens for device", device_id=device_id)
+    if not validate_user_id(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user ID format")
+    
+    logger.info("Deleting Spotify tokens for user", user_id=user_id)
     
     try:
-        await firebase_client.delete_spotify_tokens(device_id)
+        await firebase_client.delete_spotify_tokens(user_id)
         
-        logger.info("Spotify tokens deleted successfully", device_id=device_id)
+        logger.info("Spotify tokens deleted successfully", user_id=user_id)
         
         return {
             "success": True,
@@ -170,11 +192,11 @@ async def delete_spotify_tokens(device_id: str) -> Dict[str, Any]:
         }
         
     except FirebaseError as e:
-        logger.error("Failed to delete Spotify tokens", device_id=device_id, error=str(e))
+        logger.error("Failed to delete Spotify tokens", user_id=user_id, error=str(e))
         raise HTTPException(status_code=500, detail=f"Failed to delete tokens: {str(e)}")
     
     except Exception as e:
-        logger.error("Unexpected error deleting tokens", device_id=device_id, error=str(e))
+        logger.error("Unexpected error deleting tokens", user_id=user_id, error=str(e))
         raise HTTPException(status_code=500, detail="Failed to delete tokens")
 
 @router.post("/spotify/refresh-token")
@@ -186,9 +208,12 @@ async def refresh_spotify_token(request: SpotifyTokenRequest) -> SpotifyTokenRes
     eliminating the need for the iOS app to manage token refresh directly.
     """
     
+    if not validate_user_id(request.user_id):
+        raise HTTPException(status_code=400, detail="Invalid user ID format")
+    
     logger.info(
         "Spotify token refresh request",
-        device_id=request.device_id
+        user_id=request.user_id
     )
     
     try:
@@ -219,7 +244,7 @@ async def refresh_spotify_token(request: SpotifyTokenRequest) -> SpotifyTokenRes
         if response.status_code != 200:
             logger.error(
                 "Spotify token refresh failed",
-                device_id=request.device_id,
+                user_id=request.user_id,
                 status_code=response.status_code,
                 response=response.text
             )
@@ -244,14 +269,14 @@ async def refresh_spotify_token(request: SpotifyTokenRequest) -> SpotifyTokenRes
         
         logger.info(
             "Spotify token refreshed successfully",
-            device_id=request.device_id,
+            user_id=request.user_id,
             expires_in=expires_in
         )
         
-        # Store new tokens in Firebase for the device
+        # Store new tokens in Firebase for the user
         try:
             await firebase_client.store_spotify_tokens(
-                device_id=request.device_id,
+                user_id=request.user_id,
                 access_token=token_data["access_token"],
                 refresh_token=token_data.get("refresh_token", request.refresh_token),
                 expires_at=expires_at
@@ -259,7 +284,7 @@ async def refresh_spotify_token(request: SpotifyTokenRequest) -> SpotifyTokenRes
         except FirebaseError as e:
             logger.error(
                 "Failed to store refreshed tokens",
-                device_id=request.device_id,
+                user_id=request.user_id,
                 error=str(e)
             )
             # Continue without failing the request - token refresh succeeded
@@ -267,13 +292,13 @@ async def refresh_spotify_token(request: SpotifyTokenRequest) -> SpotifyTokenRes
         return token_response
         
     except httpx.TimeoutException:
-        logger.error("Spotify token refresh timeout", device_id=request.device_id)
+        logger.error("Spotify token refresh timeout", user_id=request.user_id)
         raise HTTPException(status_code=408, detail="Token refresh request timed out")
     
     except Exception as e:
         logger.error(
             "Unexpected error during token refresh",
-            device_id=request.device_id,
+            user_id=request.user_id,
             error=str(e)
         )
         raise HTTPException(status_code=500, detail="Token refresh failed")
@@ -287,16 +312,19 @@ async def spotify_api_proxy(request: SpotifyAPIRequest) -> Dict[str, Any]:
     which can handle token refresh transparently.
     """
     
+    if not validate_user_id(request.user_id):
+        raise HTTPException(status_code=400, detail="Invalid user ID format")
+    
     logger.info(
         "Spotify API proxy request",
-        device_id=request.device_id,
+        user_id=request.user_id,
         endpoint=request.endpoint,
         method=request.method
     )
     
     try:
-        # Get fresh access token for device
-        token_response = await get_spotify_token(request.device_id)
+        # Get fresh access token for user
+        token_response = await get_spotify_token(request.user_id)
         
         # Prepare request to Spotify API
         headers = {
@@ -331,7 +359,7 @@ async def spotify_api_proxy(request: SpotifyAPIRequest) -> Dict[str, Any]:
         else:
             logger.error(
                 "Spotify API request failed",
-                device_id=request.device_id,
+                user_id=request.user_id,
                 endpoint=request.endpoint,
                 status_code=response.status_code,
                 error=response.text
@@ -346,7 +374,7 @@ async def spotify_api_proxy(request: SpotifyAPIRequest) -> Dict[str, Any]:
     except Exception as e:
         logger.error(
             "Unexpected error in API proxy",
-            device_id=request.device_id,
+            user_id=request.user_id,
             endpoint=request.endpoint,
             error=str(e)
         )
