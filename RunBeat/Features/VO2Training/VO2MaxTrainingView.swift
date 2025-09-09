@@ -27,10 +27,6 @@ struct VO2MaxTrainingView: View {
                         Text("VO₂ Max Training")
                             .font(AppTypography.largeTitle)
                             .foregroundColor(AppColors.onBackground)
-                        
-                        Text("4 min High Intensity • 3 min Rest • 4 Intervals")
-                            .font(AppTypography.callout)
-                            .foregroundColor(AppColors.secondary)
                     }
                     
                     Spacer()
