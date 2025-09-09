@@ -31,24 +31,29 @@ struct VO2MaxTrainingView: View {
                     
                     Spacer()
                     
-                    // Timer Display (hidden during completion)
+                    // Timer and heart rate display (hidden during completion)
                     if appState.vo2TrainingState != .complete {
-                        VStack(alignment: .center, spacing: AppSpacing.md) {
-                            // Timer text
-                            Text(appState.vo2FormattedTimeRemaining)
-                                .font(.system(size: 28, weight: .medium, design: .monospaced))
-                                .foregroundColor(getPhaseColor(for: appState.vo2CurrentPhase))
+                        VStack(alignment: .center, spacing: AppSpacing.lg) {
+                            // Phase-aware timer display (active training only)
+                            if appState.vo2TrainingState == .active {
+                                VStack(alignment: .center, spacing: AppSpacing.xs) {
+                                    // Timer
+                                    Text(appState.vo2FormattedTimeRemaining)
+                                        .font(AppTypography.timerDisplay)
+                                        .foregroundColor(AppColors.onBackground)
+                                    
+                                    // Phase with interval count
+                                    Text(getPhaseDisplayText())
+                                        .font(AppTypography.body)
+                                        .foregroundColor(AppColors.onBackground)
+                                }
+                            }
                             
-                            // Always show BPMDisplayView with consistent sizing - displays "--" when no HR
+                            // Heart rate display
                             BPMDisplayView(bpm: appState.currentBPM, zone: getCurrentZone())
                                 .frame(maxWidth: .infinity, alignment: .center)
                                 .id("bpm-display")
                                 .animation(.none, value: appState.currentBPM)
-                            
-                            // Interval counter
-                            Text("Interval \(appState.vo2CurrentInterval)/\(appState.vo2TotalIntervals)")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondary)
                         }
                     }
                     
@@ -212,6 +217,21 @@ struct VO2MaxTrainingView: View {
             return AppColors.zone1 // Blue for rest periods
         case .completed:
             return AppColors.success // Green for completed
+        }
+    }
+    
+    private func getPhaseDisplayText() -> String {
+        let intervalNumber = (appState.vo2CurrentInterval + 1) / 2
+        
+        switch appState.vo2CurrentPhase {
+        case .notStarted:
+            return "READY TO START"
+        case .highIntensity:
+            return "HIGH INTENSITY \(intervalNumber)/4"
+        case .rest:
+            return "REST \(intervalNumber)/4"
+        case .completed:
+            return "TRAINING COMPLETE"
         }
     }
     
