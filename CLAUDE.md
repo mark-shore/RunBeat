@@ -36,7 +36,8 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - `HeartRateManager`: CoreBluetooth heart rate monitoring - working perfectly
 - Background execution logic for continuous monitoring
 - Audio announcement timing and cooldown system
-- **Spotify architecture**: Recently refactored (Phase 1-6) with intent-based lifecycle management, robust connection management, error recovery, and persistent authentication
+- **User-scoped authentication**: Production-ready Firebase anonymous auth with backend token management
+- **Spotify architecture**: Complete with intent-based lifecycle management, robust connection management, error recovery, and persistent authentication
 
 ### Core Modules
 
@@ -50,8 +51,8 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - `ZoneAnnouncementCoordinator.swift`: Per-training-mode announcement management
 - `SpeechAnnouncer.swift`: Audio announcement execution
 - `AudioService.swift`: Audio session and volume management
-- `BackendService.swift`: FastAPI backend integration with intelligent token caching
-- `DeviceIDManager.swift`: Consistent device identification for backend communication
+- `BackendService.swift`: FastAPI backend integration with user-scoped token management and intelligent caching
+- `FirebaseService.swift`: Firebase anonymous authentication with automatic user ID propagation
 - `AppLogger.swift`: Centralized logging system with rate limiting and structured output
 
 #### Free Training Module (`Features/FreeTraining/`)
@@ -103,11 +104,11 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - UserDefaults for settings persistence (preserve existing keys)
 
 ### Current Priority Issues
-1. **Apple Music Integration**: Consider adding as alternative to Spotify
-2. **Live HR Display**: Add current BPM to training screens
-3. **User Onboarding**: Guide new users through HR zone setup
-4. **UI Polish**: Improve training mode descriptions and visual clarity
-5. **Training Analytics**: Add workout history and performance tracking
+1. **Live HR Display**: Add current BPM to training screens
+2. **User Onboarding**: Guide new users through HR zone setup
+3. **UI Polish**: Improve training mode descriptions and visual clarity
+4. **Training Analytics**: Add workout history and performance tracking
+5. **Apple Music Integration**: Consider adding as alternative to Spotify
 
 ## Testing Requirements
 
@@ -125,7 +126,8 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - **Token Expiration Testing**: Leave app closed for 2+ hours → start VO2 training → verify graceful token refresh
 - **Reconnection Testing**: Start training → force Spotify disconnect → verify music resumes when reconnected
 - **App Switching Testing**: Start training → switch to Spotify briefly → return to RunBeat → verify music continues uninterrupted
-- **Backend Integration Testing**: Monitor backend token caching and refresh cycles
+- **User-Scoped Testing**: Verify Firebase anonymous auth → backend user ID propagation → token refresh cycles
+- **Background Token Refresh Testing**: Leave app closed for hours → verify backend automatically refreshes user tokens
 
 ## Configuration
 
@@ -141,13 +143,15 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 
 ## Known Issues
 
-### Recently Resolved
+### Production-Ready Systems
+- ✅ **User-Scoped Authentication**: Complete Firebase anonymous auth with backend integration
+- ✅ **Background Token Refresh**: Automatic user-scoped token refresh service runs server-side
 - ✅ **Token Expiration During Training**: Fixed with centralized token refresh and graceful error handling
 - ✅ **Foreground Playlist Restart**: Fixed with training-aware foreground handling
 - ✅ **Music Recovery After Reconnection**: Fixed with automatic Spotify reconnection observers
 - ✅ **Playlist Restart Interruptions**: Fixed automatic playlist restarts when switching between apps
-- ✅ **Backend Service Integration**: Implemented FastAPI backend with intelligent token caching and Railway deployment
-- ✅ **Logging System Overhaul**: Replaced 642+ print statements with structured AppLogger system featuring rate limiting and environment-aware log levels
+- ✅ **Backend Service Integration**: Production-ready FastAPI backend with user-scoped endpoints and Railway deployment
+- ✅ **Logging System**: Structured AppLogger system with rate limiting and environment-aware log levels
 
 ### Current Areas for Improvement
 - Live BPM not displayed during training screens
@@ -166,13 +170,16 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - Never modify `HeartRateManager`'s core Bluetooth logic
 - Preserve all background execution functionality (working reliably)
 - Keep audio announcement timing unchanged
-- **Spotify Architecture**: Recent improvements to token management and error handling - architecture is stable
+- **User-Scoped Architecture**: Firebase anonymous auth and backend user endpoints are production-ready - do not revert to device-based
 - **Token Management**: Use `makeAuthenticatedAPICall()` for new Spotify API calls to get automatic token refresh
+- **Backend Integration**: Use `BackendService.shared` for all backend communication - handles user ID routing automatically
 - **Logging**: Use `AppLogger` instead of `print()` statements for all new code
 - Test on physical device for realistic behavior
 - Use design system components consistently
 
-## Recent Architecture Changes (2025)
+## Production Architecture (2025)
+
+The following systems have been implemented and are production-ready:
 
 ### Spotify Token Management Improvements
 
@@ -197,30 +204,37 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 
 **API Calls Updated**: Track polling, playlist control, and playlist fetching now use centralized token management.
 
-### Backend Service Integration (2025)
+### User-Scoped Backend Architecture (2025)
 
-**Problem Solved**: Client-only OAuth created UX friction and redundant API calls during active sessions.
+**System Overview**: Complete user-scoped authentication and token management system.
 
-**Solutions Implemented**:
-1. **FastAPI Backend** (`backend/`) with Railway deployment
-   - Centralized Spotify token storage in Firebase
-   - Automatic token refresh scheduling
-   - Admin endpoints for monitoring and management
-   - Device-based token organization
+**Architecture Components**:
+1. **Firebase Anonymous Authentication** (`FirebaseService.swift`)
+   - Automatic anonymous user creation on app launch
+   - User ID propagation to backend services
+   - Seamless authentication without user friction
+   - Production-ready with error handling and retry logic
 
-2. **Intelligent iOS Token Caching** (`BackendService.swift`)
+2. **User-Scoped Backend** (`backend/`) with Railway deployment
+   - User-based token storage: `/api/v1/users/{user_id}/spotify-tokens`
+   - Automatic background token refresh service
+   - Admin endpoints for user-based monitoring
+   - Firebase Firestore integration with user-scoped documents
+
+3. **Intelligent iOS Token Management** (`BackendService.swift`)
+   - User ID-aware endpoint routing with device fallback
    - App lifecycle-aware caching (30-minute cache during active sessions)
    - 1 backend call on startup/foreground, 0 calls during active use
    - Automatic cache invalidation on app suspension
    - Offline fallback with keychain storage
 
-3. **Playlist Restart Elimination** (`SpotifyViewModel.swift`, `VO2MaxTrainingManager.swift`)
-   - Removed automatic playlist restarts on app switching
-   - Fixed connection state handlers to only ensure track polling
-   - Music continues uninterrupted when switching between apps
-   - Maintained legitimate playlist changes during training phase transitions
+4. **Background Token Refresh Service** (`backend/app/services/token_refresh_service.py`)
+   - Runs every 15 minutes server-side
+   - Refreshes user tokens before expiration
+   - Retry logic for failed refreshes
+   - Admin monitoring and manual trigger endpoints
 
-**Technical Implementation**: Backend handles token refresh automatically while users sleep/suspend app, iOS requests fresh tokens only when needed, eliminating redundant API calls and playlist interruptions.
+**Technical Benefits**: Users get seamless authentication, server handles token refresh automatically, eliminates client-side OAuth friction, provides scalable user-based architecture.
 
 ### Logging System Implementation (2025)
 

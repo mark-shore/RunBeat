@@ -65,10 +65,9 @@ RunBeat/
 │   │   ├── SpeechAnnouncer.swift  # Voice announcements
 │   │   ├── HeartRateService.swift # Shared HR processing and zone calculation
 │   │   ├── ZoneAnnouncementCoordinator.swift # Per-training-mode announcement management
-│   │   ├── BackendService.swift   # FastAPI backend integration with intelligent caching
-│   │   ├── DeviceIDManager.swift  # Device identification for backend communication
-│   │   ├── AppLogger.swift        # Centralized logging system with rate limiting
-│   │   └── FirebaseService.swift  # Firebase integration (legacy)
+│   │   ├── BackendService.swift   # User-scoped FastAPI backend integration with intelligent caching
+│   │   ├── FirebaseService.swift  # Firebase anonymous authentication with user ID propagation
+│   │   └── AppLogger.swift        # Centralized logging system with rate limiting
 │   ├── Models/                    # Data models
 │   └── Utils/                     # Utility classes
 │       ├── KeychainWrapper.swift  # Secure token storage for Spotify
@@ -290,21 +289,34 @@ VO2MaxTrainingManager ─┘
 **Shared Resources**: Both modes use HeartRateService and ZoneAnnouncementCoordinator
 **Independent Settings**: Each mode maintains separate announcement preferences
 
-## Backend Integration
+## User-Scoped Backend Integration
 
-#### FastAPI Backend Service
-- **Centralized Token Management**: Backend handles Spotify OAuth and refresh cycles
-- **Firebase Integration**: Token storage with automatic cleanup of expired tokens
-- **Railway Deployment**: Production-ready backend with monitoring and admin endpoints
-- **Device Organization**: Multi-device token management with unique device identification
+#### Firebase Anonymous Authentication
+- **Seamless User Creation**: Automatic anonymous authentication on app launch
+- **User ID Propagation**: Firebase user IDs automatically sent to backend services
+- **No User Friction**: Authentication happens transparently without login screens
+- **Production-Ready**: Error handling, retry logic, and graceful fallback
+
+#### User-Scoped FastAPI Backend Service
+- **User-Based Endpoints**: `/api/v1/users/{user_id}/spotify-tokens` replace device-based storage
+- **Background Token Refresh**: Server-side service runs every 15 minutes for all users
+- **Firebase Integration**: User-scoped Firestore documents with automatic cleanup
+- **Railway Deployment**: Production-ready backend with user-based admin endpoints
 - **Intelligent Caching**: iOS app caches tokens based on app lifecycle to minimize API calls
 
-#### Token Management Flow
-1. **iOS Authentication**: User completes OAuth, tokens sent to backend immediately
-2. **Backend Storage**: Tokens stored in Firebase with expiration tracking
-3. **Automatic Refresh**: Backend scheduler refreshes tokens before expiration
-4. **iOS Caching**: App requests fresh tokens only on startup/foreground, caches during active use
-5. **Offline Fallback**: Keychain storage provides offline token access when backend unavailable
+#### User-Scoped Token Management Flow
+1. **Firebase Authentication**: Anonymous user created automatically on app launch
+2. **User ID Propagation**: User ID sent to backend for all token operations
+3. **Backend Storage**: Tokens stored in Firebase under user-scoped paths
+4. **Automatic Background Refresh**: Server refreshes user tokens every 15 minutes before expiration
+5. **iOS Caching**: App requests fresh tokens only on startup/foreground, caches during active use
+6. **Offline Fallback**: Keychain storage provides offline token access when backend unavailable
+
+#### Background Token Refresh Service
+- **Server-Side Processing**: Runs independently of iOS app state
+- **User-Scoped Refresh**: Processes tokens for all authenticated users
+- **Retry Logic**: Failed refreshes automatically retried after 5 minutes
+- **Admin Monitoring**: User-based endpoints for monitoring token refresh status
 
 ## Background Execution Strategy
 
@@ -348,20 +360,20 @@ VO2MaxTrainingManager ─┘
 ## Known Issues & Planned Improvements
 
 ### Current Issues
-1. **Heart Rate Display**: Live BPM not visible on main training screens
-2. **User Onboarding**: Could be more guided for new users
+1. **User Onboarding**: Could be more guided for new users
 
-### Recently Resolved (2025)
-1. ✅ **Backend Service**: Implemented FastAPI backend with intelligent token caching and Railway deployment
-2. ✅ **Spotify Token Management**: Fixed token expiration and playlist restart issues with centralized refresh system
-3. ✅ **Logging System**: Replaced 642+ print statements with structured AppLogger featuring rate limiting and environment-aware levels
+### Production-Ready Systems (2025)
+1. ✅ **User-Scoped Authentication**: Complete Firebase anonymous auth with seamless backend integration
+2. ✅ **Background Token Refresh**: Server-side service automatically manages user tokens every 15 minutes
+3. ✅ **Backend Service**: Production-ready FastAPI backend with user-scoped endpoints and Railway deployment
+4. ✅ **Spotify Token Management**: Fixed token expiration and playlist restart issues with centralized refresh system
+5. ✅ **Logging System**: Structured AppLogger system with rate limiting and environment-aware levels
 
 ### Planned Improvements  
-1. **Live Heart Rate Display**: Add current BPM to active training cards
-2. **Training History**: Add workout history and statistics tracking with Firebase integration
-3. **Apple Music Integration**: Consider adding as alternative to Spotify
-4. **Audio Settings**: Make announcement settings more accessible
-5. **Onboarding Flow**: Guide new users through HR zone setup
+1. **Training History**: Add workout history and statistics tracking leveraging user-scoped Firebase integration
+2. **Audio Settings**: Make announcement settings more accessible
+3. **Onboarding Flow**: Guide new users through HR zone setup
+4. **Apple Music Integration**: Consider adding as alternative to Spotify
 
 ## Development Guidelines
 
@@ -467,21 +479,28 @@ VO2MaxTrainingManager ─┘
 - Spotify App Remote requires installed Spotify app
 
 ### Test Scenarios
-1. **Dual Training Mode Testing**:
+1. **User-Scoped Authentication Testing**:
+   - Fresh app install → verify Firebase anonymous user creation
+   - Backend integration → verify user ID propagation to endpoints
+   - Token management → verify user-scoped token storage and refresh
+   - Multiple devices → verify independent user-based token management
+
+2. **Dual Training Mode Testing**:
    - Start Free training → try to start VO2 training → should be prevented
    - Stop Free training → start VO2 training → should work normally
    - Force-quit app during training → verify proper cleanup on restart
 
-2. **Shared Services Testing**:
+3. **Shared Services Testing**:
    - Start Free training → verify HR processing and announcements
    - Stop and start VO2 training → verify same HR data but independent announcements
    - Change HR zones → verify both training modes use updated zones
 
-3. **Background Execution Testing**:
+4. **Background Execution Testing**:
    - Start zone training → background app → verify announcements continue
    - Start VO2 training → verify playlist switches at intervals
    - Connect HR monitor → verify real-time updates
    - Test audio announcements over music playback
+   - Background token refresh → leave app closed for hours, verify server-side token refresh
 
 ## Building and Deployment
 
@@ -508,11 +527,11 @@ VO2MaxTrainingManager ─┘
 ## User Guide
 
 ### Getting Started
-1. Launch app and navigate to Settings
-2. Configure your resting and max heart rate
+1. Launch app - Firebase anonymous authentication happens automatically
+2. Navigate to Settings and configure your resting and max heart rate
 3. Choose automatic or manual zone configuration
 4. Connect your Bluetooth heart rate monitor
-5. For VO2 training: Connect Spotify and select playlists
+5. For VO2 training: Connect Spotify and select playlists (tokens automatically managed by backend)
 
 ### Training Modes
 
