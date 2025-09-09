@@ -4,6 +4,10 @@ struct BPMDisplayView: View {
     let bpm: Int
     let zone: Int
     
+    private var displayText: String {
+        bpm > 0 ? "\(bpm)" : "--"
+    }
+    
     @State private var isAnimating = false
     
     var body: some View {
@@ -22,7 +26,7 @@ struct BPMDisplayView: View {
             
             // BPM number and heart icon
             VStack(spacing: 4) {
-                Text("\(bpm)")
+                Text(displayText)
                     .font(AppTypography.hrDisplay)
                     .foregroundColor(.white)
                     .fontWeight(.bold)

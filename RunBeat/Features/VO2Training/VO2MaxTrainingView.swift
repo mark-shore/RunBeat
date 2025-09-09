@@ -43,25 +43,11 @@ struct VO2MaxTrainingView: View {
                                 .font(.system(size: 28, weight: .medium, design: .monospaced))
                                 .foregroundColor(getPhaseColor(for: appState.vo2CurrentPhase))
                             
-                            if appState.vo2TrainingState == .active {
-                                // Heart rate information during training with animated zone-colored display
-                                BPMDisplayView(bpm: appState.currentBPM, zone: getCurrentZone())
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .id("bpm-display")
-                                    .animation(.none, value: appState.currentBPM)
-                            } else if appState.currentBPM > 0 {
-                                // NEW: Show BPM during setup if HR detected
-                                BPMDisplayView(bpm: appState.currentBPM, zone: getCurrentZone())
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .id("bpm-display")
-                                    .animation(.none, value: appState.currentBPM)
-                            } else {
-                                // Fallback: No HR available text when no HR detected
-                                Text("No HR available")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(AppColors.secondary)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                            }
+                            // Always show BPMDisplayView with consistent sizing - displays "--" when no HR
+                            BPMDisplayView(bpm: appState.currentBPM, zone: getCurrentZone())
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .id("bpm-display")
+                                .animation(.none, value: appState.currentBPM)
                             
                             // Interval counter
                             Text("Interval \(appState.vo2CurrentInterval)/\(appState.vo2TotalIntervals)")
