@@ -77,11 +77,17 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - **Spotify Integration**: Automatic music resumption when Spotify reconnects during training
 - Features: Structured intervals, Spotify playlist switching, configurable zone announcements, phase-aware music recovery
 
+#### Settings Module (`Features/Settings/`)
+- `SettingsView.swift`: Heart rate zone configuration and app settings
+- **Custom Navigation**: Uses `AppBackButton` with `.navigationBarBackButtonHidden(true)` for white back button styling
+- **Navigation Flow**: Integrated with navigation-based presentation (replaced modal .sheet)
+
 ### Design System (`UI/DesignSystem/`)
 - `AppColors.swift`: Brand colors (primary: #FF4500)
 - `AppTypography.swift`: Typography scales
 - `AppSpacing.swift`: Spacing system
-- `Components/`: Reusable UI components (AppButton, AppCard, etc.)
+- `Components/`: Reusable UI components (AppButton, AppCard, AppBackButton, etc.)
+  - `AppBackButton.swift`: Custom navigation back button with white arrow.left icon
 
 ## Development Guidelines
 
@@ -91,9 +97,10 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - ViewModels use `@Published` properties for reactive updates
 
 ### Design System Usage
-- Always use design system components: `AppButton`, `AppCard`, `AppColors`, etc.
+- Always use design system components: `AppButton`, `AppCard`, `AppBackButton`, `AppColors`, etc.
 - Follow existing spacing patterns from `AppSpacing`
 - Maintain dark theme consistency
+- Use `AppBackButton` for custom navigation when system back button styling doesn't match design requirements
 
 ### State Management
 - **Dual Training Architecture**: Free Training and VO2 Max Training are independent modes
