@@ -114,7 +114,7 @@ struct ContentView: View {
                     .padding(.bottom, AppSpacing.xxl + AppSpacing.lg)
                 }
             }
-            .navigationTitle("RUN BEAT")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -127,10 +127,8 @@ struct ContentView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingSettings) {
-                NavigationView {
-                    SettingsView(appState: appState, heartRateViewModel: appState.heartRateViewModel)
-                }
+            .navigationDestination(isPresented: $showingSettings) {
+                SettingsView(appState: appState, heartRateViewModel: appState.heartRateViewModel)
             }
             .navigationDestination(isPresented: $showingVO2MaxTraining) {
                 VO2MaxTrainingView(isPresented: $showingVO2MaxTraining)

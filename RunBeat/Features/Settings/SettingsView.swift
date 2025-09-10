@@ -185,13 +185,12 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Done") {
-                    // Settings are automatically saved via ViewModel
+            ToolbarItem(placement: .navigationBarLeading) {
+                AppBackButton {
                     dismiss()
                 }
-                .foregroundColor(AppColors.onBackground)
             }
         }
         .sheet(isPresented: $showingRestingHRPicker) {
