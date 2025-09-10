@@ -111,11 +111,10 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - UserDefaults for settings persistence (preserve existing keys)
 
 ### Current Priority Issues
-1. **Live HR Display**: Add current BPM to training screens
-2. **User Onboarding**: Guide new users through HR zone setup
-3. **UI Polish**: Improve training mode descriptions and visual clarity
-4. **Training Analytics**: Add workout history and performance tracking
-5. **Apple Music Integration**: Consider adding as alternative to Spotify
+1. **User Onboarding**: Guide new users through HR zone setup
+2. **UI Polish**: Improve training mode descriptions and visual clarity
+3. **Training Analytics**: Add workout history and performance tracking
+4. **Apple Music Integration**: Consider adding as alternative to Spotify
 
 ## Testing Requirements
 

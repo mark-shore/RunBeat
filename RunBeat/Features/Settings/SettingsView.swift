@@ -194,7 +194,15 @@ struct SettingsView: View {
             }
         }
         .sheet(isPresented: $showingRestingHRPicker) {
-            RestingHRPickerView(restingHR: $heartRateViewModel.restingHR)
+            PickerModal(
+                title: "RESTING HR",
+                selectedValue: heartRateViewModel.restingHR,
+                range: 30...100,
+                isPresented: $showingRestingHRPicker,
+                onValueChange: { newValue in
+                    heartRateViewModel.restingHR = newValue
+                }
+            )
         }
         .sheet(isPresented: $showingMaxHRPicker) {
             MaxHRPickerView(maxHR: $heartRateViewModel.maxHR)
@@ -529,69 +537,6 @@ struct ZoneSettingRow: View {
     }
 }
 
-struct RestingHRPickerView: View {
-    @Binding var restingHR: Int
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationView {
-            ZStack {
-                AppColors.background
-                    .ignoresSafeArea()
-                
-                VStack(spacing: AppSpacing.lg) {
-                    Text("RESTING HR")
-                        .font(AppTypography.title2)
-                        .foregroundColor(AppColors.onBackground)
-                        .tracking(1)
-                    
-                    Picker("Resting HR", selection: $restingHR) {
-                        ForEach(30...100, id: \.self) { hr in
-                            Text("\(hr)")
-                                .font(AppTypography.timerDisplay)
-                                .foregroundColor(AppColors.onBackground)
-                                .tag(hr)
-                        }
-                    }
-                    .pickerStyle(WheelPickerStyle())
-                    .frame(height: 200)
-                    
-                    AppCard(style: .highlighted) {
-                        HStack {
-                            Image(systemName: "info.circle.fill")
-                                .foregroundColor(AppColors.primary)
-                            
-                            Text("Update your resting HR if you know it to be a different value.")
-                                .font(AppTypography.callout)
-                                .foregroundColor(AppColors.secondary)
-                                .multilineTextAlignment(.leading)
-                        }
-                    }
-                    .padding(.horizontal, AppSpacing.screenMargin)
-                    
-                    Spacer()
-                    
-                    AppButton("SAVE", style: .primary) {
-                        dismiss()
-                    }
-                    .padding(.horizontal, AppSpacing.screenMargin)
-                    .padding(.bottom, AppSpacing.xxl)
-                }
-            }
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark")
-                            .foregroundColor(AppColors.onBackground)
-                            .font(AppTypography.headline)
-                    }
-                }
-            }
-        }
-    }
-}
 
 struct MaxHRPickerView: View {
     @Binding var maxHR: Int

@@ -16,11 +16,10 @@ Audio-first iOS heart rate training app. Users start workout, put phone away, ge
 - **Playlist restart fix** - eliminated automatic music interruptions when switching between apps
 
 ## Current Priorities
-1. **Live HR Display** - Show current BPM on training screens
-2. **Training Analytics** - Add workout history and performance tracking
-3. **UI Polish** - Training mode descriptions and visual improvements
-4. **User Onboarding** - Guide new users through setup
-5. **Apple Music Integration** - Consider adding as alternative to Spotify
+1. **Training Analytics** - Add workout history and performance tracking
+2. **UI Polish** - Training mode descriptions and visual improvements
+3. **User Onboarding** - Guide new users through setup
+4. **Apple Music Integration** - Consider adding as alternative to Spotify
 
 ## Don't Touch (Working Perfectly)
 - `HeartRateManager.swift` - CoreBluetooth heart rate monitoring
