@@ -45,6 +45,8 @@ RunBeat/
 │   │       ├── AppButton.swift   # Unified button component
 │   │       ├── AppCard.swift     # Card container component
 │   │       ├── BPMDisplayView.swift # Animated heart rate display with zone colors
+│   │       ├── BPMValueBox.swift # Styled container for editable heart rate values
+│   │       ├── PickerModal.swift # Unified modal component for heart rate value selection
 │   │       └── ZoneDisplay.swift # Heart rate zone display
 
 ## Architecture Overview
@@ -93,7 +95,7 @@ RunBeat/
 │   │   ├── VO2IntervalState.swift        # Interval state model
 │   │   └── VO2Config.swift               # Training configuration
 │   └── Settings/                  # App settings
-│       └── SettingsView.swift            # Settings UI
+│       └── SettingsView.swift            # Heart rate settings with unified auto/manual interface
 ├── UI/                           # UI layer
 │   ├── DesignSystem/             # Design system (see above)
 │   └── Views/                    # SwiftUI views

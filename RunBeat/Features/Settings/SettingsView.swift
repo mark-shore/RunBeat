@@ -6,12 +6,6 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showingRestingHRPicker = false
     @State private var showingMaxHRPicker = false
-    @State private var showingZone1LowerPicker = false
-    @State private var showingZone1Picker = false
-    @State private var showingZone2Picker = false
-    @State private var showingZone3Picker = false
-    @State private var showingZone4Picker = false
-    @State private var showingZone5Picker = false
     
     var body: some View {
         ZStack {
@@ -19,167 +13,19 @@ struct SettingsView: View {
                 .ignoresSafeArea()
             
             ScrollView {
-                VStack(spacing: AppSpacing.xl) {
-                    // Header
-                    VStack(spacing: AppSpacing.sm) {
-                        Text("HEART RATE SETTINGS")
-                            .font(AppTypography.title1)
-                            .foregroundColor(AppColors.onBackground)
-                            .tracking(2)
-                    }
-                    .padding(.top, AppSpacing.lg)
-                    
-                    // Heart Rate Zones Description
-                    AppCard {
-                        VStack(alignment: .leading, spacing: AppSpacing.md) {
-                            Text("Heart Rate Zones")
-                                .font(AppTypography.title2)
-                                .foregroundColor(AppColors.onBackground)
-                            
-                            Text("Calculated using the scientifically validated heart rate reserve formula, your heart rate (HR) zones are personalized using your baseline resting HR and maximum HR.")
-                                .font(AppTypography.callout)
-                                .foregroundColor(AppColors.secondary)
-                                .multilineTextAlignment(.leading)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .padding(.horizontal, AppSpacing.screenMargin)
-                    
-                    // Resting and Max HR Inputs
-                    AppCard {
-                        VStack(spacing: AppSpacing.md) {
-                            HStack(spacing: AppSpacing.lg) {
-                                VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                                    HStack {
-                                        Text("RESTING HR")
-                                            .font(AppTypography.caption)
-                                            .foregroundColor(AppColors.secondary)
-                                        
-                                        Button(action: {}) {
-                                            Image(systemName: "info.circle")
-                                                .font(AppTypography.caption)
-                                                .foregroundColor(AppColors.secondary)
-                                        }
-                                    }
-                                    
-                                    HStack {
-                                        Button(action: {
-                                            showingRestingHRPicker = true
-                                        }) {
-                                            Text("\(heartRateViewModel.restingHR)")
-                                                .font(.system(size: 24, weight: .bold))
-                                                .foregroundColor(AppColors.onBackground)
-                                                .frame(width: 80, height: AppSpacing.minTouchTarget)
-                                                .background(
-                                                    RoundedRectangle(cornerRadius: AppSpacing.cornerRadius)
-                                                        .fill(AppColors.surface)
-                                                )
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: AppSpacing.cornerRadius)
-                                                        .stroke(AppColors.secondary.opacity(0.3), lineWidth: 1)
-                                                )
-                                        }
-                                        
-                                        Text("bpm")
-                                            .font(AppTypography.callout)
-                                            .foregroundColor(AppColors.secondary)
-                                    }
-                                }
-                                
-                                Spacer()
-                                
-                                VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                                    HStack {
-                                        Text("MAX HR")
-                                            .font(AppTypography.caption)
-                                            .foregroundColor(AppColors.secondary)
-                                        
-                                        Button(action: {}) {
-                                            Image(systemName: "info.circle")
-                                                .font(AppTypography.caption)
-                                                .foregroundColor(AppColors.secondary)
-                                        }
-                                    }
-                                    
-                                    HStack {
-                                        Button(action: {
-                                            showingMaxHRPicker = true
-                                        }) {
-                                            Text("\(heartRateViewModel.maxHR)")
-                                                .font(.system(size: 24, weight: .bold))
-                                                .foregroundColor(AppColors.onBackground)
-                                                .frame(width: 80, height: AppSpacing.minTouchTarget)
-                                                .background(
-                                                    RoundedRectangle(cornerRadius: AppSpacing.cornerRadius)
-                                                        .fill(AppColors.surface)
-                                                )
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: AppSpacing.cornerRadius)
-                                                        .stroke(AppColors.secondary.opacity(0.3), lineWidth: 1)
-                                                )
-                                        }
-                                        
-                                        Text("bpm")
-                                            .font(AppTypography.callout)
-                                            .foregroundColor(AppColors.secondary)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, AppSpacing.screenMargin)
-                    
-                    // Manual Heart Rate Zones Toggle
-                    AppCard {
-                        HStack {
-                            VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                                Text("Manual Heart Rate Zones")
-                                    .font(AppTypography.headline)
-                                    .foregroundColor(AppColors.onBackground)
-                                
-                                Text("You can manually update your HR zone ranges if they don't feel normal to you.")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondary)
-                                    .multilineTextAlignment(.leading)
-                            }
-                            
-                            Spacer()
-                            
-                            Toggle("", isOn: Binding(
-                                get: { !heartRateViewModel.useAutoZones },
-                                set: { heartRateViewModel.useAutoZones = !$0 }
-                            ))
-                                .labelsHidden()
-                                .toggleStyle(SwitchToggleStyle(tint: AppColors.primary))
-                                .scaleEffect(0.8)
-                        }
-                    }
-                    .padding(.horizontal, AppSpacing.screenMargin)
-                    
-                    // Zone Display/Settings
-                    if heartRateViewModel.useAutoZones {
-                        AutoZonesDisplay(heartRateViewModel: heartRateViewModel)
-                            .padding(.horizontal, AppSpacing.screenMargin)
-                    } else {
-                        ManualZonesSettings(
-                            heartRateViewModel: heartRateViewModel,
-                            showingZone1LowerPicker: $showingZone1LowerPicker,
-                            showingZone1Picker: $showingZone1Picker,
-                            showingZone2Picker: $showingZone2Picker,
-                            showingZone3Picker: $showingZone3Picker,
-                            showingZone4Picker: $showingZone4Picker,
-                            showingZone5Picker: $showingZone5Picker
-                        )
-                            .padding(.horizontal, AppSpacing.screenMargin)
-                    }
-                    
-                    // Save Button
-                    AppButton("Save Settings", style: .primary) {
-                        // Settings are automatically saved via ViewModel
-                        dismiss()
-                    }
+                VStack(spacing: AppSpacing.lg) {
+                    // HR Settings Card
+                    CompactHRSettings(
+                        heartRateViewModel: heartRateViewModel,
+                        showingRestingHRPicker: $showingRestingHRPicker,
+                        showingMaxHRPicker: $showingMaxHRPicker
+                    )
                     .padding(.horizontal, AppSpacing.screenMargin)
                     .padding(.top, AppSpacing.lg)
+                    
+                    // Heart Rate Zones Card
+                    HeartRateZonesCard(heartRateViewModel: heartRateViewModel)
+                        .padding(.horizontal, AppSpacing.screenMargin)
                 }
             }
         }
@@ -205,58 +51,104 @@ struct SettingsView: View {
             )
         }
         .sheet(isPresented: $showingMaxHRPicker) {
-            MaxHRPickerView(maxHR: $heartRateViewModel.maxHR)
-        }
-        .sheet(isPresented: $showingZone1LowerPicker) {
-            Zone1LowerPickerView(zone1Lower: $heartRateViewModel.zone1Lower)
-        }
-        .sheet(isPresented: $showingZone1Picker) {
-            ZonePickerView(zoneNumber: 1, zoneUpper: $heartRateViewModel.zone1Upper)
-        }
-        .sheet(isPresented: $showingZone2Picker) {
-            ZonePickerView(zoneNumber: 2, zoneUpper: $heartRateViewModel.zone2Upper)
-        }
-        .sheet(isPresented: $showingZone3Picker) {
-            ZonePickerView(zoneNumber: 3, zoneUpper: $heartRateViewModel.zone3Upper)
-        }
-        .sheet(isPresented: $showingZone4Picker) {
-            ZonePickerView(zoneNumber: 4, zoneUpper: $heartRateViewModel.zone4Upper)
-        }
-        .sheet(isPresented: $showingZone5Picker) {
-            ZonePickerView(zoneNumber: 5, zoneUpper: $heartRateViewModel.zone5Upper)
+            PickerModal(
+                title: "MAX HR",
+                selectedValue: heartRateViewModel.maxHR,
+                range: 120...220,
+                isPresented: $showingMaxHRPicker,
+                onValueChange: { newValue in
+                    heartRateViewModel.maxHR = newValue
+                }
+            )
         }
     }
 }
 
-struct AutoZonesDisplay: View {
+struct ZonePickerConfig {
+    let title: String
+    let currentValue: Int
+    let range: ClosedRange<Int>
+    let onSave: (Int) -> Void
+}
+
+struct HeartRateZonesCard: View {
     @ObservedObject var heartRateViewModel: HeartRateViewModel
+    @State private var activePickerConfig: ZonePickerConfig?
     
-    private var autoZones: (Int, Int, Int, Int, Int, Int) {
-        return heartRateViewModel.currentZoneLimits
+    private var zones: (Int, Int, Int, Int, Int, Int) {
+        heartRateViewModel.currentZoneLimits
+    }
+    
+    private var isInteractive: Bool {
+        !heartRateViewModel.useAutoZones
     }
     
     var body: some View {
         AppCard {
             VStack(spacing: AppSpacing.md) {
+                // Card title
+                Text("Heart Rate Zones")
+                    .font(AppTypography.title2)
+                    .foregroundColor(AppColors.onBackground)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                
+                // Zone Calculation section with toggle
+                VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                    HStack {
+                        Text("Zone Calculation")
+                            .font(AppTypography.headline)
+                            .foregroundColor(AppColors.onBackground)
+                        
+                        Spacer()
+                        
+                        HStack(spacing: AppSpacing.sm) {
+                            Text("Auto")
+                                .font(AppTypography.caption)
+                                .foregroundColor(heartRateViewModel.useAutoZones ? AppColors.primary : AppColors.secondary)
+                            
+                            Toggle("", isOn: Binding(
+                                get: { !heartRateViewModel.useAutoZones },
+                                set: { heartRateViewModel.useAutoZones = !$0 }
+                            ))
+                            .labelsHidden()
+                            .toggleStyle(SwitchToggleStyle(tint: AppColors.primary))
+                            .scaleEffect(0.8)
+                            
+                            Text("Manual")
+                                .font(AppTypography.caption)
+                                .foregroundColor(!heartRateViewModel.useAutoZones ? AppColors.primary : AppColors.secondary)
+                        }
+                    }
+                    
+                    Text("Your HR zones are calculated using the heart rate reserve formula. You can manually update your HR zone ranges.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondary)
+                        .multilineTextAlignment(.leading)
+                }
+                
+                // Table header
                 HStack {
                     Text("ZONE")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondary)
+                        .frame(width: 80, alignment: .leading)
                     
                     Spacer()
                     
-                    Text("ZONE MIN")
+                    Text("MIN")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondary)
+                        .frame(width: 80, alignment: .leading)
                     
                     Spacer()
                     
-                    Text("ZONE MAX")
+                    Text("MAX")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondary)
+                        .frame(width: 80, alignment: .leading)
                 }
                 
-                let zones = autoZones
+                // Zone rows (5 to 1, reverse order)
                 let zoneColors: [Color] = [AppColors.zone1, AppColors.zone2, AppColors.zone3, AppColors.zone4, AppColors.zone5]
                 let zoneRanges = [
                     (zones.0, zones.1), // Zone 1: zone1Lower to zone1Upper
@@ -267,340 +159,255 @@ struct AutoZonesDisplay: View {
                 ]
                 
                 ForEach(0..<5, id: \.self) { index in
+                    let zoneNumber = 5 - index
+                    let zoneRange = zoneRanges[4-index]
+                    let zoneColor = zoneColors[4-index]
+                    
                     HStack {
+                        // Zone indicator column
                         HStack {
                             Circle()
-                                .fill(zoneColors[4-index])
+                                .fill(zoneColor)
                                 .frame(width: 12, height: 12)
                             
-                            Text("Zone \(5-index)")
+                            Text("Zone \(zoneNumber)")
                                 .font(AppTypography.headline)
                                 .foregroundColor(AppColors.onBackground)
                         }
+                        .frame(width: 80, alignment: .leading)
                         
                         Spacer()
                         
-                        Text("\(zoneRanges[4-index].0)")
-                            .font(AppTypography.headline)
-                            .foregroundColor(AppColors.secondary)
-                        
-                        Text("bpm")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondary)
+                        // Min value column
+                        HStack(spacing: AppSpacing.xs) {
+                            let minEditable = isInteractive // All zones min values are editable in manual mode
+                            
+                            BPMValueBox(
+                                value: "\(zoneRange.0)",
+                                isEditable: minEditable,
+                                action: minEditable ? { openPickerForZone(zoneNumber, isLower: true, currentValue: zoneRange.0) } : nil
+                            )
+                            
+                            Text("bpm")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondary)
+                        }
+                        .frame(width: 80, alignment: .leading)
                         
                         Spacer()
                         
-                        Text("\(zoneRanges[4-index].1)")
-                            .font(AppTypography.headline)
-                            .foregroundColor(AppColors.secondary)
-                        
-                        Text("bpm")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondary)
+                        // Max value column
+                        HStack(spacing: AppSpacing.xs) {
+                            let isZone5Upper = zoneNumber == 5
+                            let maxEditable = isInteractive && !isZone5Upper
+                            
+                            BPMValueBox(
+                                value: "\(zoneRange.1)",
+                                isEditable: maxEditable,
+                                action: maxEditable ? { openPickerForZone(zoneNumber, isLower: false, currentValue: zoneRange.1) } : nil
+                            )
+                            
+                            Text("bpm")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondary)
+                        }
+                        .frame(width: 80, alignment: .leading)
                     }
                     .padding(.vertical, AppSpacing.sm)
                 }
             }
         }
-    }
-}
-
-struct ManualZonesSettings: View {
-    @ObservedObject var heartRateViewModel: HeartRateViewModel
-    @Binding var showingZone1LowerPicker: Bool
-    @Binding var showingZone1Picker: Bool
-    @Binding var showingZone2Picker: Bool
-    @Binding var showingZone3Picker: Bool
-    @Binding var showingZone4Picker: Bool
-    @Binding var showingZone5Picker: Bool
-    
-    var body: some View {
-        VStack(spacing: AppSpacing.lg) {
-            Zone1SettingRow(
-                heartRateViewModel: heartRateViewModel,
-                onLowerTap: { showingZone1LowerPicker = true },
-                onUpperTap: { showingZone1Picker = true }
-            )
-            
-            ZoneSettingRow(
-                zone: 2,
-                title: "Zone 2 - Aerobic Base",
-                subtitle: "Base training, fat burning",
-                color: .green,
-                upperLimit: heartRateViewModel.zone2Upper,
-                onTap: { showingZone2Picker = true }
-            )
-            
-            ZoneSettingRow(
-                zone: 3,
-                title: "Zone 3 - Aerobic Threshold",
-                subtitle: "Moderate intensity",
-                color: .yellow,
-                upperLimit: heartRateViewModel.zone3Upper,
-                onTap: { showingZone3Picker = true }
-            )
-            
-            ZoneSettingRow(
-                zone: 4,
-                title: "Zone 4 - Lactate Threshold",
-                subtitle: "Hard intensity",
-                color: .orange,
-                upperLimit: heartRateViewModel.zone4Upper,
-                onTap: { showingZone4Picker = true }
-            )
-            
-            ZoneSettingRow(
-                zone: 5,
-                title: "Zone 5 - VO2 Max",
-                subtitle: "Very hard, neuromuscular",
-                color: .red,
-                upperLimit: heartRateViewModel.zone5Upper,
-                onTap: { showingZone5Picker = true }
+        .sheet(item: $activePickerConfig) { config in
+            PickerModal(
+                title: config.title,
+                selectedValue: config.currentValue,
+                range: config.range,
+                isPresented: .constant(true),
+                onValueChange: config.onSave
             )
         }
     }
-}
-
-struct Zone1SettingRow: View {
-    @ObservedObject var heartRateViewModel: HeartRateViewModel
-    let onLowerTap: () -> Void
-    let onUpperTap: () -> Void
     
-    var body: some View {
-        AppCard(style: .highlighted) {
-            VStack(alignment: .leading, spacing: AppSpacing.md) {
-                // Zone header
-                HStack {
-                    Circle()
-                        .fill(AppColors.zone1)
-                        .frame(width: 24, height: 24)
-                        .overlay(
-                            Text("1")
-                                .font(AppTypography.caption.weight(.bold))
-                                .foregroundColor(AppColors.onBackground)
-                        )
-                    
-                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                        Text("Zone 1 - Active Recovery")
-                            .font(AppTypography.headline)
-                            .foregroundColor(AppColors.onBackground)
-                        
-                        Text("Easy pace, recovery")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondary)
+    private func openPickerForZone(_ zoneNumber: Int, isLower: Bool, currentValue: Int) {
+        let config: ZonePickerConfig
+        
+        if isLower {
+            // Lower limits - editing these adjusts the previous zone's upper limit
+            switch zoneNumber {
+            case 1:
+                config = ZonePickerConfig(
+                    title: "ZONE 1 LOWER",
+                    currentValue: currentValue,
+                    range: 30...heartRateViewModel.zone1Upper - 5, // Min 5 BPM zone width
+                    onSave: { newValue in
+                        heartRateViewModel.zone1Lower = newValue
                     }
-                    
-                    Spacer()
-                }
-                
-                // Heart rate inputs
-                HStack {
-                    Text("Lower limit:")
-                        .font(AppTypography.callout)
-                        .foregroundColor(AppColors.secondary)
-                    
-                    Spacer()
-                    
-                    HStack(spacing: AppSpacing.xs) {
-                        Button(action: onLowerTap) {
-                            Text("\(heartRateViewModel.zone1Lower)")
-                                .font(AppTypography.headline)
-                                .foregroundColor(AppColors.onBackground)
-                                .frame(width: 80, height: 32)
-                                .background(
-                                    RoundedRectangle(cornerRadius: AppSpacing.cornerRadius)
-                                        .fill(AppColors.surface)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: AppSpacing.cornerRadius)
-                                        .stroke(AppColors.zone1.opacity(0.3), lineWidth: 1)
-                                )
-                        }
-                        
-                        Text("BPM")
-                            .font(AppTypography.callout)
-                            .foregroundColor(AppColors.secondary)
+                )
+            case 2:
+                config = ZonePickerConfig(
+                    title: "ZONE 2 LOWER",
+                    currentValue: currentValue,
+                    range: heartRateViewModel.zone1Lower + 5...heartRateViewModel.zone2Upper - 5,
+                    onSave: { newValue in
+                        // Zone 2 lower = newValue, so Zone 1 upper = newValue - 1
+                        heartRateViewModel.zone1Upper = newValue - 1
                     }
-                }
-                
-                HStack {
-                    Text("Upper limit:")
-                        .font(AppTypography.callout)
-                        .foregroundColor(AppColors.secondary)
-                    
-                    Spacer()
-                    
-                    HStack(spacing: AppSpacing.xs) {
-                        Button(action: onUpperTap) {
-                            Text("\(heartRateViewModel.zone1Upper)")
-                                .font(AppTypography.headline)
-                                .foregroundColor(AppColors.onBackground)
-                                .frame(width: 80, height: 32)
-                                .background(
-                                    RoundedRectangle(cornerRadius: AppSpacing.cornerRadius)
-                                        .fill(AppColors.surface)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: AppSpacing.cornerRadius)
-                                        .stroke(AppColors.zone1.opacity(0.3), lineWidth: 1)
-                                )
-                        }
-                        
-                        Text("BPM")
-                            .font(AppTypography.callout)
-                            .foregroundColor(AppColors.secondary)
+                )
+            case 3:
+                config = ZonePickerConfig(
+                    title: "ZONE 3 LOWER",
+                    currentValue: currentValue,
+                    range: heartRateViewModel.zone1Upper + 5...heartRateViewModel.zone3Upper - 5,
+                    onSave: { newValue in
+                        // Zone 3 lower = newValue, so Zone 2 upper = newValue - 1
+                        heartRateViewModel.zone2Upper = newValue - 1
                     }
-                }
+                )
+            case 4:
+                config = ZonePickerConfig(
+                    title: "ZONE 4 LOWER",
+                    currentValue: currentValue,
+                    range: heartRateViewModel.zone2Upper + 5...heartRateViewModel.zone4Upper - 5,
+                    onSave: { newValue in
+                        // Zone 4 lower = newValue, so Zone 3 upper = newValue - 1
+                        heartRateViewModel.zone3Upper = newValue - 1
+                    }
+                )
+            case 5:
+                config = ZonePickerConfig(
+                    title: "ZONE 5 LOWER",
+                    currentValue: currentValue,
+                    range: heartRateViewModel.zone3Upper + 5...heartRateViewModel.maxHR - 5,
+                    onSave: { newValue in
+                        // Zone 5 lower = newValue, so Zone 4 upper = newValue - 1
+                        heartRateViewModel.zone4Upper = newValue - 1
+                    }
+                )
+            default:
+                return
+            }
+        } else {
+            // Upper limits - editing these automatically adjusts next zone's lower limit
+            switch zoneNumber {
+            case 1:
+                config = ZonePickerConfig(
+                    title: "ZONE 1 UPPER",
+                    currentValue: currentValue,
+                    range: heartRateViewModel.zone1Lower + 5...heartRateViewModel.zone2Upper - 5,
+                    onSave: { newValue in
+                        heartRateViewModel.zone1Upper = newValue
+                        // Zone 2 lower automatically becomes newValue + 1 (handled by currentZoneLimits)
+                    }
+                )
+            case 2:
+                config = ZonePickerConfig(
+                    title: "ZONE 2 UPPER",
+                    currentValue: currentValue,
+                    range: heartRateViewModel.zone1Upper + 5...heartRateViewModel.zone3Upper - 5,
+                    onSave: { newValue in
+                        heartRateViewModel.zone2Upper = newValue
+                        // Zone 3 lower automatically becomes newValue + 1 (handled by currentZoneLimits)
+                    }
+                )
+            case 3:
+                config = ZonePickerConfig(
+                    title: "ZONE 3 UPPER",
+                    currentValue: currentValue,
+                    range: heartRateViewModel.zone2Upper + 5...heartRateViewModel.zone4Upper - 5,
+                    onSave: { newValue in
+                        heartRateViewModel.zone3Upper = newValue
+                        // Zone 4 lower automatically becomes newValue + 1 (handled by currentZoneLimits)
+                    }
+                )
+            case 4:
+                config = ZonePickerConfig(
+                    title: "ZONE 4 UPPER",
+                    currentValue: currentValue,
+                    range: heartRateViewModel.zone3Upper + 5...heartRateViewModel.maxHR,
+                    onSave: { newValue in
+                        heartRateViewModel.zone4Upper = newValue
+                        // Zone 5 lower automatically becomes newValue + 1 (handled by currentZoneLimits)
+                    }
+                )
+            default:
+                return
             }
         }
+        
+        activePickerConfig = config
     }
 }
 
-struct ZoneSettingRow: View {
-    let zone: Int
-    let title: String
-    let subtitle: String
-    let color: Color
-    let upperLimit: Int
-    let onTap: () -> Void
-    
-    private var zoneColor: Color {
-        switch zone {
-        case 0: return AppColors.zone0
-        case 1: return AppColors.zone1
-        case 2: return AppColors.zone2
-        case 3: return AppColors.zone3
-        case 4: return AppColors.zone4
-        case 5: return AppColors.zone5
-        default: return color
-        }
-    }
+extension ZonePickerConfig: Identifiable {
+    var id: String { title }
+}
+
+struct CompactHRSettings: View {
+    @ObservedObject var heartRateViewModel: HeartRateViewModel
+    @Binding var showingRestingHRPicker: Bool
+    @Binding var showingMaxHRPicker: Bool
     
     var body: some View {
-        AppCard(style: .highlighted) {
-            VStack(alignment: .leading, spacing: AppSpacing.md) {
-                // Zone header
-                HStack {
-                    Circle()
-                        .fill(zoneColor)
-                        .frame(width: 24, height: 24)
-                        .overlay(
-                            Text("\(zone)")
-                                .font(AppTypography.caption.weight(.bold))
-                                .foregroundColor(AppColors.onBackground)
-                        )
-                    
-                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                        Text(title)
-                            .font(AppTypography.headline)
-                            .foregroundColor(AppColors.onBackground)
-                        
-                        Text(subtitle)
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondary)
-                    }
-                    
-                    Spacer()
-                }
+        AppCard {
+            VStack(spacing: AppSpacing.md) {
+                // Card title
+                Text("Heart Rate Settings")
+                    .font(AppTypography.title2)
+                    .foregroundColor(AppColors.onBackground)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 
-                // Heart rate input
+                // Resting HR row
                 HStack {
-                    Text("Upper limit:")
+                    Text("Resting HR")
                         .font(AppTypography.callout)
-                        .foregroundColor(AppColors.secondary)
-                    
-                    Spacer()
-                    
-                    HStack(spacing: AppSpacing.xs) {
-                        Button(action: onTap) {
-                            Text("\(upperLimit)")
-                                .font(AppTypography.headline)
-                                .foregroundColor(AppColors.onBackground)
-                                .frame(width: 80, height: 32)
-                                .background(
-                                    RoundedRectangle(cornerRadius: AppSpacing.cornerRadius)
-                                        .fill(AppColors.surface)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: AppSpacing.cornerRadius)
-                                        .stroke(zoneColor.opacity(0.3), lineWidth: 1)
-                                )
-                        }
-                        
-                        Text("BPM")
-                            .font(AppTypography.callout)
-                            .foregroundColor(AppColors.secondary)
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-struct MaxHRPickerView: View {
-    @Binding var maxHR: Int
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationView {
-            ZStack {
-                AppColors.background
-                    .ignoresSafeArea()
-                
-                VStack(spacing: AppSpacing.lg) {
-                    Text("MAX HR")
-                        .font(AppTypography.title2)
                         .foregroundColor(AppColors.onBackground)
-                        .tracking(1)
-                    
-                    Picker("Max HR", selection: $maxHR) {
-                        ForEach(120...220, id: \.self) { hr in
-                            Text("\(hr)")
-                                .font(AppTypography.timerDisplay)
-                                .foregroundColor(AppColors.onBackground)
-                                .tag(hr)
-                        }
-                    }
-                    .pickerStyle(WheelPickerStyle())
-                    .frame(height: 200)
-                    
-                    AppCard(style: .highlighted) {
-                        HStack {
-                            Image(systemName: "info.circle.fill")
-                                .foregroundColor(AppColors.primary)
-                            
-                            Text("Update your max HR if you know it to be a different value.")
-                                .font(AppTypography.callout)
-                                .foregroundColor(AppColors.secondary)
-                                .multilineTextAlignment(.leading)
-                        }
-                    }
-                    .padding(.horizontal, AppSpacing.screenMargin)
                     
                     Spacer()
                     
-                    AppButton("SAVE", style: .primary) {
-                        dismiss()
-                    }
-                    .padding(.horizontal, AppSpacing.screenMargin)
-                    .padding(.bottom, AppSpacing.xxl)
-                }
-            }
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark")
-                            .foregroundColor(AppColors.onBackground)
-                            .font(AppTypography.headline)
+                    HStack(spacing: AppSpacing.xs) {
+                        BPMValueBox(
+                            value: "\(heartRateViewModel.restingHR)",
+                            isEditable: true,
+                            action: { showingRestingHRPicker = true }
+                        )
+                        
+                        Text("bpm")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondary)
                     }
                 }
+                .padding(.vertical, AppSpacing.xs)
+                
+                // Max HR row
+                HStack {
+                    Text("Maximum HR")
+                        .font(AppTypography.callout)
+                        .foregroundColor(AppColors.onBackground)
+                    
+                    Spacer()
+                    
+                    HStack(spacing: AppSpacing.xs) {
+                        BPMValueBox(
+                            value: "\(heartRateViewModel.maxHR)",
+                            isEditable: true,
+                            action: { showingMaxHRPicker = true }
+                        )
+                        
+                        Text("bpm")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondary)
+                    }
+                }
+                .padding(.vertical, AppSpacing.xs)
             }
         }
     }
 }
+
+
+
+
+
 
 struct ZonePickerView: View {
     let zoneNumber: Int

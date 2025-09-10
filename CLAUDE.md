@@ -78,9 +78,12 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - Features: Structured intervals, Spotify playlist switching, configurable zone announcements, phase-aware music recovery
 
 #### Settings Module (`Features/Settings/`)
-- `SettingsView.swift`: Heart rate zone configuration and app settings
+- `SettingsView.swift`: Heart rate zone configuration and app settings with unified auto/manual display
+- **Heart Rate Settings Interface**: Professional two-card layout with consistent editable value styling
+- **Unified Zone Management**: Bidirectional zone adjustment with proper boundary validation
 - **Custom Navigation**: Uses `AppBackButton` with `.navigationBarBackButtonHidden(true)` for white back button styling
 - **Navigation Flow**: Integrated with navigation-based presentation (replaced modal .sheet)
+- **Eliminates Dual UI**: Replaced separate AutoZonesDisplay/ManualZonesSettings with single unified interface
 
 ### Design System (`UI/DesignSystem/`)
 - `AppColors.swift`: Brand colors (primary: #FF4500)
@@ -88,6 +91,8 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - `AppSpacing.swift`: Spacing system
 - `Components/`: Reusable UI components (AppButton, AppCard, AppBackButton, etc.)
   - `AppBackButton.swift`: Custom navigation back button with white arrow.left icon
+  - `BPMValueBox.swift`: Styled container for editable heart rate values with state-based interaction hints
+  - `PickerModal.swift`: Unified modal component for heart rate value selection with consistent presentation
 
 ## Development Guidelines
 
@@ -112,9 +117,8 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 
 ### Current Priority Issues
 1. **User Onboarding**: Guide new users through HR zone setup
-2. **UI Polish**: Improve training mode descriptions and visual clarity
-3. **Training Analytics**: Add workout history and performance tracking
-4. **Apple Music Integration**: Consider adding as alternative to Spotify
+2. **Training Analytics**: Add workout history and performance tracking
+3. **Apple Music Integration**: Consider adding as alternative to Spotify
 
 ## Testing Requirements
 
@@ -329,3 +333,31 @@ The following systems have been implemented and are production-ready:
    - Added `cleanupVO2Training()` convenience method for consistent termination
 
 **Technical Benefits**: Eliminates accidental workout dismissal during serious training, provides consistent music behavior, maintains all existing background execution and Spotify integration while modernizing navigation patterns for iOS 16+ compatibility.
+
+### Heart Rate Settings Interface Redesign (2025)
+
+**Problem Solved**: Heart rate zone picker interface had verbose modal designs, inconsistent styling, and confusing dual UI structure that required scrolling.
+
+**Solutions Implemented**:
+1. **Reusable PickerModal Component** (`UI/DesignSystem/Components/PickerModal.swift`)
+   - Unified modal component replacing individual verbose picker views
+   - Consistent presentation with 500px height and auto-save callbacks
+   - Eliminates misleading "SAVE" buttons with immediate value updates
+
+2. **BPMValueBox Component** (`UI/DesignSystem/Components/BPMValueBox.swift`)
+   - Standard design system component for all heart rate values
+   - State-based styling: editable (AppColors.tertiary) vs non-editable (AppColors.surfaceSecondary)
+   - Consistent padding, typography, and interaction hints across interface
+
+3. **Unified Settings Interface** (`Features/Settings/SettingsView.swift`)
+   - Two-card professional layout: Heart Rate Settings + Heart Rate Zones
+   - Bidirectional zone adjustment with proper boundary validation (5 BPM minimum widths)
+   - Auto/Manual toggle with clear zone calculation labeling
+   - Professional table formatting with left-aligned columns and proper spacing
+
+4. **Eliminated UI Complexity**
+   - Replaced separate AutoZonesDisplay/ManualZonesSettings with single unified component
+   - Consolidated multiple cards to eliminate scrolling requirements
+   - Consistent editable value styling across both foundational settings and zone configuration
+
+**Technical Benefits**: Creates unified interaction language for all heart rate values, eliminates UI inconsistencies, provides professional table design with clear visual hierarchy, and maintains all bidirectional editing functionality while simplifying the interface architecture.
