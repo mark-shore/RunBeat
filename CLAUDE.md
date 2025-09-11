@@ -74,7 +74,9 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 #### VO2 Training Module (`Features/VO2Training/`)
 - `VO2MaxTrainingManager.swift`: 4x4 interval training coordination with shared HR services and Spotify reconnection observers
 - `VO2MaxTrainingView.swift`: Training UI with design system integration
+- `VO2TrainingBottomDrawer.swift`: Context-aware bottom drawer with smooth content-based animations
 - **Spotify Integration**: Automatic music resumption when Spotify reconnects during training
+- **Smart Drawer Interface**: State-aware UI showing Connect Spotify, track info, or playlist selection based on context
 - Features: Structured intervals, Spotify playlist switching, configurable zone announcements, phase-aware music recovery
 
 #### Settings Module (`Features/Settings/`)

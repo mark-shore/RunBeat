@@ -93,7 +93,9 @@ RunBeat/
 │   │   ├── VO2MaxTrainingManager.swift   # Training session logic
 │   │   ├── VO2MaxTrainingView.swift      # Training UI
 │   │   ├── VO2IntervalState.swift        # Interval state model
-│   │   └── VO2Config.swift               # Training configuration
+│   │   ├── VO2Config.swift               # Training configuration
+│   │   └── Components/
+│   │       └── VO2TrainingBottomDrawer.swift # Context-aware bottom drawer
 │   └── Settings/                  # App settings
 │       └── SettingsView.swift            # Heart rate settings with unified auto/manual interface
 ├── UI/                           # UI layer
@@ -259,6 +261,14 @@ The Spotify integration uses a modular architecture with specialized components:
 - Coordinates with Spotify for playlist switching
 - Spotify reconnection observers for automatic music recovery during training
 - Manages training state with visual and audio feedback
+
+#### VO2TrainingBottomDrawer
+- **Context-aware bottom drawer** that adapts UI based on Spotify connection state
+- **Smart interface states**: Connect Spotify button → Track info display → Playlist selection
+- **Smooth content-based animations** using SwiftUI spring physics with state-specific fixed heights
+- **Existing component reuse**: Uses proven `SelectedPlaylistCard`, `EmptySelectionCard`, `AvailablePlaylistCard`
+- **ActionSheet integration**: "Use for Work" / "Use for Recovery" playlist assignment
+- **Professional layout**: Collapsed state shows side-by-side Work/Recovery assignments, expanded shows grid view
 
 ## Architecture: Shared Services + Dual Training Modes
 
