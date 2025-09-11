@@ -19,9 +19,9 @@ enum PlaylistAssignment {
         case .none:
             return nil
         case .highIntensity:
-            return "H"
+            return "WORK"
         case .rest:
-            return "R"
+            return "RECOVERY"
         }
     }
     
@@ -239,9 +239,9 @@ enum PlaylistSelectionMode: CaseIterable, Hashable {
     var title: String {
         switch self {
         case .highIntensity:
-            return "High Intensity"
+            return "Work"
         case .rest:
-            return "Rest"
+            return "Recovery"
         }
     }
     
@@ -841,6 +841,8 @@ struct AvailablePlaylistCard: View {
     let playlist: SpotifyPlaylist
     let onTap: () -> Void
     
+    @StateObject private var spotifyViewModel = SpotifyViewModel.shared
+    
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 0) {
@@ -860,6 +862,8 @@ struct AvailablePlaylistCard: View {
                             .lineSpacing(1)
                         
                         Spacer()
+                        
+                        // No badge - clean card design
                     }
                     
                     Spacer()
@@ -868,7 +872,7 @@ struct AvailablePlaylistCard: View {
                 .padding(.trailing, 12)
             }
             .frame(height: 60)
-            .background(Color.gray.opacity(0.2))
+            .background(AppColors.surfaceSecondary)
             .cornerRadius(8)
         }
         .buttonStyle(PlainButtonStyle())
@@ -948,7 +952,7 @@ struct PlaylistSelectionCard: View {
                 .padding(.trailing, 12)
             }
             .frame(height: 60)
-            .background(backgroundColor)
+            .background(AppColors.surfaceSecondary)
             .cornerRadius(8)
         }
         .buttonStyle(PlainButtonStyle())

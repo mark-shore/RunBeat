@@ -2556,6 +2556,146 @@ extension SpotifyService: SPTAppRemotePlayerStateDelegate {
 
 // MARK: - Playlist Management
 extension SpotifyService {
+    func fetchRecentlyPlayedPlaylists(completion: @escaping (Result<[SpotifyPlaylist], Error>) -> Void) {
+        guard let accessToken = accessToken else {
+            print("❌ No access token available for recently played fetch")
+            completion(.failure(SpotifyError.notAuthenticated))
+            return
+        }
+        
+        guard isAuthenticated else {
+            print("❌ Not authenticated with Spotify")
+            completion(.failure(SpotifyError.notAuthenticated))
+            return
+        }
+        
+        let recentlyPlayedURL = URL(string: "https://api.spotify.com/v1/me/player/recently-played?limit=20")!
+        var request = URLRequest(url: recentlyPlayedURL)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpMethod = "GET"
+        
+        print("🎵 Fetching recently played tracks from Spotify Web API...")
+        
+        makeAuthenticatedAPICall(request: request) { [weak self] data, response, error in
+            if let error = error {
+                print("❌ Network error fetching recently played: \(error.localizedDescription)")
+                completion(.failure(SpotifyError.networkError(error.localizedDescription)))
+                return
+            }
+            
+            guard let data = data else {
+                print("❌ No data received from recently played API")
+                completion(.failure(SpotifyError.noData))
+                return
+            }
+            
+            if let httpResponse = response as? HTTPURLResponse {
+                print("📊 Recently played API response status: \(httpResponse.statusCode)")
+                
+                guard httpResponse.statusCode == 200 else {
+                    print("❌ Recently played API Error - Status: \(httpResponse.statusCode)")
+                    completion(.failure(SpotifyError.apiError(httpResponse.statusCode)))
+                    return
+                }
+            }
+            
+            do {
+                let decoder = JSONDecoder()
+                let apiResponse = try decoder.decode(SpotifyRecentlyPlayedResponse.self, from: data)
+                
+                // Extract unique playlist contexts from recently played tracks
+                var uniquePlaylistIDs = Set<String>()
+                var contextURIs: [String] = []
+                
+                for item in apiResponse.items {
+                    if let context = item.context,
+                       context.type == "playlist",
+                       let playlistID = self?.extractPlaylistID(from: context.uri) {
+                        if !uniquePlaylistIDs.contains(playlistID) {
+                            uniquePlaylistIDs.insert(playlistID)
+                            contextURIs.append(playlistID)
+                        }
+                    }
+                }
+                
+                print("🎵 Found \(contextURIs.count) unique playlists from recently played tracks")
+                
+                if contextURIs.isEmpty {
+                    completion(.success([]))
+                    return
+                }
+                
+                // Fetch playlist details for the unique playlist IDs
+                self?.fetchPlaylistDetails(playlistIDs: Array(contextURIs.prefix(8)), completion: completion)
+                
+            } catch let decodingError {
+                print("❌ Error decoding recently played response: \(decodingError)")
+                completion(.failure(SpotifyError.decodingError(decodingError.localizedDescription)))
+            }
+        }
+    }
+    
+    private func extractPlaylistID(from uri: String) -> String? {
+        // URI format: "spotify:playlist:37i9dQZF1DX0XUsuxWHRQd"
+        let components = uri.components(separatedBy: ":")
+        guard components.count >= 3, components[1] == "playlist" else {
+            return nil
+        }
+        return components[2]
+    }
+    
+    private func fetchPlaylistDetails(playlistIDs: [String], completion: @escaping (Result<[SpotifyPlaylist], Error>) -> Void) {
+        guard !playlistIDs.isEmpty else {
+            completion(.success([]))
+            return
+        }
+        
+        let idsString = playlistIDs.joined(separator: ",")
+        let playlistsURL = URL(string: "https://api.spotify.com/v1/playlists?ids=\(idsString)")!
+        var request = URLRequest(url: playlistsURL)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpMethod = "GET"
+        
+        print("🎵 Fetching details for \(playlistIDs.count) recently played playlists...")
+        
+        makeAuthenticatedAPICall(request: request) { [weak self] data, response, error in
+            if let error = error {
+                print("❌ Network error fetching playlist details: \(error.localizedDescription)")
+                completion(.failure(SpotifyError.networkError(error.localizedDescription)))
+                return
+            }
+            
+            guard let data = data else {
+                print("❌ No data received from playlist details API")
+                completion(.failure(SpotifyError.noData))
+                return
+            }
+            
+            if let httpResponse = response as? HTTPURLResponse {
+                guard httpResponse.statusCode == 200 else {
+                    print("❌ Playlist details API Error - Status: \(httpResponse.statusCode)")
+                    completion(.failure(SpotifyError.apiError(httpResponse.statusCode)))
+                    return
+                }
+            }
+            
+            do {
+                let decoder = JSONDecoder()
+                let apiResponse = try decoder.decode(SpotifyPlaylistsResponse.self, from: data)
+                let playlists = apiResponse.playlists.compactMap { playlistData in
+                    playlistData != nil ? SpotifyPlaylist.from(playlistData!) : nil
+                }
+                
+                print("✅ Successfully fetched \(playlists.count) recently played playlist details")
+                completion(.success(playlists))
+                
+            } catch let decodingError {
+                print("❌ Error decoding playlist details response: \(decodingError)")
+                completion(.failure(SpotifyError.decodingError(decodingError.localizedDescription)))
+            }
+        }
+    }
+
     func fetchUserPlaylists(completion: @escaping (Result<[SpotifyPlaylist], Error>) -> Void) {
         guard let accessToken = accessToken else {
             print("❌ No access token available for playlist fetch")

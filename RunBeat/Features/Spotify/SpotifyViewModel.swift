@@ -23,6 +23,7 @@ class SpotifyViewModel: ObservableObject {
     
     // Playlist management state
     @Published var availablePlaylists: [SpotifyPlaylist] = []
+    @Published var recentlyPlayedPlaylists: [SpotifyPlaylist] = []
     @Published var playlistSelection = PlaylistSelection()
     @Published var playlistFetchStatus: PlaylistFetchStatus = .notStarted
     
@@ -295,6 +296,32 @@ class SpotifyViewModel: ObservableObject {
                     } else {
                         self.playlistFetchStatus = .error(error.localizedDescription)
                     }
+                }
+            }
+        }
+    }
+    
+    func fetchRecentlyPlayedPlaylists() {
+        guard isConnected else {
+            print("❌ Cannot fetch recently played - not connected to Spotify")
+            return
+        }
+        
+        print("🎵 Starting recently played playlists fetch...")
+        
+        spotifyService.fetchRecentlyPlayedPlaylists { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                
+                switch result {
+                case .success(let playlists):
+                    print("✅ Successfully fetched \(playlists.count) recently played playlists in ViewModel")
+                    self.recentlyPlayedPlaylists = playlists
+                    
+                case .failure(let error):
+                    print("❌ Failed to fetch recently played playlists: \(error)")
+                    // Don't show error for recently played - it's supplementary data
+                    self.recentlyPlayedPlaylists = []
                 }
             }
         }

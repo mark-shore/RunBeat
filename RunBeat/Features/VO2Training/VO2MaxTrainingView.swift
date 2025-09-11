@@ -12,7 +12,6 @@ struct VO2MaxTrainingView: View {
     // ✅ View only talks to coordination layer - no direct manager access
     @StateObject private var spotifyViewModel = SpotifyViewModel.shared
     @EnvironmentObject var appState: AppState
-    @State private var showingPlaylistSelection = false
     @Binding var isPresented: Bool
     
     var body: some View {
@@ -61,13 +60,6 @@ struct VO2MaxTrainingView: View {
                     
                     // Buttons Section
                     VStack(spacing: AppSpacing.md) {
-                        // Select Playlists button (only when not training and not complete)
-                        if appState.vo2TrainingState == .setup {
-                            AppButton("Select Playlists", style: .secondary) {
-                                showingPlaylistSelection = true
-                            }
-                        }
-                        
                         // Training Control Buttons
                         switch appState.vo2TrainingState {
                         case .setup:
@@ -108,15 +100,21 @@ struct VO2MaxTrainingView: View {
                     }
                     
                     Spacer(minLength: AppSpacing.md)
-                    
-                    // Current Track Display (hidden during completion)
-                    if appState.vo2TrainingState != .complete {
-                        CurrentTrackView(track: spotifyViewModel.currentTrackInfo)
-                    }
                 }
                 .padding(.top, 50) // Generous top spacing for better visual balance
                 .padding(.horizontal, 12) // Reduced horizontal padding for wider cards
                 .padding(.vertical, AppSpacing.screenMargin)
+                
+                // Bottom drawer positioned at ZStack level (setup and active states)
+                if appState.vo2TrainingState == .setup || appState.vo2TrainingState == .active {
+                    VStack {
+                        Spacer() // Push drawer to bottom of screen
+                        VO2TrainingBottomDrawer()
+                    }
+                    .ignoresSafeArea(.container, edges: [.leading, .trailing, .bottom])
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .animation(.easeInOut(duration: 0.3), value: appState.vo2TrainingState)
+                }
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
@@ -131,9 +129,6 @@ struct VO2MaxTrainingView: View {
                     }
                 }
             }
-        .sheet(isPresented: $showingPlaylistSelection) {
-            PlaylistSelectionView()
-        }
         .onAppear {
             print("VO2 Max Training view appeared")
             

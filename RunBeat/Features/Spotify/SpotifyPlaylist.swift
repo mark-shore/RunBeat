@@ -89,6 +89,37 @@ extension SpotifyPlaylist {
     }
 }
 
+// MARK: - Recently Played API Response Models
+struct SpotifyRecentlyPlayedResponse: Codable {
+    let items: [RecentlyPlayedItem]
+    
+    struct RecentlyPlayedItem: Codable {
+        let track: TrackInfo
+        let context: PlaylistContext?
+        let played_at: String
+        
+        struct TrackInfo: Codable {
+            let id: String
+            let name: String
+            let artists: [ArtistInfo]
+            
+            struct ArtistInfo: Codable {
+                let name: String
+            }
+        }
+        
+        struct PlaylistContext: Codable {
+            let type: String
+            let uri: String
+        }
+    }
+}
+
+// MARK: - Playlists Batch API Response Model
+struct SpotifyPlaylistsResponse: Codable {
+    let playlists: [SpotifyPlaylist.APIResponse.PlaylistItem?]
+}
+
 // MARK: - Playlist Selection Storage
 struct PlaylistSelection: Codable {
     var highIntensityPlaylistID: String?
@@ -101,10 +132,10 @@ struct PlaylistSelection: Codable {
     var missingSelections: [String] {
         var missing: [String] = []
         if highIntensityPlaylistID == nil {
-            missing.append("High Intensity")
+            missing.append("Work")
         }
         if restPlaylistID == nil {
-            missing.append("Rest")
+            missing.append("Recovery")
         }
         return missing
     }
