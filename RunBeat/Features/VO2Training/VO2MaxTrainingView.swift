@@ -99,16 +99,14 @@ struct VO2MaxTrainingView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
             .toolbar {
-                if appState.vo2TrainingState != .active {
+                if appState.vo2TrainingState == .setup {
                     ToolbarItem(placement: .navigationBarLeading) {
                         AppCloseButton {
                             appState.cleanupVO2Training()
                             isPresented = false
                         }
                     }
-                }
-                
-                if appState.vo2TrainingState == .setup {
+                    
                     ToolbarItem(placement: .navigationBarTrailing) {
                         AppIconButton.settings {
                             showingVO2Settings = true

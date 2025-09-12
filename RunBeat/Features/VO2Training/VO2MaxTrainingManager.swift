@@ -163,8 +163,8 @@ class VO2MaxTrainingManager: ObservableObject {
         // Stop track polling (but let music continue playing)
         spotifyViewModel.stopTrackPolling()
         
-        // Reset device activation state for next training session
-        spotifyViewModel.resetDeviceActivationState()
+        // NOTE: resetDeviceActivationState() moved to dismissCompletionScreen() 
+        // to preserve track data for completion screen display
         
         // NEW: Reset services
         HeartRateService.shared.resetState()
@@ -181,6 +181,10 @@ class VO2MaxTrainingManager: ObservableObject {
     @MainActor
     func dismissCompletionScreen() {
         print("🔄 Dismissing completion screen, returning to setup...")
+        
+        // Reset device activation state now - prepares for next training session
+        // while preserving track data during completion screen display
+        spotifyViewModel.resetDeviceActivationState()
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
