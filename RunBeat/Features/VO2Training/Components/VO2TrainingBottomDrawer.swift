@@ -11,7 +11,6 @@ struct VO2TrainingBottomDrawer: View {
     @StateObject private var spotifyViewModel = SpotifyViewModel.shared
     @EnvironmentObject var appState: AppState
     @State private var isExpanded: Bool = false
-    @State private var dragOffset: CGFloat = 0
     
     // MARK: - State Management
     
@@ -86,7 +85,6 @@ struct VO2TrainingBottomDrawer: View {
                 )
             )
             .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: -5)
-            .offset(y: dragOffset)
             .gesture(isDrawerExpandable ? dragGesture : nil)
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .animation(.spring(response: 0.5, dampingFraction: 0.75), value: shouldShowDrawer)
@@ -563,34 +561,25 @@ struct VO2TrainingBottomDrawer: View {
                 guard isDrawerExpandable && !isTrainingActive else { return }
                 
                 let translation = gesture.translation.height
+                
                 if isExpanded {
-                    // Allow downward drag to collapse
-                    dragOffset = max(0, translation)
-                } else {
-                    // Allow upward drag to expand
-                    dragOffset = min(0, translation)
-                }
-            }
-            .onEnded { gesture in
-                guard isDrawerExpandable && !isTrainingActive else { return }
-                
-                let velocity = gesture.predictedEndLocation.y - gesture.location.y
-                let translation = gesture.translation.height
-                
-                withAnimation(.easeOut(duration: 0.3)) {
-                    if isExpanded {
-                        // Collapse if dragged down significantly
-                        if translation > 50 || velocity > 100 {
+                    // Collapse when dragged down significantly
+                    if translation > 30 {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
                             isExpanded = false
                         }
-                    } else {
-                        // Expand if dragged up significantly  
-                        if translation < -30 || velocity < -50 {
+                    }
+                } else {
+                    // Expand when dragged up significantly
+                    if translation < -20 {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
                             isExpanded = true
                         }
                     }
-                    dragOffset = 0
                 }
+            }
+            .onEnded { _ in
+                // State changes now happen during drag, no need for onEnded logic
             }
     }
 }
