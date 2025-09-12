@@ -20,12 +20,16 @@ protocol ZoneAnnouncementDelegate: AnyObject {
 
 class ZoneAnnouncementCoordinator {
     weak var delegate: ZoneAnnouncementDelegate?
+    private let userDefaults = UserDefaults.standard
     
     // Announcement state per training mode
-    private var announcementsEnabled: [TrainingMode: Bool] = [
-        .free: true,
-        .vo2Max: true
-    ]
+    private var announcementsEnabled: [TrainingMode: Bool] = [:] {
+        didSet { saveSettings() }
+    }
+    
+    init() {
+        loadSettings()
+    }
     
     // Cooldown management
     private var lastAnnouncedZone: Int?
@@ -109,6 +113,18 @@ class ZoneAnnouncementCoordinator {
                 print("⏰ Current zone (\(currentZone)) same as last announced, no announcement needed")
             }
         }
+    }
+    
+    private func loadSettings() {
+        announcementsEnabled = [
+            .free: userDefaults.object(forKey: "freeTrainingAnnouncementsEnabled") as? Bool ?? true,
+            .vo2Max: userDefaults.object(forKey: "vo2TrainingAnnouncementsEnabled") as? Bool ?? true
+        ]
+    }
+    
+    private func saveSettings() {
+        userDefaults.set(announcementsEnabled[.free], forKey: "freeTrainingAnnouncementsEnabled")
+        userDefaults.set(announcementsEnabled[.vo2Max], forKey: "vo2TrainingAnnouncementsEnabled")
     }
     
     deinit {

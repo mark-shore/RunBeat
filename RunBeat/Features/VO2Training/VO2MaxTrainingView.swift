@@ -13,6 +13,7 @@ struct VO2MaxTrainingView: View {
     @StateObject private var spotifyViewModel = SpotifyViewModel.shared
     @EnvironmentObject var appState: AppState
     @Binding var isPresented: Bool
+    @State private var showingVO2Settings = false
     
     var body: some View {
             ZStack {
@@ -55,7 +56,7 @@ struct VO2MaxTrainingView: View {
                             Button(action: {
                                 appState.stopVO2Training()
                             }) {
-                                Image(systemName: "stop.fill")
+                                Image(systemName: AppIcons.stop)
                                     .font(AppTypography.title2)
                                     .foregroundColor(AppColors.onBackground)
                                     .frame(width: 60, height: 60)
@@ -106,6 +107,17 @@ struct VO2MaxTrainingView: View {
                         }
                     }
                 }
+                
+                if appState.vo2TrainingState == .setup {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        AppIconButton.settings {
+                            showingVO2Settings = true
+                        }
+                    }
+                }
+            }
+            .navigationDestination(isPresented: $showingVO2Settings) {
+                VO2SettingsView(isPresented: $showingVO2Settings)
             }
         .onAppear {
             print("VO2 Max Training view appeared")
@@ -213,7 +225,7 @@ struct VO2MaxTrainingView: View {
             .fill(.gray.opacity(0.3))
             .frame(width: 40, height: 40)
             .overlay(
-                Image(systemName: "music.note")
+                Image(systemName: AppIcons.musicNote)
                     .font(.system(size: 16))
                     .foregroundColor(.gray)
             )

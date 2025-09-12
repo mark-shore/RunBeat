@@ -53,7 +53,7 @@ struct ContentView: View {
                                             .fill(appState.isSessionActive ? AppColors.error : AppColors.success)
                                             .frame(width: 50, height: 50)
                                         
-                                        Image(systemName: appState.isSessionActive ? "stop.fill" : "play.fill")
+                                        Image(systemName: appState.isSessionActive ? AppIcons.stop : AppIcons.play)
                                             .font(AppTypography.title2)
                                             .foregroundColor(AppColors.onBackground)
                                     }
@@ -86,7 +86,7 @@ struct ContentView: View {
                                             .fill(AppColors.primary)
                                             .frame(width: 50, height: 50)
                                         
-                                        Image(systemName: "flame.fill")
+                                        Image(systemName: AppIcons.flame)
                                             .font(AppTypography.title2)
                                             .foregroundColor(AppColors.onBackground)
                                     }
@@ -118,12 +118,8 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
+                    AppIconButton.settings {
                         showingSettings = true
-                    }) {
-                        Image(systemName: "gearshape.fill")
-                            .font(AppTypography.title2)
-                            .foregroundColor(AppColors.onBackground)
                     }
                 }
             }

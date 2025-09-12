@@ -106,13 +106,10 @@ struct HeartRateZonesCard: View {
                                 .font(AppTypography.caption)
                                 .foregroundColor(heartRateViewModel.useAutoZones ? AppColors.primary : AppColors.secondary)
                             
-                            Toggle("", isOn: Binding(
+                            AppToggle(isOn: Binding(
                                 get: { !heartRateViewModel.useAutoZones },
                                 set: { heartRateViewModel.useAutoZones = !$0 }
                             ))
-                            .labelsHidden()
-                            .toggleStyle(SwitchToggleStyle(tint: AppColors.primary))
-                            .scaleEffect(0.8)
                             
                             Text("Manual")
                                 .font(AppTypography.caption)

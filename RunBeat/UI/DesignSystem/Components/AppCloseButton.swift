@@ -13,7 +13,7 @@ struct AppCloseButton: View {
             impactFeedback.impactOccurred()
             action()
         }) {
-            Image(systemName: "xmark.circle.fill")
+            Image(systemName: AppIcons.closeCircle)
                 .font(.title2)
                 .foregroundColor(AppColors.secondary)
         }

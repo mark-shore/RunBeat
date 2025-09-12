@@ -5,7 +5,7 @@ struct AppBackButton: View {
     
     var body: some View {
         Button(action: action) {
-            Image(systemName: "arrow.left")
+            Image(systemName: AppIcons.back)
                 .font(AppTypography.title2)
                 .foregroundColor(AppColors.onBackground)
         }

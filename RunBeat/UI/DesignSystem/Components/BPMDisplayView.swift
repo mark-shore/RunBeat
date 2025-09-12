@@ -31,7 +31,7 @@ struct BPMDisplayView: View {
                     .foregroundColor(.white)
                     .fontWeight(.bold)
                 
-                Image(systemName: "heart.fill")
+                Image(systemName: AppIcons.heart)
                     .font(AppTypography.hrIcon)
                     .foregroundColor(.white)
             }
