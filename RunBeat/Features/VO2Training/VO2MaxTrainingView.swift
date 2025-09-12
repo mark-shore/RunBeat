@@ -20,72 +20,50 @@ struct VO2MaxTrainingView: View {
                 AppColors.background
                     .ignoresSafeArea()
                 
-                VStack(spacing: AppSpacing.xl) {
-                    // Header
-                    VStack(spacing: AppSpacing.sm) {
-                        Text("VO₂ Max Training")
-                            .font(AppTypography.largeTitle)
+                VStack(spacing: 0) {
+                    // Timer and phase info (always shown)
+                    VStack(alignment: .center, spacing: AppSpacing.xs) {
+                        // Timer
+                        Text(appState.vo2TrainingState == .active ? appState.vo2FormattedTimeRemaining : "4:00")
+                            .font(AppTypography.timerDisplay)
+                            .foregroundColor(AppColors.onBackground)
+                        
+                        // Phase with interval count
+                        Text(appState.vo2TrainingState == .active ? getPhaseDisplayText() : "4x4 INTERVAL TRAINING")
+                            .font(AppTypography.body)
                             .foregroundColor(AppColors.onBackground)
                     }
+                    .padding(.top, AppSpacing.xxxl)
                     
-                    Spacer()
-                    
-                    // Timer and heart rate display (hidden during completion)
+                    // Heart rate display
                     if appState.vo2TrainingState != .complete {
-                        VStack(alignment: .center, spacing: AppSpacing.lg) {
-                            // Phase-aware timer display (active training only)
-                            if appState.vo2TrainingState == .active {
-                                VStack(alignment: .center, spacing: AppSpacing.xs) {
-                                    // Timer
-                                    Text(appState.vo2FormattedTimeRemaining)
-                                        .font(AppTypography.timerDisplay)
-                                        .foregroundColor(AppColors.onBackground)
-                                    
-                                    // Phase with interval count
-                                    Text(getPhaseDisplayText())
-                                        .font(AppTypography.body)
-                                        .foregroundColor(AppColors.onBackground)
-                                }
-                            }
-                            
-                            // Heart rate display
-                            BPMDisplayView(bpm: appState.currentBPM, zone: getCurrentZone())
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .id("bpm-display")
-                                .animation(.none, value: appState.currentBPM)
-                        }
+                        BPMDisplayView(bpm: appState.currentBPM, zone: getCurrentZone())
+                            .id("bpm-display")
+                            .animation(.none, value: appState.currentBPM)
+                            .padding(.top, AppSpacing.xxl)
                     }
                     
-                    Spacer()
-                    
-                    // Buttons Section
+                    // Buttons
                     VStack(spacing: AppSpacing.md) {
-                        // Training Control Buttons
                         switch appState.vo2TrainingState {
                         case .setup:
-                            // Setup State: Show start button
                             AppButton("Start Training", style: .primary) {
                                 appState.startVO2Training()
                             }
                             
                         case .active:
-                            // Active State: Show stop button only
-                            HStack(spacing: AppSpacing.lg) {
-                                Button(action: {
-                                    // ✅ Single source of truth - only AppState controls training
-                                    appState.stopVO2Training()
-                                }) {
-                                    Image(systemName: "stop.fill")
-                                        .font(AppTypography.title2)
-                                        .foregroundColor(AppColors.onBackground)
-                                        .frame(width: 60, height: 60)
-                                        .background(AppColors.error)
-                                        .clipShape(Circle())
-                                }
+                            Button(action: {
+                                appState.stopVO2Training()
+                            }) {
+                                Image(systemName: "stop.fill")
+                                    .font(AppTypography.title2)
+                                    .foregroundColor(AppColors.onBackground)
+                                    .frame(width: 60, height: 60)
+                                    .background(AppColors.error)
+                                    .clipShape(Circle())
                             }
                             
                         case .complete:
-                            // Complete State: Show minimal completion screen
                             VStack(spacing: AppSpacing.lg) {
                                 Text("Training Complete")
                                     .font(AppTypography.title2)
@@ -98,11 +76,11 @@ struct VO2MaxTrainingView: View {
                             }
                         }
                     }
+                    .padding(.top, AppSpacing.xxl)
                     
-                    Spacer(minLength: AppSpacing.md)
+                    Spacer()
                 }
-                .padding(.top, 50) // Generous top spacing for better visual balance
-                .padding(.horizontal, 12) // Reduced horizontal padding for wider cards
+                .padding(.horizontal, AppSpacing.screenMargin)
                 .padding(.vertical, AppSpacing.screenMargin)
                 
                 // Bottom drawer positioned at ZStack level (setup and active states)
@@ -116,7 +94,7 @@ struct VO2MaxTrainingView: View {
                     .animation(.easeInOut(duration: 0.3), value: appState.vo2TrainingState)
                 }
             }
-            .navigationTitle("")
+            .navigationTitle("VO₂ Max Training")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
             .toolbar {
@@ -222,9 +200,9 @@ struct VO2MaxTrainingView: View {
         case .notStarted:
             return "READY TO START"
         case .highIntensity:
-            return "HIGH INTENSITY \(intervalNumber)/4"
+            return "WORK \(intervalNumber)/4"
         case .rest:
-            return "REST \(intervalNumber)/4"
+            return "RECOVERY \(intervalNumber)/4"
         case .completed:
             return "TRAINING COMPLETE"
         }

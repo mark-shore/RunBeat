@@ -194,7 +194,7 @@ struct VO2TrainingBottomDrawer: View {
     private var connectSpotifyContent: some View {
         // Fixed overlay - no expansion, just the connect button
         VStack(spacing: 0) {
-            AppButton("Connect to Spotify", style: .spotify) {
+            AppButton("Connect Spotify", style: .spotify) {
                 spotifyViewModel.connect()
             }
             .disabled(!spotifyViewModel.canConnect)

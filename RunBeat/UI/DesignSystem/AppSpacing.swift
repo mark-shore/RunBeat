@@ -7,6 +7,7 @@ struct AppSpacing {
     static let lg: CGFloat = 24
     static let xl: CGFloat = 32
     static let xxl: CGFloat = 48
+    static let xxxl: CGFloat = 80
     
     // Layout specific
     static let screenMargin: CGFloat = 16

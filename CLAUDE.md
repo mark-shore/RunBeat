@@ -106,6 +106,7 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 ### Design System Usage
 - Always use design system components: `AppButton`, `AppCard`, `AppBackButton`, `AppColors`, etc.
 - Follow existing spacing patterns from `AppSpacing`
+- Use consistent spacing constants instead of hardcoded values
 - Maintain dark theme consistency
 - Use `AppBackButton` for custom navigation when system back button styling doesn't match design requirements
 
