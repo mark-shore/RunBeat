@@ -19,6 +19,7 @@ An audio-first iOS app for heart rate zone training and VO2 max intervals with S
 ### 🔥 VO2 Max Intervals  
 - Guided 4x4 minute high-intensity interval training
 - Automatic Spotify playlist switching between work and rest periods
+- Play/pause controls during training and completion screens
 - Background execution for phone-away training
 - Synchronized with heart rate monitoring for zone tracking
 
@@ -47,6 +48,7 @@ RunBeat/
 │   │       ├── BPMDisplayView.swift # Animated heart rate display with zone colors
 │   │       ├── BPMValueBox.swift # Styled container for editable heart rate values
 │   │       ├── PickerModal.swift # Unified modal component for heart rate value selection
+│   │       ├── TrackDisplayWithControls.swift # Track info with optional play/pause controls
 │   │       └── ZoneDisplay.swift # Heart rate zone display
 
 ## Architecture Overview
@@ -555,7 +557,7 @@ VO2MaxTrainingManager ─┘
 
 #### VO2 Max Intervals
 - 4 minutes high intensity → 3 minutes rest → repeat 4x
-- Automatic playlist switching
+- Automatic playlist switching with play/pause controls
 - Designed for improving VO2 max
 - Total workout time: ~28 minutes
 

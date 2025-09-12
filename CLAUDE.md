@@ -48,7 +48,7 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 
 #### Core Services (`Core/Services/`)
 - `HeartRateService.swift`: Shared HR processing and zone calculation service
-- `ZoneAnnouncementCoordinator.swift`: Per-training-mode announcement management
+- `ZoneAnnouncementCoordinator.swift`: Per-training-mode announcement management with UserDefaults persistence
 - `SpeechAnnouncer.swift`: Audio announcement execution
 - `AudioService.swift`: Audio session and volume management
 - `BackendService.swift`: FastAPI backend integration with user-scoped token management, intelligent caching, and authentication state coordination
@@ -64,20 +64,24 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - `SpotifyConnectionManager.swift`: Unified connection state management with background-aware error handling
 - `SpotifyDataCoordinator.swift`: Intelligent data source prioritization
 - `SpotifyErrorHandler.swift`: Structured error recovery with background execution support
-- `SpotifyViewModel.swift`: UI state management with persistent authentication
+- `SpotifyViewModel.swift`: UI state management with persistent authentication and play/pause control
 - `KeychainWrapper.swift`: Secure token storage (eliminates repeated OAuth)
 - **Intent-Based Architecture**: SpotifyIntent enum (.training, .idle, .background) controls AppRemote lifecycle and eliminates wasteful background reconnection cycles
 - **AppState Bridging**: Moved from direct trainingManager access in views to AppState-mediated access, eliminating dual ownership patterns
 - **Token Management**: Centralized `makeAuthenticatedAPICall()` method handles automatic token refresh on 401 responses with authentication timing coordination
-- Features: Seamless training integration, reliable background playlist switching, automatic activation tracking
+- Features: Seamless training integration, reliable background playlist switching, automatic activation tracking, play/pause controls during training and completion
 
 #### VO2 Training Module (`Features/VO2Training/`)
 - `VO2MaxTrainingManager.swift`: 4x4 interval training coordination with shared HR services and Spotify reconnection observers
-- `VO2MaxTrainingView.swift`: Training UI with design system integration
-- `VO2TrainingBottomDrawer.swift`: Context-aware bottom drawer with smooth content-based animations
+- `VO2MaxTrainingView.swift`: Training UI with design system integration and VO2-specific settings access
+- `VO2TrainingBottomDrawer.swift`: Context-aware bottom drawer with smooth content-based animations and track controls
+- `VO2SettingsManager.swift`: Simple settings management for VO2-specific announcements with UserDefaults persistence
+- `VO2SettingsView.swift`: Navigation-based settings screen for zone announcement controls
 - **Spotify Integration**: Automatic music resumption when Spotify reconnects during training
-- **Smart Drawer Interface**: State-aware UI showing Connect Spotify, track info, or playlist selection based on context
-- Features: Structured intervals, Spotify playlist switching, configurable zone announcements, phase-aware music recovery
+- **Smart Drawer Interface**: State-aware UI showing Connect Spotify, track info with play/pause controls, or playlist selection based on context
+- **Training Completion**: Bottom drawer remains visible with track controls during completion screen
+- **VO2 Settings**: Gear icon in setup state provides access to zone announcement controls with persistent preferences
+- Features: Structured intervals, Spotify playlist switching, configurable zone announcements, phase-aware music recovery, play/pause controls
 
 #### Settings Module (`Features/Settings/`)
 - `SettingsView.swift`: Heart rate zone configuration and app settings with unified auto/manual display
@@ -91,10 +95,14 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - `AppColors.swift`: Brand colors (primary: #FF4500)
 - `AppTypography.swift`: Typography scales
 - `AppSpacing.swift`: Spacing system
+- `AppIcons.swift`: Centralized SF Symbol constants for consistent iconography
 - `Components/`: Reusable UI components (AppButton, AppCard, AppBackButton, etc.)
   - `AppBackButton.swift`: Custom navigation back button with white arrow.left icon
+  - `AppIconButton.swift`: Standardized icon button component with size variants and convenience methods
+  - `AppToggle.swift`: Consistent toggle styling with design system colors and scaling
   - `BPMValueBox.swift`: Styled container for editable heart rate values with state-based interaction hints
   - `PickerModal.swift`: Unified modal component for heart rate value selection with consistent presentation
+  - `TrackDisplayWithControls.swift`: Reusable component for displaying current track info with optional play/pause controls
 
 ## Development Guidelines
 
@@ -104,7 +112,9 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - ViewModels use `@Published` properties for reactive updates
 
 ### Design System Usage
-- Always use design system components: `AppButton`, `AppCard`, `AppBackButton`, `AppColors`, etc.
+- Always use design system components: `AppButton`, `AppCard`, `AppBackButton`, `AppIconButton`, `AppToggle`, `AppColors`, etc.
+- **Icons**: Use `AppIcons` constants for all SF Symbols and `AppIconButton` for standardized icon buttons
+- **Toggles**: Use `AppToggle` component instead of custom Toggle styling to maintain consistency
 - Follow existing spacing patterns from `AppSpacing`
 - Use consistent spacing constants instead of hardcoded values
 - Maintain dark theme consistency
