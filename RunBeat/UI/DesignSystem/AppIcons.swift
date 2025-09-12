@@ -18,6 +18,7 @@ struct AppIcons {
     
     // MARK: - Media Controls
     static let play = "play.fill"
+    static let pause = "pause.fill"
     static let stop = "stop.fill"
     static let playCircle = "play.circle.fill"
     

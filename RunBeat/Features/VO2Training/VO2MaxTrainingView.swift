@@ -84,8 +84,8 @@ struct VO2MaxTrainingView: View {
                 .padding(.horizontal, AppSpacing.screenMargin)
                 .padding(.vertical, AppSpacing.screenMargin)
                 
-                // Bottom drawer positioned at ZStack level (setup and active states)
-                if appState.vo2TrainingState == .setup || appState.vo2TrainingState == .active {
+                // Bottom drawer positioned at ZStack level (setup, active, and complete states)
+                if appState.vo2TrainingState == .setup || appState.vo2TrainingState == .active || appState.vo2TrainingState == .complete {
                     VStack {
                         Spacer() // Push drawer to bottom of screen
                         VO2TrainingBottomDrawer()
@@ -220,16 +220,6 @@ struct VO2MaxTrainingView: View {
         }
     }
     
-    private var albumArtworkPlaceholder: some View {
-        RoundedRectangle(cornerRadius: 6)
-            .fill(.gray.opacity(0.3))
-            .frame(width: 40, height: 40)
-            .overlay(
-                Image(systemName: AppIcons.musicNote)
-                    .font(.system(size: 16))
-                    .foregroundColor(.gray)
-            )
-    }
 }
 
 #Preview {

@@ -234,6 +234,14 @@ class SpotifyViewModel: ObservableObject {
         spotifyService.resume()
     }
     
+    func togglePlayPause() {
+        if isPlaying {
+            spotifyService.pause()
+        } else {
+            spotifyService.resume()
+        }
+    }
+    
     // MARK: - Training-specific API
     
     func activateDeviceForTraining(completion: @escaping (Bool) -> Void) {

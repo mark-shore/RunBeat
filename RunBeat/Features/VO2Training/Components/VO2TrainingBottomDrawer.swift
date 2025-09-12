@@ -15,7 +15,7 @@ struct VO2TrainingBottomDrawer: View {
     // MARK: - State Management
     
     private var shouldShowDrawer: Bool {
-        appState.vo2TrainingState == .setup || appState.vo2TrainingState == .active
+        appState.vo2TrainingState == .setup || appState.vo2TrainingState == .active || appState.vo2TrainingState == .complete
     }
     
     private var isTrainingActive: Bool {
@@ -25,7 +25,7 @@ struct VO2TrainingBottomDrawer: View {
     private var drawerContent: DrawerContent {
         if !spotifyViewModel.isConnected {
             return .connectSpotify
-        } else if isTrainingActive {
+        } else if isTrainingActive || appState.vo2TrainingState == .complete {
             return .trackInfo
         } else {
             return .playlistStatus
@@ -225,67 +225,27 @@ struct VO2TrainingBottomDrawer: View {
     }
     
     private var currentTrackDisplay: some View {
-        HStack(spacing: AppSpacing.md) {
-            // Album artwork (reduced size)
-            if let trackInfo = spotifyViewModel.currentTrackInfo,
-               let artworkURL = URL(string: trackInfo.artworkURL) {
-                AsyncImage(url: artworkURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    albumArtworkPlaceholder
+        HStack(spacing: 0) {
+            // Use the reusable TrackDisplayWithControls component
+            TrackDisplayWithControls(
+                trackInfo: spotifyViewModel.currentTrackInfo,
+                isPlaying: spotifyViewModel.isPlaying,
+                showControls: isTrainingActive || appState.vo2TrainingState == .complete, // Show controls during active training and completion
+                onPlayPauseToggle: {
+                    spotifyViewModel.togglePlayPause()
                 }
-                .frame(width: 50, height: 50)
-                .clipShape(RoundedRectangle(cornerRadius: AppSpacing.xs + 2))
-            } else {
-                albumArtworkPlaceholder
-                    .frame(width: 50, height: 50)
-            }
-            
-            // Track info with design system typography
-            VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                if let trackInfo = spotifyViewModel.currentTrackInfo {
-                    Text(trackInfo.name)
-                        .font(AppTypography.bodyMedium)
-                        .foregroundColor(AppColors.onBackground)
-                        .lineLimit(1)
-                    
-                    Text(trackInfo.artist)
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondary)
-                        .lineLimit(1)
-                } else {
-                    Text("No track playing")
-                        .font(AppTypography.bodyMedium)
-                        .foregroundColor(AppColors.secondary)
-                    
-                    Text("Music will appear here during training")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondary)
-                }
-            }
-            
-            Spacer()
+            )
             
             // Show expand chevron only when not training and expandable
             if !isExpanded && !isTrainingActive && isDrawerExpandable {
                 Image(systemName: "chevron.up")
                     .font(AppTypography.caption.weight(.medium))
                     .foregroundColor(AppColors.secondary)
+                    .padding(.leading, AppSpacing.sm)
             }
         }
     }
     
-    private var albumArtworkPlaceholder: some View {
-        RoundedRectangle(cornerRadius: AppSpacing.xs + 2) // 6px for artwork
-            .fill(AppColors.surfaceSecondary)
-            .overlay(
-                Image(systemName: "music.note")
-                    .font(AppTypography.caption.weight(.medium))
-                    .foregroundColor(AppColors.secondary)
-            )
-    }
     
     private var playlistSelectionContent: some View {
         PlaylistSectionNavigator()
