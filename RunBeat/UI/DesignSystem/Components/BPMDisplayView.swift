@@ -17,9 +17,9 @@ struct BPMDisplayView: View {
             Circle()
                 .fill(getZoneColor(for: zone))
                 .frame(width: 150, height: 150)
-                .scaleEffect(isAnimating ? 1.05 : 0.9)
+                .scaleEffect(isAnimating ? 1 : 0.9)
                 .animation(
-                    .easeInOut(duration: 1.2)
+                    .easeInOut(duration: 1.1)
                     .repeatForever(autoreverses: true),
                     value: isAnimating
                 )

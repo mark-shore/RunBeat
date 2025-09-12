@@ -40,7 +40,7 @@ struct VO2TrainingBottomDrawer: View {
         case .trackInfo:
             return 100 // Track info only - reduced to fix excessive padding
         case .playlistStatus:
-            return isExpanded ? 400 : 160 // Setup states
+            return isExpanded ? 400 : 150 // Setup states
         }
     }
     
