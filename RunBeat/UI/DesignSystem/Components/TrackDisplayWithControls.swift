@@ -62,14 +62,8 @@ struct TrackDisplayWithControls: View {
                 Button(action: onPlayPauseToggle) {
                     Image(systemName: isPlaying ? AppIcons.pause : AppIcons.play)
                         .font(AppTypography.title3.weight(.medium))
-                        .foregroundColor(AppColors.primary)
+                        .foregroundColor(.white)
                         .frame(width: 44, height: 44)
-                        .background(AppColors.surface)
-                        .clipShape(Circle())
-                        .overlay(
-                            Circle()
-                                .stroke(AppColors.primary.opacity(0.2), lineWidth: 1)
-                        )
                 }
             }
         }
