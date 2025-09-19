@@ -1,5 +1,6 @@
 import CoreBluetooth
 import Foundation
+import Combine
 
 class HeartRateManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     private var centralManager: CBCentralManager!
@@ -11,6 +12,9 @@ class HeartRateManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
 
     var onNewHeartRate: ((Int) -> Void)?
 
+    // Intent observation (keeping existing behavior unchanged for now)
+    private var cancellables = Set<AnyCancellable>()
+
     override init() {
         super.init()
         // Enable background operation with restoration identifier
@@ -20,6 +24,8 @@ class HeartRateManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         ]
         let bleQueue = DispatchQueue(label: "com.runbeat.ble", qos: .userInitiated)
         centralManager = CBCentralManager(delegate: self, queue: bleQueue, options: options)
+
+        setupIntentObservation()
     }
     
     func startMonitoring() {
@@ -135,5 +141,30 @@ class HeartRateManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         let byteArray = [UInt8](data)
         return byteArray[0] & 0x01 == 0 ? Int(byteArray[1]) :
             Int(UInt16(byteArray[1]) | UInt16(byteArray[2]) << 8)
+    }
+
+    // MARK: - Intent Observation
+
+    private func setupIntentObservation() {
+        IntentCoordinator.shared.$currentIntent
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] intent in
+                self?.handleIntentChange(intent)
+            }
+            .store(in: &cancellables)
+
+        AppLogger.debug("HeartRateManager intent observation setup complete", component: "HeartRate")
+    }
+
+    private func handleIntentChange(_ intent: AppIntent) {
+        AppLogger.debug("HeartRateManager received intent change: \(intent.description)", component: "HeartRate")
+
+        // TODO: In Phase 2, this will replace the existing isMonitoring logic
+        // For now, just logging to verify observation works
+        //
+        // Future logic will be:
+        // - Start monitoring when intent.isTrainingSession becomes true
+        // - Stop monitoring when intent becomes .idle
+        // - No manual startMonitoring/stopMonitoring calls needed
     }
 }
