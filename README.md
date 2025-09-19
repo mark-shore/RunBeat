@@ -53,18 +53,24 @@ RunBeat/
 
 ## Architecture Overview
 
-RunBeat follows the **MVVM (Model-View-ViewModel)** architecture pattern with clean separation of concerns:
+RunBeat follows the **MVVM (Model-View-ViewModel)** architecture pattern with **intent-based state coordination**:
 
-- **Models**: Data structures and business logic
+- **Models**: Data structures and business logic, including the central AppIntent system
 - **Views**: SwiftUI UI components with design system integration
 - **ViewModels**: UI state management and business logic coordination
-- **Services**: Core functionality and external integrations
+- **Services**: Core functionality and external integrations that observe app intent
+- **IntentCoordinator**: Central state coordinator that replaces distributed Boolean flag management
+
+### Intent-Based State Management
+
+The app uses a unified **AppIntent** system to coordinate behavior across all services, eliminating the need for distributed state checks and Boolean flag combinations. The `IntentCoordinator` serves as the single source of truth for app-wide state transitions.
 
 ## Project Structure
 
 RunBeat/
 ├── Core/                          # Core application services and utilities
 │   ├── Services/                  # Core business services
+│   │   ├── IntentCoordinator.swift # Central app state coordination using AppIntent system
 │   │   ├── AudioService.swift     # Audio session management
 │   │   ├── SpeechAnnouncer.swift  # Voice announcements
 │   │   ├── HeartRateService.swift # Shared HR processing and zone calculation
@@ -73,6 +79,7 @@ RunBeat/
 │   │   ├── FirebaseService.swift  # Firebase anonymous authentication with user ID propagation
 │   │   └── AppLogger.swift        # Centralized logging system with rate limiting
 │   ├── Models/                    # Data models
+│   │   └── AppIntent.swift        # Central intent enum for app-wide state coordination
 │   └── Utils/                     # Utility classes
 │       ├── KeychainWrapper.swift  # Secure token storage for Spotify
 │       ├── ConfigurationManager.swift # App configuration management
@@ -113,7 +120,7 @@ RunBeat/
 │       ├── zone4.mp3
 │       └── zone5.mp3
 ├── AppDelegate.swift             # UIKit app delegate for backend services
-├── AppState.swift                # Dual training mode coordinator with mutual exclusion
+├── AppState.swift                # Intent-based training coordinator with IntentCoordinator integration
 ├── RunBeatApp.swift              # SwiftUI app entry point
 ├── Info.plist                    # App configuration
 ├── Config.plist                  # Feature configuration
@@ -157,6 +164,69 @@ RunBeat/
     ├── test_refresh_system.py    # Token refresh tests
     ├── test_timing_updates.py    # Timing system tests
     └── .gitignore                # Python/backend specific ignore rules
+
+## Intent-Based Architecture (2025)
+
+RunBeat implements a unified intent-based architecture that replaces distributed Boolean state management with centralized app intent coordination.
+
+### AppIntent System
+
+The **AppIntent** enum serves as the single source of truth for app behavior, with cases covering the complete training lifecycle:
+
+```swift
+enum AppIntent {
+    case idle(inForeground: Bool)
+    case vo2Setup(inForeground: Bool)
+    case vo2Active(inForeground: Bool)
+    case vo2Complete(inForeground: Bool)
+    case freeSetup(inForeground: Bool)
+    case freeActive(inForeground: Bool)
+    case freeComplete(inForeground: Bool)
+}
+```
+
+Each intent case includes foreground state for automatic app lifecycle handling, eliminating the need for services to track both training state AND app lifecycle independently.
+
+### IntentCoordinator
+
+The **IntentCoordinator** singleton manages app-wide intent state transitions:
+
+- **Centralized State Management**: Single `@Published currentIntent` property that all services observe
+- **Thread-Safe Transitions**: Validates and logs all intent changes with proper error handling
+- **App Lifecycle Integration**: Automatically updates foreground state during app transitions
+- **Training Flow Helpers**: Provides methods like `startVO2Setup()`, `startFreeTraining()`, `endTraining()`
+
+### Service Coordination Benefits
+
+**Before (Distributed State)**:
+```swift
+// Services checking multiple flags independently
+if isTraining && inForeground && isVO2Mode && !isComplete { ... }
+```
+
+**After (Intent-Based)**:
+```swift
+// Services observe unified intent
+switch appIntent {
+case .vo2Active(inForeground: true):
+    // Clear, single decision point
+}
+```
+
+### Migration Status
+
+**✅ Phase 1 Complete - Foundation**:
+- AppIntent enum with full training lifecycle coverage
+- IntentCoordinator with centralized state management
+- AppState integration replacing activeTrainingMode
+- Automatic foreground/background coordination
+
+**🔄 Phase 2 Pending - Service Migration**:
+- Individual services (SpotifyService, HeartRateManager) still use legacy patterns
+- Full intent observation system implementation
+- Elimination of remaining Boolean flag combinations
+
+This foundation enables services to make decisions based on unified app intent rather than checking distributed state flags, providing clearer coordination and eliminating complex Boolean logic throughout the codebase.
 
 ## Key Components
 

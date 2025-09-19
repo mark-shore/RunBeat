@@ -5,7 +5,6 @@ import Combine
 
 class AppState: ObservableObject {
     @Published var currentBPM: Int = 0
-    @Published var activeTrainingMode: TrainingMode = .none
     
     // VO2 Training UI State - Bridged from VO2MaxTrainingManager
     @Published var vo2TimeRemaining: TimeInterval = 0
@@ -41,17 +40,20 @@ class AppState: ObservableObject {
     
     // Legacy compatibility for existing UI
     var isSessionActive: Bool {
-        return activeTrainingMode == .free
+        return intentCoordinator.isTrainingSession
     }
+
+    // Intent-based coordination - single source of truth for app state
+    private let intentCoordinator = IntentCoordinator.shared
 
     let hrManager = HeartRateManager()
     private let announcer = SpeechAnnouncer()
     private let audioService = AudioService()
-    
+
     // NEW: Replace HeartRateTrainingManager with FreeTrainingManager
     private let freeTrainingManager = FreeTrainingManager()
     private let vo2TrainingManager = VO2MaxTrainingManager.shared
-    
+
     // Heart rate zone settings ViewModel
     let heartRateViewModel = HeartRateViewModel()
 
@@ -62,7 +64,7 @@ class AppState: ObservableObject {
         observeHeartRateSettings()
         observeVO2TrainingUpdates() // NEW: Bridge VO2 training UI state
 
-        print("🚀 AppState initialized – ready for dual training mode architecture with proper separation of concerns")
+        AppLogger.info("AppState initialized with intent-based architecture", component: "AppState")
     }
     
     private func setupHeartRateMonitoring() {
@@ -76,13 +78,14 @@ class AppState: ObservableObject {
     
     private func routeHeartRateData(_ bpm: Int) {
         Task { @MainActor in
-            switch activeTrainingMode {
-            case .free:
+            let currentIntent = intentCoordinator.currentIntent
+            switch currentIntent {
+            case .freeActive, .freeSetup, .freeComplete:
                 freeTrainingManager.processHeartRate(bpm)
-            case .vo2Max:
+            case .vo2Active, .vo2Setup, .vo2Complete:
                 vo2TrainingManager.processHeartRate(bpm)
                 vo2TrainingManager.tick(now: Date())
-            case .none:
+            case .idle:
                 break // No training active
             }
         }
@@ -91,7 +94,7 @@ class AppState: ObservableObject {
     private func setupAudioManagement() {
         announcer.onAnnouncementFinished = { [weak self] in
             guard let self = self else { return }
-            self.audioService.restoreMusicVolume(isTrainingSessionActive: self.activeTrainingMode != .none)
+            self.audioService.restoreMusicVolume(isTrainingSessionActive: self.intentCoordinator.isTrainingSession)
         }
         audioService.delegate = self
     }
@@ -113,75 +116,71 @@ class AppState: ObservableObject {
     // MARK: - Training Mode Management
     
     func startFreeTraining() {
-        guard activeTrainingMode == .none else {
-            print("⚠️ Cannot start free training - another mode is active: \(activeTrainingMode)")
-            return
-        }
-        
-        activeTrainingMode = .free
-        Task { @MainActor in
-            freeTrainingManager.start()
-        }
+        // First set intent to Free setup mode
+        intentCoordinator.startFreeSetup()
+
+        // Start heart rate monitoring and configure settings
         hrManager.startMonitoring()
         Task { @MainActor in
             updateZoneSettings()
+
+            // Now transition to active Free training
+            intentCoordinator.startFreeTraining()
+            freeTrainingManager.start()
         }
-        print("🏃 Free training mode started")
     }
     
     func stopFreeTraining() {
-        guard activeTrainingMode == .free else { return }
-        
+        guard intentCoordinator.isFreeTraining else { return }
+
         Task { @MainActor in
             freeTrainingManager.stop()
         }
         hrManager.stopMonitoring()
         audioService.deactivateAudioSession()
-        activeTrainingMode = .none
-        print("⏹️ Free training mode stopped")
+        intentCoordinator.endTraining()
     }
     
     func startVO2Training() {
         // Handle restart from complete state
-        if activeTrainingMode == .vo2Max && vo2TrainingState == .complete {
-            print("🔄 Restarting VO2 training from complete state")
+        if intentCoordinator.isVO2Training && vo2TrainingState == .complete {
             Task { @MainActor in
                 vo2TrainingManager.resetToSetup()
+                intentCoordinator.startVO2Training()
                 vo2TrainingManager.startTraining()
             }
             return
         }
-        
-        guard activeTrainingMode == .none else {
-            print("⚠️ Cannot start VO2 training - another mode is active: \(activeTrainingMode)")
-            return
-        }
-        
-        activeTrainingMode = .vo2Max
+
+        // First set intent to VO2 setup mode
+        intentCoordinator.startVO2Setup()
+
+        // Start heart rate monitoring and configure settings
         hrManager.startMonitoring()
         Task { @MainActor in
             updateZoneSettings()
+
+            // Now transition to active VO2 training
+            intentCoordinator.startVO2Training()
             vo2TrainingManager.startTraining()
         }
-        print("🏃 VO2 Max training mode started")
     }
     
     func stopVO2Training() {
-        guard activeTrainingMode == .vo2Max else { return }
-        
+        guard intentCoordinator.isVO2Training else { return }
+
         Task { @MainActor in
             vo2TrainingManager.endTraining()
         }
         hrManager.stopMonitoring()
         audioService.deactivateAudioSession()
-        activeTrainingMode = .none
-        print("⏹️ VO2 Max training mode stopped")
+        intentCoordinator.endTraining()
     }
     
     /// Simplified cleanup method for consistent termination
     func cleanupVO2Training() {
-        if activeTrainingMode == .vo2Max {
-            stopVO2Training()
+        if intentCoordinator.isVO2Training {
+            intentCoordinator.endTraining()
         }
     }
     
@@ -259,7 +258,7 @@ class AppState: ObservableObject {
             .assign(to: \.vo2TrainingState, on: self)
             .store(in: &cancellables)
             
-        print("🔗 VO2 training state bridging established")
+        AppLogger.debug("VO2 training state bridging established", component: "AppState")
     }
     
     private var cancellables = Set<AnyCancellable>()
@@ -272,7 +271,7 @@ class AppState: ObservableObject {
     private func announceZone(_ zone: Int) {
         audioService.setupAudioSessionForAnnouncement()
         announcer.announceZone(zone)
-        print("🔊 Zone \(zone) announced")
+        AppLogger.debug("Zone \(zone) announced", component: "AppState")
     }
     
     @MainActor
@@ -310,7 +309,7 @@ class AppState: ObservableObject {
 // MARK: - AudioServiceDelegate
 extension AppState: AudioServiceDelegate {
     func audioServiceDidRestoreMusicVolume() {
-        print("🎵 Audio service restored music volume")
+        AppLogger.debug("Audio service restored music volume", component: "AppState")
     }
 }
 

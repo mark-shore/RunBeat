@@ -27,6 +27,7 @@ xcodebuild -scheme RunBeat clean
 RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architecture**. The app is designed for "phone-away" training with real-time audio announcements.
 
 ### Key Architectural Principles
+- **Intent-based state coordination** with AppIntent and IntentCoordinator
 - **Feature-based modules** in `Features/` directory
 - **Design system** with reusable components in `UI/DesignSystem/`
 - **Service layer** for external integrations (Bluetooth, Spotify)
@@ -47,6 +48,7 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - `HeartRateViewModel.swift`: UI state and settings persistence
 
 #### Core Services (`Core/Services/`)
+- `IntentCoordinator.swift`: Central app-wide state coordination using AppIntent system (replaces distributed Boolean flags)
 - `HeartRateService.swift`: Shared HR processing and zone calculation service
 - `ZoneAnnouncementCoordinator.swift`: Per-training-mode announcement management with UserDefaults persistence
 - `SpeechAnnouncer.swift`: Audio announcement execution
@@ -54,6 +56,9 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - `BackendService.swift`: FastAPI backend integration with user-scoped token management, intelligent caching, and authentication state coordination
 - `FirebaseService.swift`: Firebase anonymous authentication with automatic user ID propagation and authentication completion notifications
 - `AppLogger.swift`: Centralized logging system with rate limiting and structured output
+
+#### Core Models (`Core/Models/`)
+- `AppIntent.swift`: Central intent enum for unified app state coordination with training lifecycle and foreground state
 
 #### Free Training Module (`Features/FreeTraining/`)
 - `FreeTrainingManager.swift`: Simple background HR monitoring with announcements (replaces legacy HeartRateTrainingManager)
@@ -121,12 +126,19 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - Use `AppBackButton` for custom navigation when system back button styling doesn't match design requirements
 
 ### State Management
+- **Intent-Based Architecture**: AppIntent system replaces distributed Boolean state management (Phase 1 complete)
+- **IntentCoordinator**: Central singleton managing app-wide state transitions with automatic foreground/background coordination
+- **AppState Integration**: Uses IntentCoordinator instead of legacy activeTrainingMode enum
 - **Dual Training Architecture**: Free Training and VO2 Max Training are independent modes
-- **AppState**: Coordinates training mode mutual exclusion (only one active at a time)
 - **Shared Services**: HeartRateService and ZoneAnnouncementCoordinator used by both training modes
 - ViewModels manage UI state with `@Published` properties
 - Services handle business logic and external integrations
 - UserDefaults for settings persistence (preserve existing keys)
+
+### Intent System Migration Status
+- ✅ **Foundation Complete**: AppIntent enum, IntentCoordinator, AppState integration
+- 🔄 **Service Migration Pending**: Individual services still use legacy state patterns
+- **Legacy Compatibility**: Old `activeTrainingMode` system has been replaced by IntentCoordinator
 
 ### Current Priority Issues
 1. **User Onboarding**: Guide new users through HR zone setup
@@ -195,6 +207,8 @@ RunBeat is an iOS heart rate training app built with **SwiftUI + MVVM architectu
 - Never modify `HeartRateManager`'s core Bluetooth logic
 - Preserve all background execution functionality (working reliably)
 - Keep audio announcement timing unchanged
+- **Intent-Based Coordination**: Use IntentCoordinator for state management instead of creating new Boolean flags
+- **State Migration**: New services should observe AppIntent changes rather than checking distributed state
 - **User-Scoped Architecture**: Complete Firebase anonymous auth with authentication timing resolution - production-ready and stable
 - **Authentication Timing**: All backend operations automatically handle Firebase auth delays via operation queueing - no manual handling needed
 - **Token Management**: Use `makeAuthenticatedAPICall()` for new Spotify API calls to get automatic token refresh with auth coordination
