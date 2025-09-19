@@ -25,7 +25,7 @@ struct VO2MaxTrainingView: View {
                     // Timer and phase info (always shown)
                     VStack(alignment: .center, spacing: AppSpacing.xs) {
                         // Timer
-                        Text(appState.vo2TrainingState == .active ? appState.vo2FormattedTimeRemaining : "4:00")
+                        Text(getTimerText())
                             .font(AppTypography.timerDisplay)
                             .foregroundColor(AppColors.onBackground)
                         
@@ -37,12 +37,10 @@ struct VO2MaxTrainingView: View {
                     .padding(.top, AppSpacing.xxxl)
                     
                     // Heart rate display
-                    if appState.vo2TrainingState != .complete {
-                        BPMDisplayView(bpm: appState.currentBPM, zone: getCurrentZone())
-                            .id("bpm-display")
-                            .animation(.none, value: appState.currentBPM)
-                            .padding(.top, AppSpacing.xxl)
-                    }
+                    BPMDisplayView(bpm: appState.currentBPM, zone: getCurrentZone())
+                        .id("bpm-display")
+                        .animation(.none, value: appState.currentBPM)
+                        .padding(.top, AppSpacing.xxl)
                     
                     // Buttons
                     VStack(spacing: AppSpacing.md) {
@@ -119,10 +117,10 @@ struct VO2MaxTrainingView: View {
             }
         .onAppear {
             print("VO2 Max Training view appeared")
-            
-            // Start HR monitoring for setup screen
-            if appState.vo2TrainingState == .setup {
-                print("💓 Starting HR monitoring for VO2 setup screen")
+
+            // Start HR monitoring for setup and completion screens
+            if appState.vo2TrainingState == .setup || appState.vo2TrainingState == .complete {
+                print("💓 Starting HR monitoring for VO2 \(appState.vo2TrainingState) screen")
                 appState.hrManager.startMonitoring()
             }
             
@@ -154,9 +152,9 @@ struct VO2MaxTrainingView: View {
             }
         }
         .onDisappear {
-            // Stop HR monitoring only if we're leaving from setup state (not after completion)
-            if appState.vo2TrainingState == .setup && appState.vo2CurrentPhase != .completed {
-                print("💓 Stopping HR monitoring for VO2 setup screen")
+            // Stop HR monitoring when leaving setup or completion screens
+            if appState.vo2TrainingState == .setup || appState.vo2TrainingState == .complete {
+                print("💓 Stopping HR monitoring for VO2 \(appState.vo2TrainingState) screen")
                 appState.hrManager.stopMonitoring()
             }
 
@@ -166,21 +164,32 @@ struct VO2MaxTrainingView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-            if appState.vo2TrainingState == .setup {
-                print("💓 App backgrounding - stopping HR monitoring for VO2 setup screen")
+            if appState.vo2TrainingState == .setup || appState.vo2TrainingState == .complete {
+                print("💓 App backgrounding - stopping HR monitoring for VO2 \(appState.vo2TrainingState) screen")
                 appState.hrManager.stopMonitoring()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            if appState.vo2TrainingState == .setup {
-                print("💓 App foregrounding - resuming HR monitoring for VO2 setup screen")
+            if appState.vo2TrainingState == .setup || appState.vo2TrainingState == .complete {
+                print("💓 App foregrounding - resuming HR monitoring for VO2 \(appState.vo2TrainingState) screen")
                 appState.hrManager.startMonitoring()
             }
         }
     }
     
     // MARK: - Helper Methods
-    
+
+    private func getTimerText() -> String {
+        switch appState.vo2TrainingState {
+        case .active:
+            return appState.vo2FormattedTimeRemaining
+        case .complete:
+            return "0:00"
+        case .setup:
+            return "4:00"
+        }
+    }
+
     private func getCurrentZone() -> Int {
         guard appState.currentBPM > 0 else { return 0 }
         
