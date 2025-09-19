@@ -159,10 +159,22 @@ struct VO2MaxTrainingView: View {
                 print("💓 Stopping HR monitoring for VO2 setup screen")
                 appState.hrManager.stopMonitoring()
             }
-            
+
             // Ensure polling stops when view disappears (training manager handles its own polling)
             if appState.vo2TrainingState == .setup || appState.vo2TrainingState == .complete {
                 spotifyViewModel.stopTrackPolling()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            if appState.vo2TrainingState == .setup {
+                print("💓 App backgrounding - stopping HR monitoring for VO2 setup screen")
+                appState.hrManager.stopMonitoring()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            if appState.vo2TrainingState == .setup {
+                print("💓 App foregrounding - resuming HR monitoring for VO2 setup screen")
+                appState.hrManager.startMonitoring()
             }
         }
     }
