@@ -1,3 +1,6 @@
+# Environment variables (do not commit secrets)
+.env
+
 # macOS
 .DS_Store
 
