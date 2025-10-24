@@ -2,7 +2,7 @@
 //  MusicPlaylist.swift
 //  RunBeat
 //
-//  Apple Music playlist model - mirrors SpotifyPlaylist structure
+//  Apple Music playlist model for VO2 Max training
 //
 
 import Foundation

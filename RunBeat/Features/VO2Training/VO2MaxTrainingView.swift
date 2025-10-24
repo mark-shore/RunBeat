@@ -9,8 +9,6 @@ import SwiftUI
 import Foundation
 
 struct VO2MaxTrainingView: View {
-    // ✅ View only talks to coordination layer - no direct manager access
-    @StateObject private var spotifyViewModel = SpotifyViewModel.shared
     @EnvironmentObject var appState: AppState
     @Binding var isPresented: Bool
     @State private var showingVO2Settings = false
@@ -116,62 +114,32 @@ struct VO2MaxTrainingView: View {
                 VO2SettingsView(isPresented: $showingVO2Settings)
             }
         .onAppear {
-            print("VO2 Max Training view appeared")
+            AppLogger.debug("VO2 Max Training view appeared", component: "VO2Training")
 
             // Start HR monitoring for setup and completion screens
             if appState.vo2TrainingState == .setup || appState.vo2TrainingState == .complete {
-                print("💓 Starting HR monitoring for VO2 \(appState.vo2TrainingState) screen")
+                AppLogger.debug("Starting HR monitoring for VO2 \(appState.vo2TrainingState) screen", component: "VO2Training")
                 appState.hrManager.startMonitoring()
             }
-            
-            // Ensure playlist fetch happens if connected
-            if spotifyViewModel.isConnected {
-                if spotifyViewModel.availablePlaylists.isEmpty {
-                    print("🎵 Auto-fetching playlists for training view")
-                    spotifyViewModel.fetchPlaylists()
-                } else if (spotifyViewModel.selectedHighIntensityPlaylist == nil || spotifyViewModel.selectedRestPlaylist == nil) &&
-                          (spotifyViewModel.playlistSelection.highIntensityPlaylistID != nil || spotifyViewModel.playlistSelection.restPlaylistID != nil) {
-                    print("🎵 Refreshing playlists to resolve missing selections")
-                    spotifyViewModel.fetchPlaylists()
-                }
-                
-                // Track info will be refreshed when training actually starts
-                // No need to make API calls just for viewing the screen
-            }
-        }
-        .onChange(of: appState.vo2TrainingState) { oldValue, newValue in
-            switch newValue {
-            case .active:
-                // Training started - polling is handled by VO2MaxTrainingManager
-                print("🎵 [VO2View] Training started - polling managed by training manager")
-                
-            case .setup, .complete:
-                // Training stopped - ensure polling stops
-                print("🎵 [VO2View] Training stopped - ensuring track polling stopped")
-                spotifyViewModel.stopTrackPolling()
-            }
+
+            // Apple Music playlist management is handled by VO2TrainingBottomDrawer
         }
         .onDisappear {
             // Stop HR monitoring when leaving setup or completion screens
             if appState.vo2TrainingState == .setup || appState.vo2TrainingState == .complete {
-                print("💓 Stopping HR monitoring for VO2 \(appState.vo2TrainingState) screen")
+                AppLogger.debug("Stopping HR monitoring for VO2 \(appState.vo2TrainingState) screen", component: "VO2Training")
                 appState.hrManager.stopMonitoring()
-            }
-
-            // Ensure polling stops when view disappears (training manager handles its own polling)
-            if appState.vo2TrainingState == .setup || appState.vo2TrainingState == .complete {
-                spotifyViewModel.stopTrackPolling()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             if appState.vo2TrainingState == .setup || appState.vo2TrainingState == .complete {
-                print("💓 App backgrounding - stopping HR monitoring for VO2 \(appState.vo2TrainingState) screen")
+                AppLogger.debug("App backgrounding - stopping HR monitoring for VO2 \(appState.vo2TrainingState) screen", component: "VO2Training")
                 appState.hrManager.stopMonitoring()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             if appState.vo2TrainingState == .setup || appState.vo2TrainingState == .complete {
-                print("💓 App foregrounding - resuming HR monitoring for VO2 \(appState.vo2TrainingState) screen")
+                AppLogger.debug("App foregrounding - resuming HR monitoring for VO2 \(appState.vo2TrainingState) screen", component: "VO2Training")
                 appState.hrManager.startMonitoring()
             }
         }

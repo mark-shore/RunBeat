@@ -10,7 +10,6 @@ struct AppButton: View {
         case primary    // For main actions
         case secondary  // For secondary actions
         case destructive // For destructive actions
-        case spotify    // For Spotify integration
     }
     
     init(
@@ -74,25 +73,6 @@ struct AppButton: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
-            .clipShape(Capsule())
-            .disabled(isLoading)
-            
-        case .spotify:
-            Button(action: action) {
-                HStack {
-                    if isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .black))
-                            .scaleEffect(0.9)
-                    }
-                    Text(title)
-                        .foregroundColor(.black)
-                        .fontWeight(.semibold)
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .tint(AppColors.spotify)
             .clipShape(Capsule())
             .disabled(isLoading)
         }

@@ -64,14 +64,9 @@ class VO2MaxTrainingManager: ObservableObject {
     
     @MainActor
     func startTraining() {
-        print("🏃 Starting VO2 Max training...")
-        // TEMPORARY: Disabled during Apple Music migration
-        // print("🎵 Spotify connected: \(spotifyViewModel.isConnected)")
+        AppLogger.info("Starting VO2 Max training", component: "VO2Training")
 
-        // TEMPORARY: Disabled during Apple Music migration
-        // spotifyViewModel.setIntent(.training)
-
-        // NEW: Reset HR services
+        // Reset HR services
         HeartRateService.shared.resetState()
         announcements.resetState()
 
@@ -91,21 +86,21 @@ class VO2MaxTrainingManager: ObservableObject {
 
         // Start high intensity music if playlists are configured
         if musicViewModel.hasPlaylistsConfigured {
-            print("🎵 Starting high intensity playlist")
+            AppLogger.info("Starting high intensity playlist", component: "VO2Training")
             musicViewModel.playHighIntensityMusic()
         } else {
-            print("⚠️ No playlists configured - training will run without music")
+            AppLogger.warn("No playlists configured - training will run without music", component: "VO2Training")
         }
     }
     
     /// Ends the training session and shows completion screen
     @MainActor
     func endTraining() {
-        print("⏹️ Ending VO2 Max training...")
-        
+        AppLogger.info("Ending VO2 Max training", component: "VO2Training")
+
         timer?.invalidate()
         timer = nil
-        
+
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.trainingState = .complete
@@ -113,19 +108,8 @@ class VO2MaxTrainingManager: ObservableObject {
             self.currentPhase = .completed
             self.timeRemaining = 0
         }
-        
-        // Deactivate Spotify training state - stops unnecessary reconnection attempts  
-        // TEMPORARY: Disabled during Apple Music migration
-        // spotifyViewModel.setIntent(.idle)
-        
-        // Stop track polling (but let music continue playing)
-        // TEMPORARY: Disabled during Apple Music migration
-        // spotifyViewModel.stopTrackPolling()
-        
-        // NOTE: resetDeviceActivationState() moved to dismissCompletionScreen() 
-        // to preserve track data for completion screen display
-        
-        // NEW: Reset services
+
+        // Reset services
         HeartRateService.shared.resetState()
         announcements.resetState()
     }
@@ -139,13 +123,8 @@ class VO2MaxTrainingManager: ObservableObject {
     /// Dismisses completion screen and returns to setup state
     @MainActor
     func dismissCompletionScreen() {
-        print("🔄 Dismissing completion screen, returning to setup...")
-        
-        // Reset device activation state now - prepares for next training session
-        // while preserving track data during completion screen display
-        // TEMPORARY: Disabled during Apple Music migration
-        // spotifyViewModel.resetDeviceActivationState()
-        
+        AppLogger.info("Dismissing completion screen, returning to setup", component: "VO2Training")
+
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.showingCompletionScreen = false
@@ -158,7 +137,7 @@ class VO2MaxTrainingManager: ObservableObject {
     /// Resets the training session to setup state (for completed training)
     @MainActor
     func resetToSetup() {
-        print("🔄 Resetting training to setup state...")
+        AppLogger.info("Resetting training to setup state", component: "VO2Training")
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
@@ -179,29 +158,29 @@ class VO2MaxTrainingManager: ObservableObject {
     
     @MainActor
     private func startNextInterval() {
-        print("Starting next interval: \(currentInterval)")
-        
+        AppLogger.debug("Starting next interval: \(currentInterval)", component: "VO2Training")
+
         if currentInterval > totalIntervals {
-            print("🎉 VO2 Max training completed!")
+            AppLogger.info("VO2 Max training completed!", component: "VO2Training")
             endTraining()
             return
         }
-        
+
         // Determine if this is a high-intensity or rest interval
         let isHighIntensity = currentInterval % 2 == 1 // Odd intervals are high-intensity
-        
+
         if isHighIntensity {
             DispatchQueue.main.async { [weak self] in
                 self?.currentPhase = .highIntensity
                 self?.timeRemaining = self?.highIntensityDuration ?? 0
             }
             intervalState = IntervalState(phase: .highIntensity, start: timeProvider.now(), duration: highIntensityDuration)
-            
+
             // Skip playing playlist for first interval since it should already be playing from device activation
             if currentInterval == 1 {
-                print("First high intensity interval - playlist should already be playing from device activation")
+                AppLogger.debug("First high intensity interval - playlist already playing", component: "VO2Training")
             } else {
-                print("High intensity interval - attempting to play playlist...")
+                AppLogger.debug("High intensity interval - switching playlist", component: "VO2Training")
                 switchPlaylistIfNeeded(for: .highIntensity)
             }
         } else {
@@ -210,7 +189,7 @@ class VO2MaxTrainingManager: ObservableObject {
                 self?.timeRemaining = self?.restDuration ?? 0
             }
             intervalState = IntervalState(phase: .rest, start: timeProvider.now(), duration: restDuration)
-            print("Rest interval - attempting to play playlist...")
+            AppLogger.debug("Rest interval - switching playlist", component: "VO2Training")
             switchPlaylistIfNeeded(for: .rest)
         }
         
@@ -240,13 +219,13 @@ class VO2MaxTrainingManager: ObservableObject {
         }
         
         if currentInterval <= totalIntervals {
-            print("⏱️ VO2 tick - phase: \(currentPhase) interval: \(currentInterval) elapsed: \(Int(elapsed))s remaining: \(Int(remaining))s")
+            AppLogger.rateLimited(.verbose, message: "VO2 tick - phase: \(currentPhase) interval: \(currentInterval) elapsed: \(Int(elapsed))s remaining: \(Int(remaining))s", key: "vo2_tick", component: "VO2Training")
         }
 
         if remaining <= 0 {
             DispatchQueue.main.async { [weak self] in
                 self?.currentInterval += 1
-                print("🚦 VO2 boundary reached → advancing to interval \(self?.currentInterval ?? 0)")
+                AppLogger.debug("VO2 boundary reached → advancing to interval \(self?.currentInterval ?? 0)", component: "VO2Training")
                 self?.startNextInterval()
             }
         }
@@ -262,10 +241,10 @@ class VO2MaxTrainingManager: ObservableObject {
         lastIssuedCommandInterval = currentInterval
         switch phase {
         case .highIntensity:
-            print("🎵 Switching to high intensity playlist")
+            AppLogger.info("Switching to high intensity playlist", component: "VO2Training")
             musicViewModel.playHighIntensityMusic()
         case .rest:
-            print("🎵 Switching to rest playlist")
+            AppLogger.info("Switching to rest playlist", component: "VO2Training")
             musicViewModel.playRestMusic()
         default:
             break
@@ -342,10 +321,10 @@ class VO2MaxTrainingManager: ObservableObject {
     
 }
 
-// NEW: ZoneAnnouncementDelegate implementation
+// MARK: - ZoneAnnouncementDelegate
 extension VO2MaxTrainingManager: ZoneAnnouncementDelegate {
     func announceZone(_ zone: Int) {
         NotificationCenter.default.post(name: .announceZone, object: zone)
-        print("🔊 VO2 Max training requesting zone \(zone) announcement")
+        AppLogger.debug("VO2 Max training requesting zone \(zone) announcement", component: "VO2Training")
     }
 }

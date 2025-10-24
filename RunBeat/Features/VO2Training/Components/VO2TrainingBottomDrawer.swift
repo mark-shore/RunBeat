@@ -508,6 +508,7 @@ struct VO2TrainingBottomDrawer: View {
         if currentAssignment != .highIntensity {
             buttons.append(.default(Text("Use for Work")) {
                 musicViewModel.selectHighIntensityPlaylist(playlist)
+                checkForAutoCollapse()
             })
         }
 
@@ -515,6 +516,7 @@ struct VO2TrainingBottomDrawer: View {
         if currentAssignment != .rest {
             buttons.append(.default(Text("Use for Recovery")) {
                 musicViewModel.selectRestPlaylist(playlist)
+                checkForAutoCollapse()
             })
         }
 
@@ -552,8 +554,15 @@ struct VO2TrainingBottomDrawer: View {
             return .none
         }
     }
-    
-    
+
+    private func checkForAutoCollapse() {
+        if musicViewModel.playlistSelection.isComplete {
+            // Signal drawer to collapse
+            NotificationCenter.default.post(name: .playlistSelectionComplete, object: nil)
+        }
+    }
+
+
     // MARK: - Gestures
     
     private var dragGesture: some Gesture {
@@ -591,6 +600,12 @@ enum MusicPlaylistAssignment {
     case highIntensity
     case rest
     case none
+}
+
+// MARK: - Notification Extension
+
+extension Notification.Name {
+    static let playlistSelectionComplete = Notification.Name("playlistSelectionComplete")
 }
 
 #Preview {

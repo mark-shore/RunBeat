@@ -74,7 +74,7 @@ struct ContentView: View {
                                             .font(AppTypography.title2)
                                             .foregroundColor(AppColors.onBackground)
                                         
-                                        Text("4 min high-intensity intervals with Spotify")
+                                        Text("4 min high-intensity intervals with Apple Music")
                                             .font(AppTypography.callout)
                                             .foregroundColor(AppColors.secondary)
                                     }

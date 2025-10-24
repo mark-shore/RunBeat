@@ -2,15 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>SPOTIFY_CLIENT_ID</key>
-	<string>5f95e15c837b447bbc6aed4ec83776b6</string>
-	<key>SPOTIFY_CLIENT_SECRET</key>
-	<string>0757e194891d4f8db9e280f868de0d05</string>
-	<key>SPOTIFY_HIGH_INTENSITY_PLAYLIST_ID</key>
-	<string>4OVrwFYrBP03lXStlTkbDK</string>
-	<key>SPOTIFY_REST_PLAYLIST_ID</key>
-	<string>5TZiprVS1hx8i8DmnF1U9i</string>
-	<key>BackendBaseURL</key>
-	<string>https://runbeat-production.up.railway.app</string>
+	<!-- Configuration file for RunBeat -->
+	<!-- Add future configuration keys here -->
 </dict>
 </plist>

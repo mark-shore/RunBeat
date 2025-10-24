@@ -26,7 +26,4 @@ struct AppColors {
     static let success = Color(.systemGreen)
     static let warning = Color(.systemOrange)
     static let error = Color(.systemRed)
-    
-    // Third-party brand colors
-    static let spotify = Color(red: 0.11, green: 0.73, blue: 0.33) // #1DB954
 }

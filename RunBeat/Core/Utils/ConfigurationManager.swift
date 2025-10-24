@@ -71,22 +71,3 @@ class ConfigurationManager {
         return configuration[key] ?? defaultValue
     }
 }
-
-// MARK: - Spotify Configuration
-extension ConfigurationManager {
-    var spotifyClientID: String {
-        return getValue(for: "SPOTIFY_CLIENT_ID", defaultValue: "")
-    }
-    
-    var spotifyClientSecret: String {
-        return getValue(for: "SPOTIFY_CLIENT_SECRET", defaultValue: "")
-    }
-    
-    var spotifyHighIntensityPlaylistID: String {
-        return getValue(for: "SPOTIFY_HIGH_INTENSITY_PLAYLIST_ID", defaultValue: "")
-    }
-    
-    var spotifyRestPlaylistID: String {
-        return getValue(for: "SPOTIFY_REST_PLAYLIST_ID", defaultValue: "")
-    }
-}
