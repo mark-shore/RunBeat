@@ -13,7 +13,6 @@
 		6D1EAA742E6141D9005572D3 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 6D1EAA732E6141D9005572D3 /* FirebaseFunctions */; };
 		6D1EAA762E6141D9005572D3 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 6D1EAA752E6141D9005572D3 /* FirebaseMessaging */; };
 		6D1EAA782E614233005572D3 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 6D1EAA772E614233005572D3 /* GoogleService-Info.plist */; };
-		6D34307F2E4511D7003F0058 /* SpotifyiOS in Frameworks */ = {isa = PBXBuildFile; productRef = 6D34307E2E4511D7003F0058 /* SpotifyiOS */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -68,7 +67,6 @@
 				6D1EAA722E6141D9005572D3 /* FirebaseFirestore in Frameworks */,
 				6D1EAA742E6141D9005572D3 /* FirebaseFunctions in Frameworks */,
 				6D1EAA702E6141D9005572D3 /* FirebaseAuth in Frameworks */,
-				6D34307F2E4511D7003F0058 /* SpotifyiOS in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -130,7 +128,6 @@
 			);
 			name = RunBeat;
 			packageProductDependencies = (
-				6D34307E2E4511D7003F0058 /* SpotifyiOS */,
 				6D1EAA6D2E6141D9005572D3 /* FirebaseAnalytics */,
 				6D1EAA6F2E6141D9005572D3 /* FirebaseAuth */,
 				6D1EAA712E6141D9005572D3 /* FirebaseFirestore */,
@@ -220,7 +217,6 @@
 			mainGroup = 6DBD7F592E343DF300608F0D;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				6D34307D2E4511D7003F0058 /* XCRemoteSwiftPackageReference "ios-sdk" */,
 				6D1EAA6C2E6141D9005572D3 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -618,15 +614,7 @@
 				minimumVersion = 12.2.0;
 			};
 		};
-		6D34307D2E4511D7003F0058 /* XCRemoteSwiftPackageReference "ios-sdk" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/spotify/ios-sdk";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.0.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
+	/* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		6D1EAA6D2E6141D9005572D3 /* FirebaseAnalytics */ = {
@@ -654,12 +642,7 @@
 			package = 6D1EAA6C2E6141D9005572D3 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseMessaging;
 		};
-		6D34307E2E4511D7003F0058 /* SpotifyiOS */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 6D34307D2E4511D7003F0058 /* XCRemoteSwiftPackageReference "ios-sdk" */;
-			productName = SpotifyiOS;
-		};
-/* End XCSwiftPackageProductDependency section */
+	/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 6DBD7F5A2E343DF300608F0D /* Project object */;
 }

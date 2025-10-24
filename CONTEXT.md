@@ -6,7 +6,7 @@ Audio-first iOS heart rate training app. Users start workout, put phone away, ge
 ## Current Project State
 ✅ **Stable & Production Ready**:
 - **Apple Music Integration** - Full MusicKit integration for VO2 Max training with playlist switching
-- **Firebase Anonymous Auth** - Automatic user creation and management (no backend needed)
+- **Firebase** - Initialized and ready for Analytics (not currently in use)
 - Heart rate monitoring with CoreBluetooth and shared services architecture
 - **Dual training mode system** with mutual exclusion (Free Training + VO2 Max Training)
 - **Shared services** eliminate code duplication: HeartRateService + ZoneAnnouncementCoordinator
@@ -28,7 +28,6 @@ Audio-first iOS heart rate training app. Users start workout, put phone away, ge
 - **Zone announcement pre-warming** - SpeechAnnouncer initializes AVAudioPlayer on app launch
 - Audio announcement timing and cooldown system
 - **Apple Music integration** - MusicKitService with audio session configuration for proper ducking
-- **Firebase anonymous auth** - Automatic user creation with no backend required
 
 ## Apple Music Integration Status
 ✅ **Production-Ready Architecture**:
@@ -42,7 +41,6 @@ Audio-first iOS heart rate training app. Users start workout, put phone away, ge
 
 ## Testing Requirements
 - Background modes need physical device testing
-- Firebase anonymous auth testing requires clean app installs
 - **Apple Music requires Apple Music subscription** for playlist playback
 - UI updates must use main thread (`@MainActor` or `DispatchQueue.main.async`)
 - Test untethered from Xcode for realistic background behavior
@@ -52,7 +50,7 @@ Audio-first iOS heart rate training app. Users start workout, put phone away, ge
 - SwiftUI + MVVM architecture
 - CoreBluetooth for HR monitoring
 - **MusicKit for Apple Music integration**
-- Firebase (anonymous auth only)
+- Firebase (initialized for future Analytics)
 - UserDefaults for settings persistence
 - Combine for reactive state management
 - **AppLogger for structured logging**

@@ -277,7 +277,7 @@ The Apple Music integration uses MusicKit for native iOS music library access:
 - **MVVM** - Architecture pattern
 - **CoreBluetooth** - Heart rate monitor integration
 - **MusicKit** - Apple Music integration
-- **Firebase** - Anonymous authentication only (no backend)
+- **Firebase** - Initialized for future Analytics (not currently in use)
 - **Combine** - Reactive state management
 - **AVFoundation** - Audio playback and session management
 - **UserDefaults** - Settings persistence

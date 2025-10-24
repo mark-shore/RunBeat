@@ -10,8 +10,7 @@ let package = Package(
         .library(name: "RunBeat", targets: ["RunBeat"])
     ],
     dependencies: [
-        .package(url: "https://github.com/firebase/firebase-ios-sdk", from: "10.20.0"),
-        .package(url: "https://github.com/spotify/ios-sdk", from: "2.1.6")
+        .package(url: "https://github.com/firebase/firebase-ios-sdk", from: "10.20.0")
     ],
     targets: [
         .target(
@@ -19,8 +18,7 @@ let package = Package(
             dependencies: [
                 .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseFirestore", package: "firebase-ios-sdk"),
-                .product(name: "FirebaseAnalytics", package: "firebase-ios-sdk"),
-                .product(name: "SpotifyiOS", package: "ios-sdk")
+                .product(name: "FirebaseAnalytics", package: "firebase-ios-sdk")
             ]
         )
     ]

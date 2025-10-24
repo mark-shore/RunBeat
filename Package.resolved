@@ -82,15 +82,6 @@
       }
     },
     {
-      "identity" : "ios-sdk",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/spotify/ios-sdk",
-      "state" : {
-        "revision" : "5bd49e227145dee4871b1667bf81a2b896590176",
-        "version" : "2.1.7"
-      }
-    },
-    {
       "identity" : "leveldb",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/firebase/leveldb.git",
