@@ -217,10 +217,6 @@ class VO2MaxTrainingManager: ObservableObject {
             // Display rounds down, but phase change uses exact remaining to avoid extra 1s of delay
             self?.timeRemaining = floor(remaining)
         }
-        
-        if currentInterval <= totalIntervals {
-            AppLogger.rateLimited(.verbose, message: "VO2 tick - phase: \(currentPhase) interval: \(currentInterval) elapsed: \(Int(elapsed))s remaining: \(Int(remaining))s", key: "vo2_tick", component: "VO2Training")
-        }
 
         if remaining <= 0 {
             DispatchQueue.main.async { [weak self] in

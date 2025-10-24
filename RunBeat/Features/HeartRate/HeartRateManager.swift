@@ -128,7 +128,6 @@ class HeartRateManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         guard let data = characteristic.value else { return }
         let bpm = decodeHeartRate(from: data)
         onNewHeartRate?(bpm)
-        print("💓 Heart Rate Updated: \(bpm) BPM")
     }
 
     private func decodeHeartRate(from data: Data) -> Int {
