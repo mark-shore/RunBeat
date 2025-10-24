@@ -42,6 +42,8 @@
 	<string>RunBeat reads your heart rate data to calculate training zones and provide personalized workout guidance.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>RunBeat saves your workout data to Apple Health to track your training progress and performance over time.</string>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>RunBeat uses Apple Music to play workout playlists during training sessions.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

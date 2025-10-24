@@ -10,18 +10,20 @@ import SpotifyiOS
 
 @main
 struct RunBeatApp: App {
-    @StateObject private var spotifyManager = SpotifyManager.shared
-    @StateObject private var firebaseService = FirebaseService.shared
+    // TEMPORARY: Disabled during Apple Music migration
+    // @StateObject private var spotifyManager = SpotifyManager.shared
+    // @StateObject private var firebaseService = FirebaseService.shared
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
-    
-    
+
+
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(spotifyManager)
-                .onOpenURL { url in
-                    spotifyManager.handleCallback(url: url)
-                }
+                // TEMPORARY: Disabled during Apple Music migration
+                // .environmentObject(spotifyManager)
+                // .onOpenURL { url in
+                //     spotifyManager.handleCallback(url: url)
+                // }
         }
     }
 }

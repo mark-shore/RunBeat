@@ -77,10 +77,17 @@ class ZoneAnnouncementCoordinator {
     }
     
     private func requestZoneAnnouncement(_ zone: Int) {
+        let startTime = CFAbsoluteTimeGetCurrent()
+        AppLogger.verbose("requestZoneAnnouncement(\(zone)) called", component: "ZoneAnnouncement")
+
         delegate?.announceZone(zone)
+
+        let delegateDuration = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
+        AppLogger.verbose("delegate?.announceZone() took \(String(format: "%.1f", delegateDuration))ms", component: "ZoneAnnouncement")
+
         lastAnnouncementTime = Date()
         lastAnnouncedZone = zone
-        
+
         // Cancel existing timer and start new cooldown timer
         cooldownTimer?.invalidate()
         DispatchQueue.main.async { [weak self] in
@@ -92,8 +99,8 @@ class ZoneAnnouncementCoordinator {
             self.cooldownTimer = timer
             RunLoop.main.add(timer, forMode: .common)
         }
-        
-        print("🔊 Zone \(zone) announcement requested (cooldown active for \(Int(announcementCooldown))s)")
+
+        AppLogger.info("Zone \(zone) announcement requested (cooldown: \(Int(announcementCooldown))s)", component: "ZoneAnnouncement")
     }
     
     private func handleCooldownExpired() {

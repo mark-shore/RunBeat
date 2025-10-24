@@ -19,7 +19,7 @@ class VO2MaxTrainingManager: ObservableObject {
     @Published var showingCompletionScreen: Bool = false
     
     private var timer: Timer?
-    private var spotifyViewModel: SpotifyViewModel
+    private var musicViewModel: MusicViewModel
     
     // NEW: Shared services for HR processing and announcements
     private let announcements = ZoneAnnouncementCoordinator()
@@ -50,16 +50,8 @@ class VO2MaxTrainingManager: ObservableObject {
     private let restDuration: TimeInterval = VO2Config.restDuration
     
     private init() {
-        // Initialize with shared SpotifyViewModel for consistent state
-        self.spotifyViewModel = SpotifyViewModel.shared
-        self.announcements.delegate = self // NEW: Set up announcement delegation
-    }
-    
-    // Dependency injection for testing
-    init(spotifyViewModel: SpotifyViewModel, timeProvider: TimeProvider = SystemTimeProvider()) {
-        self.spotifyViewModel = spotifyViewModel
-        self.timeProvider = timeProvider
-        self.announcements.delegate = self // NEW: Set up announcement delegation
+        self.musicViewModel = MusicViewModel.shared
+        self.announcements.delegate = self
     }
     
     // MARK: - Computed Properties
@@ -73,15 +65,16 @@ class VO2MaxTrainingManager: ObservableObject {
     @MainActor
     func startTraining() {
         print("🏃 Starting VO2 Max training...")
-        print("🎵 Spotify connected: \(spotifyViewModel.isConnected)")
-        
-        // Activate Spotify for training session - stops unnecessary background activity
-        spotifyViewModel.setIntent(.training)
-        
+        // TEMPORARY: Disabled during Apple Music migration
+        // print("🎵 Spotify connected: \(spotifyViewModel.isConnected)")
+
+        // TEMPORARY: Disabled during Apple Music migration
+        // spotifyViewModel.setIntent(.training)
+
         // NEW: Reset HR services
         HeartRateService.shared.resetState()
         announcements.resetState()
-        
+
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.trainingState = .active
@@ -89,55 +82,19 @@ class VO2MaxTrainingManager: ObservableObject {
             self.currentPhase = .highIntensity
             self.timeRemaining = self.highIntensityDuration
         }
-        
+
         intervalState = IntervalState(phase: .highIntensity, start: timeProvider.now(), duration: highIntensityDuration)
 
         // Reset switch guard and start timer immediately for responsive UI (foreground only)
         lastIssuedCommandInterval = nil
         startTimer()
-        
-        // Check Spotify connection and validate tokens before starting music
-        if spotifyViewModel.isConnected {
-            print("🎵 Spotify connected - validating token before starting training music")
-            
-            // Validate token by making a lightweight API call first
-            spotifyViewModel.refreshCurrentTrack()
-            
-            // Small delay to allow token validation, then proceed with training music
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                guard let self = self else { return }
-                
-                // Check if still connected after token validation attempt
-                if self.spotifyViewModel.isConnected {
-                    print("✅ Token validated - starting training music")
-                    
-                    // Start track polling for real-time updates during training
-                    self.spotifyViewModel.startTrackPolling()
-                    
-                    // Activate device and start music
-                    self.spotifyViewModel.activateDeviceForTraining { success in
-                        if success {
-                            print("✅ Training music started during first interval")
-                        } else {
-                            print("ℹ️ Using fallback music control during first interval")
-                            DispatchQueue.main.async {
-                                self.spotifyViewModel.playHighIntensityPlaylist()
-                            }
-                        }
-                        
-                        // Refresh track info after music starts
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            self.spotifyViewModel.refreshCurrentTrack()
-                        }
-                    }
-                } else {
-                    print("⚠️ Token validation failed - Spotify likely disconnected for re-authentication")
-                    print("🔄 Training will continue, music will start when Spotify reconnects")
-                }
-            }
+
+        // Start high intensity music if playlists are configured
+        if musicViewModel.hasPlaylistsConfigured {
+            print("🎵 Starting high intensity playlist")
+            musicViewModel.playHighIntensityMusic()
         } else {
-            print("⚠️ Spotify not connected - training will start without music")
-            print("⚠️ Music will start automatically once Spotify connects")
+            print("⚠️ No playlists configured - training will run without music")
         }
     }
     
@@ -158,10 +115,12 @@ class VO2MaxTrainingManager: ObservableObject {
         }
         
         // Deactivate Spotify training state - stops unnecessary reconnection attempts  
-        spotifyViewModel.setIntent(.idle)
+        // TEMPORARY: Disabled during Apple Music migration
+        // spotifyViewModel.setIntent(.idle)
         
         // Stop track polling (but let music continue playing)
-        spotifyViewModel.stopTrackPolling()
+        // TEMPORARY: Disabled during Apple Music migration
+        // spotifyViewModel.stopTrackPolling()
         
         // NOTE: resetDeviceActivationState() moved to dismissCompletionScreen() 
         // to preserve track data for completion screen display
@@ -184,7 +143,8 @@ class VO2MaxTrainingManager: ObservableObject {
         
         // Reset device activation state now - prepares for next training session
         // while preserving track data during completion screen display
-        spotifyViewModel.resetDeviceActivationState()
+        // TEMPORARY: Disabled during Apple Music migration
+        // spotifyViewModel.resetDeviceActivationState()
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
@@ -302,9 +262,11 @@ class VO2MaxTrainingManager: ObservableObject {
         lastIssuedCommandInterval = currentInterval
         switch phase {
         case .highIntensity:
-            spotifyViewModel.playHighIntensityPlaylist()
+            print("🎵 Switching to high intensity playlist")
+            musicViewModel.playHighIntensityMusic()
         case .rest:
-            spotifyViewModel.playRestPlaylist()
+            print("🎵 Switching to rest playlist")
+            musicViewModel.playRestMusic()
         default:
             break
         }

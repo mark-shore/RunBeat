@@ -115,9 +115,11 @@ class SpotifyService: NSObject {
         setupAppLifecycleMonitoring()
         setupConnectionManagerObservation()
         setupFirebaseAuthNotifications()
-        
+
+        // TEMPORARY: Disabled during Apple Music migration to prevent 8-second startup delay
+        // This attemptTokenRestoration() call tries to validate stored tokens against backend
         // Try to restore persisted authentication
-        attemptTokenRestoration()
+        // attemptTokenRestoration()
     }
     
     private func setupConnectionManagerObservation() {

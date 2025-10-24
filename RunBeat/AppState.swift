@@ -46,7 +46,7 @@ class AppState: ObservableObject {
 
     let hrManager = HeartRateManager()
     private let announcer = SpeechAnnouncer()
-    private let audioService = AudioService()
+    private let audioService = AudioService.shared
     
     // NEW: Replace HeartRateTrainingManager with FreeTrainingManager
     private let freeTrainingManager = FreeTrainingManager()
@@ -270,9 +270,19 @@ class AppState: ObservableObject {
     }
     
     private func announceZone(_ zone: Int) {
-        audioService.setupAudioSessionForAnnouncement()
+        let startTime = CFAbsoluteTimeGetCurrent()
+        AppLogger.verbose("AppState.announceZone(\(zone)) called", component: "ZoneAnnouncement")
+
+        // Don't configure audio session - it causes hangs when music is playing
+        // AVAudioPlayer will automatically use the existing session
+        // .duckOthers should handle volume ducking automatically for both:
+        // - Free training: External music apps
+        // - VO2 Max: ApplicationMusicPlayer (system music player)
+
         announcer.announceZone(zone)
-        print("🔊 Zone \(zone) announced")
+
+        let duration = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
+        AppLogger.verbose("AppState.announceZone() completed in \(String(format: "%.1f", duration))ms", component: "ZoneAnnouncement")
     }
     
     @MainActor

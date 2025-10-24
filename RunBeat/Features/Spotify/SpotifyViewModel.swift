@@ -9,9 +9,13 @@ import Foundation
 import Combine
 
 class SpotifyViewModel: ObservableObject {
+    // MARK: - Migration Flag
+    // TEMPORARY: Set to true during Apple Music migration to prevent Spotify initialization
+    static let isDisabledDuringMigration = true
+
     // MARK: - Singleton for shared state
     static let shared = SpotifyViewModel()
-    
+
     // MARK: - Published UI State
     @Published var isConnected = false          // OAuth authentication status (for UI)
     @Published var currentTrack: String = ""    // Currently playing track name
@@ -91,21 +95,27 @@ class SpotifyViewModel: ObservableObject {
     private init(configurationManager: ConfigurationManager = ConfigurationManager.shared) {
         print("🎵 [SpotifyViewModel] Initializing SpotifyViewModel...")
         self.configurationManager = configurationManager
-        
-        // Initialize SpotifyService with configuration
+
+        // Initialize SpotifyService with configuration (will check migration flag internally)
         self.spotifyService = SpotifyService(
             clientID: configurationManager.spotifyClientID,
             clientSecret: configurationManager.spotifyClientSecret
         )
-        
+
+        // TEMPORARY: Skip delegate setup during migration
+        if Self.isDisabledDuringMigration {
+            print("⚠️ [SpotifyViewModel] Spotify is disabled during Apple Music migration - skipping delegate setup")
+            return
+        }
+
         print("🎵 [SpotifyViewModel] Initial state - isConnected: \(isConnected), connectionStatus: \(connectionStatus)")
-        
+
         setupSpotifyServiceDelegate()
         loadPersistedPlaylistSelection()
-        
+
         // Debug: Check keychain state
         print("🔍 [SpotifyViewModel] Checking keychain and connection state...")
-        
+
         // Check if we're already connected and should fetch playlists
         checkForExistingConnection()
     }
@@ -119,10 +129,10 @@ class SpotifyViewModel: ObservableObject {
             print("🎵 [SpotifyViewModel] Has high intensity playlist: \(self.playlistSelection.highIntensityPlaylistID != nil)")
             print("🎵 [SpotifyViewModel] Has rest playlist: \(self.playlistSelection.restPlaylistID != nil)")
             print("🎵 [SpotifyViewModel] Playlist fetch status: \(self.playlistFetchStatus)")
-            
-            if self.isConnected && 
-               (self.playlistSelection.highIntensityPlaylistID != nil || 
-                self.playlistSelection.restPlaylistID != nil) && 
+
+            if self.isConnected &&
+               (self.playlistSelection.highIntensityPlaylistID != nil ||
+                self.playlistSelection.restPlaylistID != nil) &&
                self.playlistFetchStatus == .notStarted {
                 print("🎵 Auto-fetching playlists for existing connection")
                 self.fetchPlaylists()

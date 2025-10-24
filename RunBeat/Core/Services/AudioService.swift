@@ -13,16 +13,20 @@ protocol AudioServiceDelegate: AnyObject {
 }
 
 class AudioService {
+    static let shared = AudioService()
+
     weak var delegate: AudioServiceDelegate?
-    
+
     private var isSessionActive = false
     
     func setupAudioSessionForAnnouncement() {
         #if os(iOS)
         do {
+            // Set audio category for mixing and ducking
+            // DON'T call setActive(true) - that causes hangs when music is playing
+            // AVAudioPlayer will activate the session automatically when needed
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers, .duckOthers])
-            try AVAudioSession.sharedInstance().setActive(true)
-            print("🔊 Audio session activated with mixing and ducking")
+            print("🔊 Audio session category configured (mix with others + duck)")
         } catch {
             print("❌ Failed to set audio session: \(error)")
         }

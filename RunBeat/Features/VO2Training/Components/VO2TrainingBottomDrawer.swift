@@ -8,23 +8,23 @@
 import SwiftUI
 
 struct VO2TrainingBottomDrawer: View {
-    @StateObject private var spotifyViewModel = SpotifyViewModel.shared
+    @StateObject private var musicViewModel = MusicViewModel.shared
     @EnvironmentObject var appState: AppState
     @State private var isExpanded: Bool = false
-    
+
     // MARK: - State Management
-    
+
     private var shouldShowDrawer: Bool {
         appState.vo2TrainingState == .setup || appState.vo2TrainingState == .active || appState.vo2TrainingState == .complete
     }
-    
+
     private var isTrainingActive: Bool {
         appState.vo2TrainingState == .active
     }
-    
+
     private var drawerContent: DrawerContent {
-        if !spotifyViewModel.isConnected {
-            return .connectSpotify
+        if !musicViewModel.isAuthorized {
+            return .connectMusic
         } else if isTrainingActive || appState.vo2TrainingState == .complete {
             return .trackInfo
         } else {
@@ -34,7 +34,7 @@ struct VO2TrainingBottomDrawer: View {
     
     private var drawerHeight: CGFloat {
         switch drawerContent {
-        case .connectSpotify:
+        case .connectMusic:
             return 120 // Button + padding
         case .trackInfo:
             return 100 // Track info only - reduced to fix excessive padding
@@ -42,20 +42,20 @@ struct VO2TrainingBottomDrawer: View {
             return isExpanded ? 400 : 150 // Setup states
         }
     }
-    
+
     private var isDrawerExpandable: Bool {
         drawerContent == .playlistStatus && !isTrainingActive // Only expandable when showing playlist status during setup
     }
-    
+
     private var shouldAutoExpand: Bool {
-        spotifyViewModel.isConnected && 
-        !spotifyViewModel.playlistSelection.isComplete && 
+        musicViewModel.isAuthorized &&
+        !musicViewModel.playlistSelection.isComplete &&
         !isTrainingActive &&
         drawerContent == .playlistStatus
     }
-    
+
     enum DrawerContent {
-        case connectSpotify
+        case connectMusic
         case trackInfo
         case playlistStatus
     }
@@ -97,11 +97,9 @@ struct VO2TrainingBottomDrawer: View {
                 }
             }
             .onAppear {
-                // Auto-expand if connected but playlist selection incomplete
+                // Auto-expand immediately if connected but playlist selection incomplete
                 if shouldAutoExpand {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.75).delay(0.5)) {
-                        isExpanded = true
-                    }
+                    isExpanded = true
                 }
             }
             // Safe area handling now managed at container level in parent view
@@ -133,8 +131,8 @@ struct VO2TrainingBottomDrawer: View {
     @ViewBuilder
     private var drawerContentContainer: some View {
         switch drawerContent {
-        case .connectSpotify:
-            connectSpotifyContent
+        case .connectMusic:
+            connectMusicContent
         case .trackInfo:
             trackInfoContent
         case .playlistStatus:
@@ -180,22 +178,26 @@ struct VO2TrainingBottomDrawer: View {
     @ViewBuilder
     private var drawerContentView: some View {
         switch drawerContent {
-        case .connectSpotify:
-            connectSpotifyContent
+        case .connectMusic:
+            connectMusicContent
         case .trackInfo:
             trackInfoContent
         case .playlistStatus:
             playlistStatusContent
         }
     }
-    
-    private var connectSpotifyContent: some View {
-        // Fixed overlay - no expansion, just the connect button
+
+    private var connectMusicContent: some View {
+        // Fixed overlay - no expansion, just authorize and fetch
         VStack(spacing: 0) {
-            AppButton("Connect Spotify", style: .spotify) {
-                spotifyViewModel.connect()
+            AppButton("Authorize Apple Music", style: .primary) {
+                Task {
+                    await musicViewModel.authorize()
+                    if musicViewModel.isAuthorized {
+                        await musicViewModel.fetchPlaylists()
+                    }
+                }
             }
-            .disabled(!spotifyViewModel.canConnect)
         }
         .padding(.horizontal, AppSpacing.lg)
         .padding(.top, AppSpacing.lg)
@@ -226,15 +228,51 @@ struct VO2TrainingBottomDrawer: View {
     
     private var currentTrackDisplay: some View {
         HStack(spacing: 0) {
-            // Use the reusable TrackDisplayWithControls component
-            TrackDisplayWithControls(
-                trackInfo: spotifyViewModel.currentTrackInfo,
-                isPlaying: spotifyViewModel.isPlaying,
-                showControls: isTrainingActive || appState.vo2TrainingState == .complete, // Show controls during active training and completion
-                onPlayPauseToggle: {
-                    spotifyViewModel.togglePlayPause()
+            // Display current track info
+            HStack(spacing: AppSpacing.sm) {
+                // Artwork
+                if let artwork = musicViewModel.currentAlbumArtwork {
+                    Image(uiImage: artwork)
+                        .resizable()
+                        .frame(width: 50, height: 50)
+                        .cornerRadius(6)
+                } else {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(AppColors.surface)
+                        .frame(width: 50, height: 50)
+                        .overlay(
+                            Image(systemName: "music.note")
+                                .font(AppTypography.body)
+                                .foregroundColor(AppColors.secondary)
+                        )
                 }
-            )
+
+                // Track info
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(musicViewModel.currentTrack.isEmpty ? "No track playing" : musicViewModel.currentTrack)
+                        .font(AppTypography.callout.weight(.medium))
+                        .foregroundColor(AppColors.onBackground)
+                        .lineLimit(1)
+
+                    Text(musicViewModel.currentArtist.isEmpty ? "Select a playlist" : musicViewModel.currentArtist)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                // Play/pause button (show during training and completion)
+                if isTrainingActive || appState.vo2TrainingState == .complete {
+                    Button(action: {
+                        musicViewModel.togglePlayPause()
+                    }) {
+                        Image(systemName: musicViewModel.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                            .font(.system(size: 32))
+                            .foregroundColor(AppColors.onBackground)
+                    }
+                }
+            }
             
             // Show expand chevron only when not training and expandable
             if !isExpanded && !isTrainingActive && isDrawerExpandable {
@@ -248,7 +286,7 @@ struct VO2TrainingBottomDrawer: View {
     
     
     private var playlistSelectionContent: some View {
-        PlaylistSectionNavigator()
+        Text("Playlist selection placeholder")
             .onReceive(NotificationCenter.default.publisher(for: .playlistSelectionComplete)) { _ in
                 withAnimation(.easeIn(duration: 0.3)) {
                     isExpanded = false
@@ -278,35 +316,35 @@ struct VO2TrainingBottomDrawer: View {
                 Text("Work")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(AppColors.primary)
-                
-                if let workPlaylist = spotifyViewModel.selectedHighIntensityPlaylist {
-                    SelectedPlaylistCard(playlist: workPlaylist, type: .highIntensity) {
+
+                if let workPlaylist = musicViewModel.selectedHighIntensityPlaylist {
+                    SelectedMusicPlaylistCard(playlist: workPlaylist, type: .highIntensity) {
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
                             isExpanded = true
                         }
                     }
                 } else {
-                    EmptySelectionCard(type: .highIntensity) {
+                    EmptyMusicPlaylistCard(type: .highIntensity) {
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
                             isExpanded = true
                         }
                     }
                 }
             }
-            
+
             VStack(alignment: .leading, spacing: 8) {
                 Text("Recovery")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(AppColors.zone1)
-                
-                if let recoveryPlaylist = spotifyViewModel.selectedRestPlaylist {
-                    SelectedPlaylistCard(playlist: recoveryPlaylist, type: .rest) {
+
+                if let recoveryPlaylist = musicViewModel.selectedRestPlaylist {
+                    SelectedMusicPlaylistCard(playlist: recoveryPlaylist, type: .rest) {
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
                             isExpanded = true
                         }
                     }
                 } else {
-                    EmptySelectionCard(type: .rest) {
+                    EmptyMusicPlaylistCard(type: .rest) {
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
                             isExpanded = true
                         }
@@ -330,10 +368,17 @@ struct VO2TrainingBottomDrawer: View {
         .actionSheet(isPresented: $showingActionSheet) {
             playlistActionSheet
         }
+        .onChange(of: showingActionSheet) { _, isShowing in
+            if !isShowing {
+                selectedPlaylistForAction = nil
+            }
+        }
         .onAppear {
             // Fetch playlists when view appears
-            if spotifyViewModel.isConnected {
-                spotifyViewModel.fetchPlaylists()
+            if musicViewModel.isAuthorized && musicViewModel.availablePlaylists.isEmpty {
+                Task {
+                    await musicViewModel.fetchPlaylists()
+                }
             }
         }
     }
@@ -365,11 +410,8 @@ struct VO2TrainingBottomDrawer: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(AppColors.primary)
                 
-                if let highIntensityPlaylist = spotifyViewModel.selectedHighIntensityPlaylist {
-                    SelectedPlaylistCard(
-                        playlist: highIntensityPlaylist,
-                        type: .highIntensity
-                    ) {
+                if let highIntensityPlaylist = musicViewModel.selectedHighIntensityPlaylist {
+                    SelectedMusicPlaylistCard(playlist: highIntensityPlaylist, type: .highIntensity) {
                         selectedPlaylistForAction = highIntensityPlaylist
                         showingActionSheet = true
                     }
@@ -381,18 +423,15 @@ struct VO2TrainingBottomDrawer: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            
+
             // Recovery Section
             VStack(alignment: .leading, spacing: 8) {
                 Text("Recovery")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(AppColors.zone1)
-                
-                if let restPlaylist = spotifyViewModel.selectedRestPlaylist {
-                    SelectedPlaylistCard(
-                        playlist: restPlaylist,
-                        type: .rest
-                    ) {
+
+                if let restPlaylist = musicViewModel.selectedRestPlaylist {
+                    SelectedMusicPlaylistCard(playlist: restPlaylist, type: .rest) {
                         selectedPlaylistForAction = restPlaylist
                         showingActionSheet = true
                     }
@@ -406,8 +445,8 @@ struct VO2TrainingBottomDrawer: View {
             .frame(maxWidth: .infinity)
         }
     }
-    
-    @State private var selectedPlaylistForAction: SpotifyPlaylist?
+
+    @State private var selectedPlaylistForAction: MusicPlaylist?
     @State private var showingActionSheet = false
     
     private var availablePlaylistsSection: some View {
@@ -431,13 +470,13 @@ struct VO2TrainingBottomDrawer: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, AppSpacing.md)
             } else {
-                // Use existing grid layout from PlaylistSelectionView
+                // Use existing grid layout
                 LazyVGrid(columns: [
                     GridItem(.flexible(), spacing: 12),
                     GridItem(.flexible(), spacing: 12)
                 ], spacing: 12) {
                     ForEach(unassignedPlaylists) { playlist in
-                        AvailablePlaylistCard(playlist: playlist) {
+                        AvailableMusicPlaylistCard(playlist: playlist) {
                             selectedPlaylistForAction = playlist
                             showingActionSheet = true
                         }
@@ -447,11 +486,11 @@ struct VO2TrainingBottomDrawer: View {
         }
     }
     
-    private var unassignedPlaylists: [SpotifyPlaylist] {
+    private var unassignedPlaylists: [MusicPlaylist] {
         // Filter out already assigned playlists for cleaner organization
-        spotifyViewModel.availablePlaylists.filter { playlist in
-            playlist.id != spotifyViewModel.playlistSelection.highIntensityPlaylistID &&
-            playlist.id != spotifyViewModel.playlistSelection.restPlaylistID
+        musicViewModel.availablePlaylists.filter { playlist in
+            playlist.id != musicViewModel.playlistSelection.highIntensityPlaylistID &&
+            playlist.id != musicViewModel.playlistSelection.restPlaylistID
         }
     }
     
@@ -468,31 +507,33 @@ struct VO2TrainingBottomDrawer: View {
         // Work option (updated text)
         if currentAssignment != .highIntensity {
             buttons.append(.default(Text("Use for Work")) {
-                spotifyViewModel.selectHighIntensityPlaylist(playlist)
+                musicViewModel.selectHighIntensityPlaylist(playlist)
             })
         }
-        
+
         // Recovery option (updated text)
         if currentAssignment != .rest {
             buttons.append(.default(Text("Use for Recovery")) {
-                spotifyViewModel.selectRestPlaylist(playlist)
+                musicViewModel.selectRestPlaylist(playlist)
             })
         }
-        
+
         // Remove assignment option
         if currentAssignment != .none {
             buttons.append(.destructive(Text("Remove Assignment")) {
                 if currentAssignment == .highIntensity {
-                    spotifyViewModel.playlistSelection.highIntensityPlaylistID = nil
+                    musicViewModel.playlistSelection.highIntensity = nil
                 } else if currentAssignment == .rest {
-                    spotifyViewModel.playlistSelection.restPlaylistID = nil
+                    musicViewModel.playlistSelection.rest = nil
                 }
-                spotifyViewModel.savePlaylistSelection()
+                musicViewModel.savePlaylistSelection()
             })
         }
         
-        buttons.append(.cancel())
-        
+        buttons.append(.cancel() {
+            selectedPlaylistForAction = nil
+        })
+
         return ActionSheet(
             title: Text(playlist.name),
             message: Text("How would you like to use this playlist?"),
@@ -502,10 +543,10 @@ struct VO2TrainingBottomDrawer: View {
     
     // MARK: - Helper Methods
     
-    private func getPlaylistAssignment(_ playlist: SpotifyPlaylist) -> PlaylistAssignment {
-        if playlist.id == spotifyViewModel.playlistSelection.highIntensityPlaylistID {
+    private func getPlaylistAssignment(_ playlist: MusicPlaylist) -> MusicPlaylistAssignment {
+        if playlist.id == musicViewModel.playlistSelection.highIntensityPlaylistID {
             return .highIntensity
-        } else if playlist.id == spotifyViewModel.playlistSelection.restPlaylistID {
+        } else if playlist.id == musicViewModel.playlistSelection.restPlaylistID {
             return .rest
         } else {
             return .none
@@ -544,11 +585,19 @@ struct VO2TrainingBottomDrawer: View {
     }
 }
 
+// MARK: - Helper Types
+
+enum MusicPlaylistAssignment {
+    case highIntensity
+    case rest
+    case none
+}
+
 #Preview {
     ZStack {
         AppColors.background
             .ignoresSafeArea()
-        
+
         VStack {
             Spacer()
             VO2TrainingBottomDrawer()
