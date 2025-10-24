@@ -416,11 +416,3 @@ When contributing to RunBeat:
 3. **Use AppLogger** - Replace print() with appropriate log levels
 4. **Test on device** - Background modes require physical device testing
 5. **Check CLAUDE.md** - Read development guidelines before making changes
-
-## License
-
-[Your License Here]
-
-## Contact
-
-[Your Contact Information Here]
