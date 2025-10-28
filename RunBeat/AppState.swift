@@ -206,9 +206,10 @@ class AppState: ObservableObject {
         // Observe key heart rate settings changes and update training manager
         Publishers.CombineLatest3(
             heartRateViewModel.$restingHR,
-            heartRateViewModel.$maxHR, 
+            heartRateViewModel.$maxHR,
             heartRateViewModel.$useAutoZones
         )
+        .dropFirst() // Skip initial emission during init
         .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
         .sink { [weak self] _, _, _ in
             Task { @MainActor [weak self] in
@@ -216,13 +217,14 @@ class AppState: ObservableObject {
             }
         }
         .store(in: &cancellables)
-        
+
         // Also observe manual zone changes
         Publishers.CombineLatest3(
             heartRateViewModel.$zone1Lower,
             heartRateViewModel.$zone2Upper,
             heartRateViewModel.$zone4Upper
         )
+        .dropFirst() // Skip initial emission during init
         .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
         .sink { [weak self] _, _, _ in
             Task { @MainActor [weak self] in
@@ -288,20 +290,10 @@ class AppState: ObservableObject {
     @MainActor
     private func updateZoneSettings() {
         let settings = heartRateViewModel.getCurrentZoneSettings()
-        
-        freeTrainingManager.updateZoneSettings(
-            restingHR: settings.restingHR,
-            maxHR: settings.maxHR,
-            useAutoZones: settings.useAutoZones,
-            zone1Lower: settings.manualZones.zone1Lower,
-            zone1Upper: settings.manualZones.zone1Upper,
-            zone2Upper: settings.manualZones.zone2Upper,
-            zone3Upper: settings.manualZones.zone3Upper,
-            zone4Upper: settings.manualZones.zone4Upper,
-            zone5Upper: settings.manualZones.zone5Upper
-        )
-        
-        vo2TrainingManager.updateZoneSettings(
+
+        // Update HeartRateService directly - both training managers use this shared service
+        // This eliminates redundant updates to the same singleton instance
+        HeartRateService.shared.updateZoneSettings(
             restingHR: settings.restingHR,
             maxHR: settings.maxHR,
             useAutoZones: settings.useAutoZones,

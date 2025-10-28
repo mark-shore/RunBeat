@@ -15,15 +15,22 @@ class HeartRateViewModel: ObservableObject {
     
     // Core heart rate settings
     @Published var restingHR: Int = 60 {
-        didSet { saveZoneSettings() }
+        didSet {
+            guard !isLoading else { return }
+            saveZoneSettings()
+        }
     }
-    
+
     @Published var maxHR: Int = 190 {
-        didSet { saveZoneSettings() }
+        didSet {
+            guard !isLoading else { return }
+            saveZoneSettings()
+        }
     }
-    
+
     @Published var useAutoZones: Bool = true {
         didSet {
+            guard !isLoading else { return }
             // When switching to manual zones, populate with current auto values
             if !useAutoZones && oldValue == true {
                 updateManualZonesFromAuto()
@@ -31,37 +38,56 @@ class HeartRateViewModel: ObservableObject {
             saveZoneSettings()
         }
     }
-    
+
     // Manual heart rate zones (used when useAutoZones is false)
     @Published var zone1Lower: Int = 60 {
-        didSet { saveZoneSettings() }
+        didSet {
+            guard !isLoading else { return }
+            saveZoneSettings()
+        }
     }
-    
+
     @Published var zone1Upper: Int = 70 {
-        didSet { saveZoneSettings() }
+        didSet {
+            guard !isLoading else { return }
+            saveZoneSettings()
+        }
     }
-    
+
     @Published var zone2Upper: Int = 80 {
-        didSet { saveZoneSettings() }
+        didSet {
+            guard !isLoading else { return }
+            saveZoneSettings()
+        }
     }
-    
+
     @Published var zone3Upper: Int = 90 {
-        didSet { saveZoneSettings() }
+        didSet {
+            guard !isLoading else { return }
+            saveZoneSettings()
+        }
     }
-    
+
     @Published var zone4Upper: Int = 100 {
-        didSet { saveZoneSettings() }
+        didSet {
+            guard !isLoading else { return }
+            saveZoneSettings()
+        }
     }
-    
+
     @Published var zone5Upper: Int = 110 {
-        didSet { saveZoneSettings() }
+        didSet {
+            guard !isLoading else { return }
+            saveZoneSettings()
+        }
     }
     
     // MARK: - Dependencies
-    
+
     private let userDefaults = UserDefaults.standard
     private var saveDebouncer: AnyCancellable?
-    
+    private var isLoading = false
+
     // MARK: - Initialization
     
     init() {
@@ -112,11 +138,13 @@ class HeartRateViewModel: ObservableObject {
     // MARK: - Zone Settings Persistence
     
     private func loadZoneSettings() {
+        isLoading = true
+
         // Load heart rate settings
         restingHR = userDefaults.object(forKey: "restingHR") as? Int ?? 60
         maxHR = userDefaults.object(forKey: "maxHR") as? Int ?? 190
         useAutoZones = userDefaults.object(forKey: "useAutoZones") as? Bool ?? true
-        
+
         // Load manual zone settings
         zone1Lower = userDefaults.object(forKey: "zone1Lower") as? Int ?? 60
         zone1Upper = userDefaults.object(forKey: "zone1Upper") as? Int ?? 70
@@ -124,7 +152,9 @@ class HeartRateViewModel: ObservableObject {
         zone3Upper = userDefaults.object(forKey: "zone3Upper") as? Int ?? 90
         zone4Upper = userDefaults.object(forKey: "zone4Upper") as? Int ?? 100
         zone5Upper = userDefaults.object(forKey: "zone5Upper") as? Int ?? 110
-        
+
+        isLoading = false
+
         HeartRateZoneCalculator.logZoneSettings(
             restingHR: restingHR,
             maxHR: maxHR,
@@ -148,7 +178,7 @@ class HeartRateViewModel: ObservableObject {
         userDefaults.set(restingHR, forKey: "restingHR")
         userDefaults.set(maxHR, forKey: "maxHR")
         userDefaults.set(useAutoZones, forKey: "useAutoZones")
-        
+
         // Save manual zone settings
         userDefaults.set(zone1Lower, forKey: "zone1Lower")
         userDefaults.set(zone1Upper, forKey: "zone1Upper")
@@ -156,13 +186,8 @@ class HeartRateViewModel: ObservableObject {
         userDefaults.set(zone3Upper, forKey: "zone3Upper")
         userDefaults.set(zone4Upper, forKey: "zone4Upper")
         userDefaults.set(zone5Upper, forKey: "zone5Upper")
-        
-        HeartRateZoneCalculator.logZoneSettings(
-            restingHR: restingHR,
-            maxHR: maxHR,
-            useAutoZones: useAutoZones,
-            manualZones: (zone1Lower, zone1Upper, zone2Upper, zone3Upper, zone4Upper, zone5Upper)
-        )
+
+        // Note: Logging removed - zones are logged at load time and when HeartRateService is updated
     }
     
     /// Update manual zone values from current auto calculations

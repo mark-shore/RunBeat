@@ -23,21 +23,36 @@ class HeartRateService: ObservableObject {
     
     private init() {}
     
-    func updateZoneSettings(restingHR: Int, maxHR: Int, useAutoZones: Bool, 
-                          zone1Lower: Int = 60, zone1Upper: Int = 70, 
-                          zone2Upper: Int = 80, zone3Upper: Int = 90, 
+    func updateZoneSettings(restingHR: Int, maxHR: Int, useAutoZones: Bool,
+                          zone1Lower: Int = 60, zone1Upper: Int = 70,
+                          zone2Upper: Int = 80, zone3Upper: Int = 90,
                           zone4Upper: Int = 100, zone5Upper: Int = 110) {
+        // Detect if zones actually changed (user-initiated changes, not initial sync)
+        let changed = self.restingHR != restingHR ||
+                      self.maxHR != maxHR ||
+                      self.useAutoZones != useAutoZones ||
+                      self.manualZones.zone1Lower != zone1Lower ||
+                      self.manualZones.zone1Upper != zone1Upper ||
+                      self.manualZones.zone2Upper != zone2Upper ||
+                      self.manualZones.zone3Upper != zone3Upper ||
+                      self.manualZones.zone4Upper != zone4Upper ||
+                      self.manualZones.zone5Upper != zone5Upper
+
         self.restingHR = restingHR
         self.maxHR = maxHR
         self.useAutoZones = useAutoZones
         self.manualZones = (zone1Lower, zone1Upper, zone2Upper, zone3Upper, zone4Upper, zone5Upper)
-        
-        HeartRateZoneCalculator.logZoneSettings(
-            restingHR: restingHR,
-            maxHR: maxHR,
-            useAutoZones: useAutoZones,
-            manualZones: manualZones
-        )
+
+        // Only log when zones actually change - provides user feedback without startup spam
+        if changed {
+            AppLogger.info("Zone settings updated", component: "HeartRate")
+            HeartRateZoneCalculator.logZoneSettings(
+                restingHR: restingHR,
+                maxHR: maxHR,
+                useAutoZones: useAutoZones,
+                manualZones: manualZones
+            )
+        }
     }
     
     func processHeartRate(_ bpm: Int) -> (currentZone: Int?, didChangeZone: Bool, oldZone: Int?) {

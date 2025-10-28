@@ -614,7 +614,7 @@
 				minimumVersion = 12.2.0;
 			};
 		};
-	/* End XCRemoteSwiftPackageReference section */
+/* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		6D1EAA6D2E6141D9005572D3 /* FirebaseAnalytics */ = {
@@ -642,7 +642,7 @@
 			package = 6D1EAA6C2E6141D9005572D3 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseMessaging;
 		};
-	/* End XCSwiftPackageProductDependency section */
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 6DBD7F5A2E343DF300608F0D /* Project object */;
 }
